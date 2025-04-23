@@ -1072,15 +1072,6 @@ const onConfirm = async (data: any): Promise<ValidationError[]> => {
       ),
     ]);
 
-    if (result.length > 0) {
-      result.push(
-        createError(
-          "Order validation failed due to multiple errors",
-          ERROR_CODES.ORDER_VALIDATION_FAILURE
-        )
-      );
-    }
-
     return result;
   } catch (err: any) {
     console.error(
