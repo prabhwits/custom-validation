@@ -1,5 +1,6 @@
 import { RedisService } from "ondc-automation-cache-lib";
 import {
+  addMsgIdToRedisSet,
   checkBppIdOrBapId,
   checkContext,
   findItemByItemType,
@@ -98,11 +99,30 @@ const select = async (data: any) => {
   }
 
   const select = message.order;
-  await RedisService.setKey(
-    `${transaction_id}_${ApiSequence.SELECT}_msgId`,
-    context?.message_id,
-    TTL_IN_SECONDS
-  );
+  try {
+    console.info(`Adding Message Id /${constants.SELECT}`);
+    const isMsgIdNotPresent = await addMsgIdToRedisSet(
+      context.transaction_id,
+      context.message_id,
+      ApiSequence.SELECT
+    );
+    if (isMsgIdNotPresent) {
+      result.push({
+        valid: false,
+        code: 20000,
+        description: `Message id should not be same with previous calls`,
+      });
+    }
+    await RedisService.setKey(
+      `${context.transaction_id}_${ApiSequence.SELECT}_msgId`,
+      context.message_id,
+      TTL_IN_SECONDS
+    );
+  } catch (error: any) {
+    console.error(
+      `!!Error while checking message id for /${constants.SELECT}, ${error.stack}`
+    );
+  }
 
   await RedisService.setKey(
     `${transaction_id}_${ApiSequence.SELECT}`,
