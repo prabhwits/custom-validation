@@ -179,7 +179,8 @@ const init = async (data: any) => {
       console.info(`Adding Message Id /${constants.INIT}`);
       const isMsgIdNotPresent = await addMsgIdToRedisSet(
         context.transaction_id,
-        context.message_id
+        context.message_id,
+        ApiSequence.INIT
       );
       if (isMsgIdNotPresent) {
         result.push({

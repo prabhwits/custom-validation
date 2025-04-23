@@ -283,13 +283,31 @@ export default async function search(payload: any): Promise<ValidationOutput> {
     }
 
     // Redis operations for message ID and domain
-    await addMsgIdToRedisSet(context.transaction_id, context.message_id);
-    await RedisService.setKey(
-      `${context.transaction_id}_${ApiSequence.SEARCH}_msgId`,
-      context.message_id,
-      TTL_IN_SECONDS
-    );
-
+    try {
+          console.info(`Adding Message Id /${constants.SEARCH}`);
+          const isMsgIdNotPresent = await addMsgIdToRedisSet(
+            context.transaction_id,
+            context.message_id,
+            ApiSequence.SEARCH
+          );
+          if (isMsgIdNotPresent) {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `Message id should not be same with previous calls`,
+            });
+          }
+          await RedisService.setKey(
+            `${context.transaction_id}_${ApiSequence.SEARCH}_msgId`,
+            context.message_id,
+            TTL_IN_SECONDS
+          );
+        } catch (error: any) {
+          console.error(
+            `!!Error while checking message id for /${constants.SEARCH}, ${error.stack}`
+          );
+        }
+ 
     const domainParts = context.domain?.split(":");
     if (domainParts?.[1]) {
       await RedisService.setKey(
