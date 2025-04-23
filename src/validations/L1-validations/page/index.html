@@ -1,0 +1,2116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API SERVICE VALIDATIONS</title>
+    <!-- Link to the CSS file -->
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+    <div id="content">
+        <h2>List of validations of api</h2>
+        <ul>
+<li><p><strong>search</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_1_CONTEXT_TIMESTAMP</strong>: $.context.timestamp must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_2_CONTEXT_BAP_ID</strong>: $.context.bap_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_3_CONTEXT_TRANSACTION_ID</strong>: $.context.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_4_CONTEXT_MESSAGE_ID</strong>: $.context.message_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_5_CONTEXT_VERSION</strong>: $.context.version must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_6_CONTEXT_BAP_URI</strong>: $.context.bap_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_7_CONTEXT_TTL</strong>: $.context.ttl must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_8_CONTEXT_ACTION</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_8_CONTEXT_ACTION.1</strong>: every element of $.context.action must be in [&quot;search&quot;]</li>
+<li><strong>condition Enum_Required_8_CONTEXT_ACTION.2</strong>: $.context.action must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_9_COUNTRY_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_9_COUNTRY_CODE.1</strong>: every element of $.context.location.country.code must be in [&quot;IND&quot;]</li>
+<li><strong>condition Enum_Required_9_COUNTRY_CODE.2</strong>: $.context.location.country.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_10_CITY_CODE</strong>: $.context.location.city.code must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_11_CONTEXT_DOMAIN</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_11_CONTEXT_DOMAIN.1</strong>: every element of $.context.domain must be in [&quot;ONDC:TRV11&quot;]</li>
+<li><strong>condition Enum_Required_11_CONTEXT_DOMAIN.2</strong>: $.context.domain must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_12_VEHICLE_CATEGORY</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_12_VEHICLE_CATEGORY.1</strong>: every element of $.message.intent.fulfillment.vehicle.category must be in [&quot;BUS&quot;, &quot;METRO&quot;]</li>
+<li><strong>condition Enum_Required_12_VEHICLE_CATEGORY.2</strong>: $.message.intent.fulfillment.vehicle.category must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_13_FULFILLMENT_TYPE</strong>: every element of $.message.intent.fulfillment.type must be in [&quot;ROUTE&quot;, &quot;TRIP&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_13_FULFILLMENT_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.intent.fulfillment.type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_14_STOPS_TYPE</strong>: every element of $.message.intent.fulfillment.stops[*].type must be in [&quot;START&quot;, &quot;END&quot;, &quot;INTERMEDIATE_STOP&quot;, &quot;TRANSIT_STOP&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_14_STOPS_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.intent.fulfillment.stops[*].type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_15_AUTHORIZATION_TYPE</strong>: every element of $.message.intent.fulfillment.stops[*].authorization.type must be in [&quot;QR&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_15_AUTHORIZATION_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.intent.fulfillment.stops[*].authorization.type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_16_AUTHORIZATION_STATUS</strong>: every element of $.message.intent.fulfillment.stops[*].authorization.status must be in [&quot;UNCLAIMED&quot;, &quot;CLAIMED&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_16_AUTHORIZATION_STATUS</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.intent.fulfillment.stops[*].authorization.status must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition BUYER_FINDER_FEES_Tag_Required_17_DESCRIPTOR_CODE</strong>: every element of $.message.intent.payment.tags[*].descriptor.code must be in [&quot;BUYER_FINDER_FEES&quot;, &quot;SETTLEMENT_TERMS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition BUYER_FINDER_FEES_Tag_Required_17_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.intent.payment.tags[*].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_0_BUYER_FINDER_FEES</strong>: every element of $.message.intent.payment.tags[?(@.descriptor.code==&#39;BUYER_FINDER_FEES&#39;)].list[*].descriptor.code must be in [&quot;BUYER_FINDER_FEES_TYPE&quot;, &quot;BUYER_FINDER_FEES_PERCENTAGE&quot;, &quot;BUYER_FINDER_FEES_AMOUNT&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_0_SETTLEMENT_TERMS</strong>: every element of $.message.intent.payment.tags[?(@.descriptor.code==&#39;SETTLEMENT_TERMS&#39;)].list[*].descriptor.code must be in [&quot;SETTLEMENT_WINDOW&quot;, &quot;SETTLEMENT_BASIS&quot;, &quot;SETTLEMENT_TYPE&quot;, &quot;MANDATORY_ARBITRATION&quot;, &quot;COURT_JURISDICTION&quot;, &quot;DELAY_INTEREST&quot;, &quot;STATIC_TERMS&quot;, &quot;SETTLEMENT_AMOUNT&quot;]</p>
+</li>
+</ul>
+</li>
+<li><p><strong>select</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_1_CONTEXT_TIMESTAMP</strong>: $.context.timestamp must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_2_CONTEXT_BAP_ID</strong>: $.context.bap_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_3_CONTEXT_TRANSACTION_ID</strong>: $.context.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_4_CONTEXT_MESSAGE_ID</strong>: $.context.message_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_5_CONTEXT_VERSION</strong>: $.context.version must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_6_CONTEXT_BAP_URI</strong>: $.context.bap_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_7_CONTEXT_TTL</strong>: $.context.ttl must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_8_CONTEXT_BPP_ID</strong>: $.context.bpp_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_9_CONTEXT_BPP_URI</strong>: $.context.bpp_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_10_ITEMS_ID</strong>: $.message.order.items[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_11_SELECTED_COUNT</strong>: $.message.order.items[*].quantity.selected.count must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_12_PROVIDER_ID</strong>: $.message.order.provider.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_13_CONTEXT_ACTION</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_13_CONTEXT_ACTION.1</strong>: every element of $.context.action must be in [&quot;select&quot;]</li>
+<li><strong>condition Enum_Required_13_CONTEXT_ACTION.2</strong>: $.context.action must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_14_COUNTRY_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_14_COUNTRY_CODE.1</strong>: every element of $.context.location.country.code must be in [&quot;IND&quot;]</li>
+<li><strong>condition Enum_Required_14_COUNTRY_CODE.2</strong>: $.context.location.country.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_15_CITY_CODE</strong>: $.context.location.city.code must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_16_CONTEXT_DOMAIN</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_16_CONTEXT_DOMAIN.1</strong>: every element of $.context.domain must be in [&quot;ONDC:TRV11&quot;]</li>
+<li><strong>condition Enum_Required_16_CONTEXT_DOMAIN.2</strong>: $.context.domain must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_17_DESCRIPTOR_CODE</strong>: every element of $.message.order.items[*].descriptor.code must be in [&quot;SJT&quot;, &quot;SFSJT&quot;, &quot;RJT&quot;, &quot;PASS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_17_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.items[*].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_18_VEHICLE_CATEGORY</strong>: every element of $.message.order.fulfillments[*].vehicle.category must be in [&quot;BUS&quot;, &quot;METRO&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_18_VEHICLE_CATEGORY</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].vehicle.category must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_19_FULFILLMENTS_TYPE</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;ROUTE&quot;, &quot;TRIP&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_19_FULFILLMENTS_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_20_FULFILLMENTS_TYPE</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;START&quot;, &quot;END&quot;, &quot;INTERMEDIATE_STOP&quot;, &quot;TRANSIT_STOP&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_20_FULFILLMENTS_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_21_AUTHORIZATION_TYPE</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.type must be in [&quot;QR&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_21_AUTHORIZATION_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_22_AUTHORIZATION_STATUS</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.status must be in [&quot;UNCLAIMED&quot;, &quot;CLAIMED&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_22_AUTHORIZATION_STATUS</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.status must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_23_ORDER_STATUS</strong>: every element of $.message.order.status must be in [&quot;SOFT_CANCEL&quot;, &quot;CONFIRM_CANCEL&quot;, &quot;ACTIVE&quot;, &quot;COMPLETE&quot;, &quot;CANCELLED&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_23_ORDER_STATUS</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.status must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_24_BREAKUP_TITLE</strong>: every element of $.message.order.quote.breakup[*].title must be in [&quot;BASE_PRICE&quot;, &quot;REFUND&quot;, &quot;CANCELLATION_CHARGES&quot;, &quot;OFFER&quot;, &quot;TOLL&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_24_BREAKUP_TITLE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.quote.breakup[*].title must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition ROUTE_INFO_Tag_Required_25_DESCRIPTOR_CODE</strong>: every element of $.message.order.fulfillments[<em>].tags[</em>].descriptor.code must be in [&quot;ROUTE_INFO&quot;, &quot;TICKET_INFO&quot;, &quot;TRIP_DETAILS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition ROUTE_INFO_Tag_Required_25_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_0_ROUTE_INFO</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;ROUTE_INFO&#39;)].list[</em>].descriptor.code must be in [&quot;ROUTE_ID&quot;, &quot;ROUTE_DIRECTION&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_0_TICKET_INFO</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;TICKET_INFO&#39;)].list[</em>].descriptor.code must be in [&quot;NUMBER&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_0_TRIP_DETAILS</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;TRIP_DETAILS&#39;)].list[</em>].descriptor.code must be in [&quot;AVAILABLE_TRIPS&quot;, &quot;UTILIZED_TRIPS&quot;]</p>
+</li>
+</ul>
+</li>
+<li><p><strong>init</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_1_CONTEXT_TIMESTAMP</strong>: $.context.timestamp must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_2_CONTEXT_BAP_ID</strong>: $.context.bap_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_3_CONTEXT_TRANSACTION_ID</strong>: $.context.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_4_CONTEXT_MESSAGE_ID</strong>: $.context.message_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_5_CONTEXT_VERSION</strong>: $.context.version must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_6_CONTEXT_BAP_URI</strong>: $.context.bap_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_7_CONTEXT_TTL</strong>: $.context.ttl must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_8_CONTEXT_BPP_ID</strong>: $.context.bpp_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_9_CONTEXT_BPP_URI</strong>: $.context.bpp_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_10_ITEMS_ID</strong>: $.message.order.items[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_11_SELECTED_COUNT</strong>: $.message.order.items[*].quantity.selected.count must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_12_PROVIDER_ID</strong>: $.message.order.provider.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_13_PAYMENTS_COLLECTED_BY</strong>: $.message.order.payments[*].collected_by must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_14_PAYMENTS_STATUS</strong>: $.message.order.payments[*].status must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_15_PAYMENTS_TYPE</strong>: $.message.order.payments[*].type must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_16_CONTEXT_ACTION</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_16_CONTEXT_ACTION.1</strong>: every element of $.context.action must be in [&quot;init&quot;]</li>
+<li><strong>condition Enum_Required_16_CONTEXT_ACTION.2</strong>: $.context.action must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_17_COUNTRY_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_17_COUNTRY_CODE.1</strong>: every element of $.context.location.country.code must be in [&quot;IND&quot;]</li>
+<li><strong>condition Enum_Required_17_COUNTRY_CODE.2</strong>: $.context.location.country.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_18_CITY_CODE</strong>: $.context.location.city.code must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_19_CONTEXT_DOMAIN</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_19_CONTEXT_DOMAIN.1</strong>: every element of $.context.domain must be in [&quot;ONDC:TRV11&quot;]</li>
+<li><strong>condition Enum_Required_19_CONTEXT_DOMAIN.2</strong>: $.context.domain must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_20_DESCRIPTOR_CODE</strong>: every element of $.message.order.items[*].descriptor.code must be in [&quot;SJT&quot;, &quot;SFSJT&quot;, &quot;RJT&quot;, &quot;PASS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_20_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.items[*].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_21_VEHICLE_CATEGORY</strong>: every element of $.message.order.fulfillments[*].vehicle.category must be in [&quot;BUS&quot;, &quot;METRO&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_21_VEHICLE_CATEGORY</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].vehicle.category must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_22_FULFILLMENTS_TYPE</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;ROUTE&quot;, &quot;TRIP&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_22_FULFILLMENTS_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_23_FULFILLMENTS_TYPE</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;START&quot;, &quot;END&quot;, &quot;INTERMEDIATE_STOP&quot;, &quot;TRANSIT_STOP&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_23_FULFILLMENTS_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_24_AUTHORIZATION_TYPE</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.type must be in [&quot;QR&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_24_AUTHORIZATION_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_25_AUTHORIZATION_STATUS</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.status must be in [&quot;UNCLAIMED&quot;, &quot;CLAIMED&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_25_AUTHORIZATION_STATUS</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.status must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_26_ORDER_STATUS</strong>: every element of $.message.order.status must be in [&quot;SOFT_CANCEL&quot;, &quot;CONFIRM_CANCEL&quot;, &quot;ACTIVE&quot;, &quot;COMPLETE&quot;, &quot;CANCELLED&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_26_ORDER_STATUS</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.status must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_27_BREAKUP_TITLE</strong>: every element of $.message.order.quote.breakup[*].title must be in [&quot;BASE_PRICE&quot;, &quot;REFUND&quot;, &quot;CANCELLATION_CHARGES&quot;, &quot;OFFER&quot;, &quot;TOLL&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_27_BREAKUP_TITLE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.quote.breakup[*].title must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition BUYER_FINDER_FEES_Tag_Required_28_DESCRIPTOR_CODE</strong>: every element of $.message.order.payments[<em>].tags[</em>].descriptor.code must be in [&quot;BUYER_FINDER_FEES&quot;, &quot;SETTLEMENT_TERMS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition BUYER_FINDER_FEES_Tag_Required_28_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.payments[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_0_BUYER_FINDER_FEES</strong>: every element of $.message.order.payments[<em>].tags[?(@.descriptor.code==&#39;BUYER_FINDER_FEES&#39;)].list[</em>].descriptor.code must be in [&quot;BUYER_FINDER_FEES_TYPE&quot;, &quot;BUYER_FINDER_FEES_PERCENTAGE&quot;, &quot;BUYER_FINDER_FEES_AMOUNT&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_0_SETTLEMENT_TERMS</strong>: every element of $.message.order.payments[<em>].tags[?(@.descriptor.code==&#39;SETTLEMENT_TERMS&#39;)].list[</em>].descriptor.code must be in [&quot;SETTLEMENT_WINDOW&quot;, &quot;SETTLEMENT_BASIS&quot;, &quot;SETTLEMENT_TYPE&quot;, &quot;MANDATORY_ARBITRATION&quot;, &quot;COURT_JURISDICTION&quot;, &quot;DELAY_INTEREST&quot;, &quot;STATIC_TERMS&quot;, &quot;SETTLEMENT_AMOUNT&quot;]</p>
+</li>
+</ul>
+</li>
+<li><p><strong>confirm</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_1_CONTEXT_TIMESTAMP</strong>: $.context.timestamp must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_2_CONTEXT_BAP_ID</strong>: $.context.bap_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_3_CONTEXT_TRANSACTION_ID</strong>: $.context.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_4_CONTEXT_MESSAGE_ID</strong>: $.context.message_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_5_CONTEXT_VERSION</strong>: $.context.version must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_6_CONTEXT_BAP_URI</strong>: $.context.bap_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_7_CONTEXT_TTL</strong>: $.context.ttl must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_8_CONTEXT_BPP_ID</strong>: $.context.bpp_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_9_CONTEXT_BPP_URI</strong>: $.context.bpp_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_11_ITEMS_ID</strong>: $.message.order.items[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_12_SELECTED_COUNT</strong>: $.message.order.items[*].quantity.selected.count must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_13_PROVIDER_ID</strong>: $.message.order.provider.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_14_PAYMENTS_ID</strong>: $.message.order.payments[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_15_PARAMS_TRANSACTION_ID</strong>: $.message.order.payments[*].params.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_16_PARAMS_CURRENCY</strong>: $.message.order.payments[*].params.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_17_PARAMS_AMOUNT</strong>: $.message.order.payments[*].params.amount must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_18_PARAMS_TRANSACTION_ID</strong>: $.message.order.payments[*].params.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_19_PARAMS_CURRENCY</strong>: $.message.order.payments[*].params.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_20_PARAMS_AMOUNT</strong>: $.message.order.payments[*].params.amount must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_21_CONTEXT_ACTION</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_21_CONTEXT_ACTION.1</strong>: every element of $.context.action must be in [&quot;confirm&quot;]</li>
+<li><strong>condition Enum_Required_21_CONTEXT_ACTION.2</strong>: $.context.action must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_22_COUNTRY_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_22_COUNTRY_CODE.1</strong>: every element of $.context.location.country.code must be in [&quot;IND&quot;]</li>
+<li><strong>condition Enum_Required_22_COUNTRY_CODE.2</strong>: $.context.location.country.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_23_CITY_CODE</strong>: $.context.location.city.code must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_24_CONTEXT_DOMAIN</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_24_CONTEXT_DOMAIN.1</strong>: every element of $.context.domain must be in [&quot;ONDC:TRV11&quot;]</li>
+<li><strong>condition Enum_Required_24_CONTEXT_DOMAIN.2</strong>: $.context.domain must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_25_DESCRIPTOR_CODE</strong>: every element of $.message.order.items[*].descriptor.code must be in [&quot;SJT&quot;, &quot;SFSJT&quot;, &quot;RJT&quot;, &quot;PASS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_25_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.items[*].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_26_VEHICLE_CATEGORY</strong>: every element of $.message.order.fulfillments[*].vehicle.category must be in [&quot;BUS&quot;, &quot;METRO&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_26_VEHICLE_CATEGORY</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].vehicle.category must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_27_FULFILLMENTS_TYPE</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;ROUTE&quot;, &quot;TRIP&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_27_FULFILLMENTS_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_28_FULFILLMENTS_TYPE</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;START&quot;, &quot;END&quot;, &quot;INTERMEDIATE_STOP&quot;, &quot;TRANSIT_STOP&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_28_FULFILLMENTS_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_29_AUTHORIZATION_TYPE</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.type must be in [&quot;QR&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_29_AUTHORIZATION_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_30_AUTHORIZATION_STATUS</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.status must be in [&quot;UNCLAIMED&quot;, &quot;CLAIMED&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_30_AUTHORIZATION_STATUS</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.status must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_31_PAYMENTS_STATUS</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_31_PAYMENTS_STATUS.1</strong>: every element of $.message.order.payments[*].status must be in [&quot;NOT-PAID&quot;, &quot;PAID&quot;]</li>
+<li><strong>condition Enum_Required_31_PAYMENTS_STATUS.2</strong>: $.message.order.payments[*].status must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_32_PAYMENTS_COLLECTED_BY</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_32_PAYMENTS_COLLECTED_BY.1</strong>: every element of $.message.order.payments[*].collected_by must be in [&quot;BPP&quot;, &quot;BAP&quot;]</li>
+<li><strong>condition Enum_Required_32_PAYMENTS_COLLECTED_BY.2</strong>: $.message.order.payments[*].collected_by must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_33_PAYMENTS_TYPE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_33_PAYMENTS_TYPE.1</strong>: every element of $.message.order.payments[*].type must be in [&quot;PRE-ORDER&quot;, &quot;ON-FULFILLMENT&quot;, &quot;POST-FULFILLMENT&quot;]</li>
+<li><strong>condition Enum_Required_33_PAYMENTS_TYPE.2</strong>: $.message.order.payments[*].type must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_34_BREAKUP_TITLE</strong>: every element of $.message.order.quote.breakup[*].title must be in [&quot;BASE_PRICE&quot;, &quot;REFUND&quot;, &quot;CANCELLATION_CHARGES&quot;, &quot;OFFER&quot;, &quot;TOLL&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_34_BREAKUP_TITLE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.quote.breakup[*].title must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+</ul>
+</li>
+<li><p><strong>status</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_1_CONTEXT_TIMESTAMP</strong>: $.context.timestamp must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_2_CONTEXT_BAP_ID</strong>: $.context.bap_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_3_CONTEXT_TRANSACTION_ID</strong>: $.context.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_4_CONTEXT_MESSAGE_ID</strong>: $.context.message_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_5_CONTEXT_VERSION</strong>: $.context.version must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_6_CONTEXT_BAP_URI</strong>: $.context.bap_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_7_CONTEXT_TTL</strong>: $.context.ttl must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_8_CONTEXT_BPP_ID</strong>: $.context.bpp_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_9_CONTEXT_BPP_URI</strong>: $.context.bpp_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_10_CONTEXT_ACTION</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_10_CONTEXT_ACTION.1</strong>: every element of $.context.action must be in [&quot;status&quot;]</li>
+<li><strong>condition Enum_Required_10_CONTEXT_ACTION.2</strong>: $.context.action must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_11_COUNTRY_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_11_COUNTRY_CODE.1</strong>: every element of $.context.location.country.code must be in [&quot;IND&quot;]</li>
+<li><strong>condition Enum_Required_11_COUNTRY_CODE.2</strong>: $.context.location.country.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_12_CITY_CODE</strong>: $.context.location.city.code must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_13_CONTEXT_DOMAIN</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_13_CONTEXT_DOMAIN.1</strong>: every element of $.context.domain must be in [&quot;ONDC:TRV11&quot;]</li>
+<li><strong>condition Enum_Required_13_CONTEXT_DOMAIN.2</strong>: $.context.domain must be present in the payload</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><strong>cancel</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_1_CONTEXT_TIMESTAMP</strong>: $.context.timestamp must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_2_CONTEXT_BAP_ID</strong>: $.context.bap_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_3_CONTEXT_TRANSACTION_ID</strong>: $.context.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_4_CONTEXT_MESSAGE_ID</strong>: $.context.message_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_5_CONTEXT_VERSION</strong>: $.context.version must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_6_CONTEXT_BAP_URI</strong>: $.context.bap_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_7_CONTEXT_TTL</strong>: $.context.ttl must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_8_CONTEXT_BPP_ID</strong>: $.context.bpp_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_9_CONTEXT_BPP_URI</strong>: $.context.bpp_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_10_MESSAGE_ORDER_ID</strong>: $.message.order_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_11_MESSAGE_CANCELLATION_REASON_ID</strong>: $.message.cancellation_reason_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_12_DESCRIPTOR_NAME</strong>: $.message.descriptor.name must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_13_CONTEXT_ACTION</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_13_CONTEXT_ACTION.1</strong>: every element of $.context.action must be in [&quot;cancel&quot;]</li>
+<li><strong>condition Enum_Required_13_CONTEXT_ACTION.2</strong>: $.context.action must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_14_COUNTRY_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_14_COUNTRY_CODE.1</strong>: every element of $.context.location.country.code must be in [&quot;IND&quot;]</li>
+<li><strong>condition Enum_Required_14_COUNTRY_CODE.2</strong>: $.context.location.country.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_15_CITY_CODE</strong>: $.context.location.city.code must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_16_CONTEXT_DOMAIN</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_16_CONTEXT_DOMAIN.1</strong>: every element of $.context.domain must be in [&quot;ONDC:TRV11&quot;]</li>
+<li><strong>condition Enum_Required_16_CONTEXT_DOMAIN.2</strong>: $.context.domain must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_17_DESCRIPTOR_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_17_DESCRIPTOR_CODE.1</strong>: every element of $.message.descriptor.code must be in [&quot;SOFT_CANCEL&quot;, &quot;CONFIRM_CANCEL&quot;]</li>
+<li><strong>condition Enum_Required_17_DESCRIPTOR_CODE.2</strong>: $.message.descriptor.code must be present in the payload</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><strong>update</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_1_CONTEXT_TIMESTAMP</strong>: $.context.timestamp must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_2_CONTEXT_BAP_ID</strong>: $.context.bap_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_3_CONTEXT_TRANSACTION_ID</strong>: $.context.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_4_CONTEXT_MESSAGE_ID</strong>: $.context.message_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_5_CONTEXT_VERSION</strong>: $.context.version must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_6_CONTEXT_BAP_URI</strong>: $.context.bap_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_7_CONTEXT_TTL</strong>: $.context.ttl must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_8_CONTEXT_BPP_ID</strong>: $.context.bpp_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_9_CONTEXT_BPP_URI</strong>: $.context.bpp_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_10_MESSAGE_UPDATE_TARGET</strong>: $.message.update_target must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_11_ORDER_ID</strong>: $.message.order.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_12_CONTEXT_ACTION</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_12_CONTEXT_ACTION.1</strong>: every element of $.context.action must be in [&quot;update&quot;]</li>
+<li><strong>condition Enum_Required_12_CONTEXT_ACTION.2</strong>: $.context.action must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_13_COUNTRY_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_13_COUNTRY_CODE.1</strong>: every element of $.context.location.country.code must be in [&quot;IND&quot;]</li>
+<li><strong>condition Enum_Required_13_COUNTRY_CODE.2</strong>: $.context.location.country.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_14_CITY_CODE</strong>: $.context.location.city.code must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_15_CONTEXT_DOMAIN</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_15_CONTEXT_DOMAIN.1</strong>: every element of $.context.domain must be in [&quot;ONDC:TRV11&quot;]</li>
+<li><strong>condition Enum_Required_15_CONTEXT_DOMAIN.2</strong>: $.context.domain must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_16_DESCRIPTOR_CODE</strong>: every element of $.message.order.items[*].descriptor.code must be in [&quot;SJT&quot;, &quot;SFSJT&quot;, &quot;RJT&quot;, &quot;PASS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_16_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.items[*].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_17_VEHICLE_CATEGORY</strong>: every element of $.message.order.fulfillments[*].vehicle.category must be in [&quot;BUS&quot;, &quot;METRO&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_17_VEHICLE_CATEGORY</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].vehicle.category must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_18_FULFILLMENTS_TYPE</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;ROUTE&quot;, &quot;TRIP&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_18_FULFILLMENTS_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_19_FULFILLMENTS_TYPE</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;START&quot;, &quot;END&quot;, &quot;INTERMEDIATE_STOP&quot;, &quot;TRANSIT_STOP&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_19_FULFILLMENTS_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_20_AUTHORIZATION_TYPE</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.type must be in [&quot;QR&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_20_AUTHORIZATION_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_21_AUTHORIZATION_STATUS</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.status must be in [&quot;UNCLAIMED&quot;, &quot;CLAIMED&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_21_AUTHORIZATION_STATUS</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.status must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_22_PAYMENTS_STATUS</strong>: every element of $.message.order.payments[*].status must be in [&quot;NOT-PAID&quot;, &quot;PAID&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_22_PAYMENTS_STATUS</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.payments[*].status must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_23_PAYMENTS_COLLECTED_BY</strong>: every element of $.message.order.payments[*].collected_by must be in [&quot;BPP&quot;, &quot;BAP&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_23_PAYMENTS_COLLECTED_BY</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.payments[*].collected_by must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_24_PAYMENTS_TYPE</strong>: every element of $.message.order.payments[*].type must be in [&quot;PRE-ORDER&quot;, &quot;ON-FULFILLMENT&quot;, &quot;POST-FULFILLMENT&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_24_PAYMENTS_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.payments[*].type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_25_BREAKUP_TITLE</strong>: every element of $.message.order.quote.breakup[*].title must be in [&quot;BASE_PRICE&quot;, &quot;REFUND&quot;, &quot;CANCELLATION_CHARGES&quot;, &quot;OFFER&quot;, &quot;TOLL&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_25_BREAKUP_TITLE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.quote.breakup[*].title must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+</ul>
+</li>
+<li><p><strong>on_search</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_1_CONTEXT_TIMESTAMP</strong>: $.context.timestamp must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_2_CONTEXT_BAP_ID</strong>: $.context.bap_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_3_CONTEXT_TRANSACTION_ID</strong>: $.context.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_4_CONTEXT_MESSAGE_ID</strong>: $.context.message_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_5_CONTEXT_VERSION</strong>: $.context.version must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_6_CONTEXT_BAP_URI</strong>: $.context.bap_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_7_CONTEXT_TTL</strong>: $.context.ttl must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_8_CONTEXT_BPP_ID</strong>: $.context.bpp_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_9_CONTEXT_BPP_URI</strong>: $.context.bpp_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_19_CONTEXT_ACTION</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_19_CONTEXT_ACTION.1</strong>: every element of $.context.action must be in [&quot;on_search&quot;]</li>
+<li><strong>condition Enum_Required_19_CONTEXT_ACTION.2</strong>: $.context.action must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_20_COUNTRY_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_20_COUNTRY_CODE.1</strong>: every element of $.context.location.country.code must be in [&quot;IND&quot;]</li>
+<li><strong>condition Enum_Required_20_COUNTRY_CODE.2</strong>: $.context.location.country.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_21_CITY_CODE</strong>: $.context.location.city.code must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_22_CONTEXT_DOMAIN</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_22_CONTEXT_DOMAIN.1</strong>: every element of $.context.domain must be in [&quot;ONDC:TRV11&quot;]</li>
+<li><strong>condition Enum_Required_22_CONTEXT_DOMAIN.2</strong>: $.context.domain must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>on_search_Message_TESTS</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_10_DESCRIPTOR_NAME</strong>: $.message.catalog.descriptor.name must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_11_PROVIDERS_ID</strong>: $.message.catalog.providers[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_12_DESCRIPTOR_NAME</strong>: $.message.catalog.providers[*].descriptor.name must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_13_FULFILLMENTS_ID</strong>: $.message.catalog.providers[<em>].fulfillments[</em>].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_14_LOCATION_GPS</strong>: $.message.catalog.providers[<em>].fulfillments[</em>].stops[*].location.gps must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_15_FULFILLMENTS_ID</strong>: $.message.catalog.providers[<em>].fulfillments[</em>].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_16_CATEGORIES_ID</strong>: $.message.catalog.providers[<em>].categories[</em>].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_17_RANGE_START</strong>: $.message.catalog.providers[*].time.range.start must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_18_RANGE_END</strong>: $.message.catalog.providers[*].time.range.end must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_23_DESCRIPTOR_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_23_DESCRIPTOR_CODE.1</strong>: every element of $.message.catalog.providers[<em>].categories[</em>].descriptor.code must be in [&quot;TICKET&quot;, &quot;PASS&quot;]</li>
+<li><strong>condition Enum_Required_23_DESCRIPTOR_CODE.2</strong>: $.message.catalog.providers[<em>].categories[</em>].descriptor.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_24_DESCRIPTOR_CODE</strong>: every element of $.message.catalog.providers[*].descriptor.code must be in [&quot;SJT&quot;, &quot;SFSJT&quot;, &quot;RJT&quot;, &quot;PASS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_24_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.catalog.providers[*].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_25_VEHICLE_CATEGORY</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_25_VEHICLE_CATEGORY.1</strong>: every element of $.message.catalog.providers[<em>].fulfillments[</em>].vehicle.category must be in [&quot;BUS&quot;, &quot;METRO&quot;]</li>
+<li><strong>condition Enum_Required_25_VEHICLE_CATEGORY.2</strong>: $.message.catalog.providers[<em>].fulfillments[</em>].vehicle.category must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_26_FULFILLMENTS_TYPE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_26_FULFILLMENTS_TYPE.1</strong>: every element of $.message.catalog.providers[<em>].fulfillments[</em>].type must be in [&quot;ROUTE&quot;, &quot;TRIP&quot;]</li>
+<li><strong>condition Enum_Required_26_FULFILLMENTS_TYPE.2</strong>: $.message.catalog.providers[<em>].fulfillments[</em>].type must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_27_FULFILLMENTS_TYPE</strong>: every element of $.message.catalog.providers[<em>].fulfillments[</em>].type must be in [&quot;START&quot;, &quot;END&quot;, &quot;INTERMEDIATE_STOP&quot;, &quot;TRANSIT_STOP&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_27_FULFILLMENTS_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.catalog.providers[<em>].fulfillments[</em>].type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_28_AUTHORIZATION_TYPE</strong>: every element of $.message.catalog.providers[<em>].fulfillments[</em>].stops[*].authorization.type must be in [&quot;QR&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_28_AUTHORIZATION_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.catalog.providers[<em>].fulfillments[</em>].stops[*].authorization.type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_29_AUTHORIZATION_STATUS</strong>: every element of $.message.catalog.providers[<em>].fulfillments[</em>].stops[*].authorization.status must be in [&quot;UNCLAIMED&quot;, &quot;CLAIMED&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_29_AUTHORIZATION_STATUS</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.catalog.providers[<em>].fulfillments[</em>].stops[*].authorization.status must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_30_PAYMENTS_STATUS</strong>: every element of $.message.catalog.providers[<em>].payments[</em>].status must be in [&quot;NOT-PAID&quot;, &quot;PAID&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_30_PAYMENTS_STATUS</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.catalog.providers[<em>].payments[</em>].status must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_31_PAYMENTS_COLLECTED_BY</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_31_PAYMENTS_COLLECTED_BY.1</strong>: every element of $.message.catalog.providers[<em>].payments[</em>].collected_by must be in [&quot;BPP&quot;, &quot;BAP&quot;]</li>
+<li><strong>condition Enum_Required_31_PAYMENTS_COLLECTED_BY.2</strong>: $.message.catalog.providers[<em>].payments[</em>].collected_by must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_32_PAYMENTS_TYPE</strong>: every element of $.message.catalog.providers[<em>].payments[</em>].type must be in [&quot;PRE-ORDER&quot;, &quot;ON-FULFILLMENT&quot;, &quot;POST-FULFILLMENT&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_32_PAYMENTS_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.catalog.providers[<em>].payments[</em>].type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition FARE_POLICY_Tag_Required_33_DESCRIPTOR_CODE</strong>: every element of $.message.catalog.providers[<em>].items[</em>].tags[*].descriptor.code must be in [&quot;FARE_POLICY&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition FARE_POLICY_Tag_Required_33_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.catalog.providers[<em>].items[</em>].tags[*].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_0_FARE_POLICY</strong>: every element of $.message.catalog.providers[<em>].items[</em>].tags[?(@.descriptor.code==&#39;FARE_POLICY&#39;)].list[*].descriptor.code must be in [&quot;RESTRICTED_PERSON&quot;, &quot;RESTRICTION_PROOF&quot;]</p>
+</li>
+<li><p><strong>condition ROUTE_INFO_Tag_Required_35_DESCRIPTOR_CODE</strong>: every element of $.message.catalog.providers[<em>].fulfillments[</em>].tags[*].descriptor.code must be in [&quot;ROUTE_INFO&quot;, &quot;TICKET_INFO&quot;, &quot;TRIP_DETAILS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition ROUTE_INFO_Tag_Required_35_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.catalog.providers[<em>].fulfillments[</em>].tags[*].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_1_ROUTE_INFO</strong>: every element of $.message.catalog.providers[<em>].fulfillments[</em>].tags[?(@.descriptor.code==&#39;ROUTE_INFO&#39;)].list[*].descriptor.code must be in [&quot;ROUTE_ID&quot;, &quot;ROUTE_DIRECTION&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_1_TICKET_INFO</strong>: every element of $.message.catalog.providers[<em>].fulfillments[</em>].tags[?(@.descriptor.code==&#39;TICKET_INFO&#39;)].list[*].descriptor.code must be in [&quot;NUMBER&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_1_TRIP_DETAILS</strong>: every element of $.message.catalog.providers[<em>].fulfillments[</em>].tags[?(@.descriptor.code==&#39;TRIP_DETAILS&#39;)].list[*].descriptor.code must be in [&quot;AVAILABLE_TRIPS&quot;, &quot;UTILIZED_TRIPS&quot;]</p>
+</li>
+<li><p><strong>condition BUYER_FINDER_FEES_Tag_Required_39_DESCRIPTOR_CODE</strong>: every element of $.message.catalog.providers[<em>].payments[</em>].tags[*].descriptor.code must be in [&quot;BUYER_FINDER_FEES&quot;, &quot;SETTLEMENT_TERMS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition BUYER_FINDER_FEES_Tag_Required_39_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.catalog.providers[<em>].payments[</em>].tags[*].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_2_BUYER_FINDER_FEES</strong>: every element of $.message.catalog.providers[<em>].payments[</em>].tags[?(@.descriptor.code==&#39;BUYER_FINDER_FEES&#39;)].list[*].descriptor.code must be in [&quot;BUYER_FINDER_FEES_TYPE&quot;, &quot;BUYER_FINDER_FEES_PERCENTAGE&quot;, &quot;BUYER_FINDER_FEES_AMOUNT&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_2_SETTLEMENT_TERMS</strong>: every element of $.message.catalog.providers[<em>].payments[</em>].tags[?(@.descriptor.code==&#39;SETTLEMENT_TERMS&#39;)].list[*].descriptor.code must be in [&quot;SETTLEMENT_WINDOW&quot;, &quot;SETTLEMENT_BASIS&quot;, &quot;SETTLEMENT_TYPE&quot;, &quot;MANDATORY_ARBITRATION&quot;, &quot;COURT_JURISDICTION&quot;, &quot;DELAY_INTEREST&quot;, &quot;STATIC_TERMS&quot;, &quot;SETTLEMENT_AMOUNT&quot;]</p>
+</li>
+<li><p><strong>condition SCHEDULED_INFO_Tag_Required_42_DESCRIPTOR_CODE</strong>: every element of $.message.catalog.providers[<em>].tags[</em>].descriptor.code must be in [&quot;SCHEDULED_INFO&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition SCHEDULED_INFO_Tag_Required_42_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.catalog.providers[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_3_SCHEDULED_INFO</strong>: every element of $.message.catalog.providers[<em>].tags[?(@.descriptor.code==&#39;SCHEDULED_INFO&#39;)].list[</em>].descriptor.code must be in [&quot;GTFS&quot;]</p>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><strong>on_select</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_1_CONTEXT_TIMESTAMP</strong>: $.context.timestamp must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_2_CONTEXT_BAP_ID</strong>: $.context.bap_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_3_CONTEXT_TRANSACTION_ID</strong>: $.context.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_4_CONTEXT_MESSAGE_ID</strong>: $.context.message_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_5_CONTEXT_VERSION</strong>: $.context.version must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_6_CONTEXT_BAP_URI</strong>: $.context.bap_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_7_CONTEXT_TTL</strong>: $.context.ttl must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_8_CONTEXT_BPP_ID</strong>: $.context.bpp_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_9_CONTEXT_BPP_URI</strong>: $.context.bpp_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_33_CONTEXT_ACTION</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_33_CONTEXT_ACTION.1</strong>: every element of $.context.action must be in [&quot;on_select&quot;]</li>
+<li><strong>condition Enum_Required_33_CONTEXT_ACTION.2</strong>: $.context.action must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_34_COUNTRY_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_34_COUNTRY_CODE.1</strong>: every element of $.context.location.country.code must be in [&quot;IND&quot;]</li>
+<li><strong>condition Enum_Required_34_COUNTRY_CODE.2</strong>: $.context.location.country.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_35_CITY_CODE</strong>: $.context.location.city.code must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_36_CONTEXT_DOMAIN</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_36_CONTEXT_DOMAIN.1</strong>: every element of $.context.domain must be in [&quot;ONDC:TRV11&quot;]</li>
+<li><strong>condition Enum_Required_36_CONTEXT_DOMAIN.2</strong>: $.context.domain must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>on_select_Message_TESTS</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_10_ITEMS_ID</strong>: $.message.order.items[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_11_PRICE_CURRENCY</strong>: $.message.order.items[*].price.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_12_PRICE_VALUE</strong>: $.message.order.items[*].price.value must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_13_SELECTED_COUNT</strong>: $.message.order.items[*].quantity.selected.count must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_14_ITEMS_FULFILLMENT_IDS</strong>: $.message.order.items[<em>].fulfillment_ids[</em>] must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_15_TIME_LABEL</strong>: $.message.order.items[*].time.label must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_16_TIME_DURATION</strong>: $.message.order.items[*].time.duration must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_17_PROVIDER_ID</strong>: $.message.order.provider.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_18_DESCRIPTOR_NAME</strong>: $.message.order.provider.descriptor.name must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_19_FULFILLMENTS_ID</strong>: $.message.order.fulfillments[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_20_LOCATION_GPS</strong>: $.message.order.fulfillments[<em>].stops[</em>].location.gps must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_21_FULFILLMENTS_ID</strong>: $.message.order.fulfillments[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_22_PRICE_VALUE</strong>: $.message.order.quote.price.value must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_23_PRICE_CURRENCY</strong>: $.message.order.quote.price.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_24_ITEM_ID</strong>: $.message.order.quote.breakup[*].item.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_25_ITEMS_CATEGORY_IDS</strong>: $.message.order.items[<em>].category_ids[</em>] must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_26_RANGE_START</strong>: $.message.order.provider.time.range.start must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_27_RANGE_END</strong>: $.message.order.provider.time.range.end must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_28_PRICE_CURRENCY</strong>: $.message.order.quote.breakup[*].item.price.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_29_PRICE_VALUE</strong>: $.message.order.quote.breakup[*].item.price.value must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_30_SELECTED_COUNT</strong>: $.message.order.quote.breakup[*].item.quantity.selected.count must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_31_EXTERNAL_REF_URL</strong>: $.message.order.cancellation_terms[*].external_ref.url must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_32_EXTERNAL_REF_MIMETYPE</strong>: $.message.order.cancellation_terms[*].external_ref.mimetype must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_37_DESCRIPTOR_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_37_DESCRIPTOR_CODE.1</strong>: every element of $.message.order.items[*].descriptor.code must be in [&quot;SJT&quot;, &quot;SFSJT&quot;, &quot;RJT&quot;, &quot;PASS&quot;]</li>
+<li><strong>condition Enum_Required_37_DESCRIPTOR_CODE.2</strong>: $.message.order.items[*].descriptor.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_38_VEHICLE_CATEGORY</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_38_VEHICLE_CATEGORY.1</strong>: every element of $.message.order.fulfillments[*].vehicle.category must be in [&quot;BUS&quot;, &quot;METRO&quot;]</li>
+<li><strong>condition Enum_Required_38_VEHICLE_CATEGORY.2</strong>: $.message.order.fulfillments[*].vehicle.category must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_39_FULFILLMENTS_TYPE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_39_FULFILLMENTS_TYPE.1</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;ROUTE&quot;, &quot;TRIP&quot;]</li>
+<li><strong>condition Enum_Required_39_FULFILLMENTS_TYPE.2</strong>: $.message.order.fulfillments[*].type must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_40_FULFILLMENTS_TYPE</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;START&quot;, &quot;END&quot;, &quot;INTERMEDIATE_STOP&quot;, &quot;TRANSIT_STOP&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_40_FULFILLMENTS_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_41_AUTHORIZATION_TYPE</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.type must be in [&quot;QR&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_41_AUTHORIZATION_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_42_AUTHORIZATION_STATUS</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.status must be in [&quot;UNCLAIMED&quot;, &quot;CLAIMED&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_42_AUTHORIZATION_STATUS</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.status must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_43_ORDER_STATUS</strong>: every element of $.message.order.status must be in [&quot;SOFT_CANCEL&quot;, &quot;CONFIRM_CANCEL&quot;, &quot;ACTIVE&quot;, &quot;COMPLETE&quot;, &quot;CANCELLED&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_43_ORDER_STATUS</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.status must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_44_BREAKUP_TITLE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_44_BREAKUP_TITLE.1</strong>: every element of $.message.order.quote.breakup[*].title must be in [&quot;BASE_PRICE&quot;, &quot;REFUND&quot;, &quot;CANCELLATION_CHARGES&quot;, &quot;OFFER&quot;, &quot;TOLL&quot;]</li>
+<li><strong>condition Enum_Required_44_BREAKUP_TITLE.2</strong>: $.message.order.quote.breakup[*].title must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition ROUTE_INFO_Tag_Required_45_DESCRIPTOR_CODE</strong>: every element of $.message.order.fulfillments[<em>].tags[</em>].descriptor.code must be in [&quot;ROUTE_INFO&quot;, &quot;TICKET_INFO&quot;, &quot;TRIP_DETAILS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition ROUTE_INFO_Tag_Required_45_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_0_ROUTE_INFO</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;ROUTE_INFO&#39;)].list[</em>].descriptor.code must be in [&quot;ROUTE_ID&quot;, &quot;ROUTE_DIRECTION&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_0_TICKET_INFO</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;TICKET_INFO&#39;)].list[</em>].descriptor.code must be in [&quot;NUMBER&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_0_TRIP_DETAILS</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;TRIP_DETAILS&#39;)].list[</em>].descriptor.code must be in [&quot;AVAILABLE_TRIPS&quot;, &quot;UTILIZED_TRIPS&quot;]</p>
+</li>
+<li><p><strong>condition FARE_POLICY_Tag_Required_49_DESCRIPTOR_CODE</strong>: every element of $.message.order.items[<em>].tags[</em>].descriptor.code must be in [&quot;FARE_POLICY&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition FARE_POLICY_Tag_Required_49_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.items[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_1_FARE_POLICY</strong>: every element of $.message.order.items[<em>].tags[?(@.descriptor.code==&#39;FARE_POLICY&#39;)].list[</em>].descriptor.code must be in [&quot;RESTRICTED_PERSON&quot;, &quot;RESTRICTION_PROOF&quot;]</p>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><strong>on_init</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_1_CONTEXT_TIMESTAMP</strong>: $.context.timestamp must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_2_CONTEXT_BAP_ID</strong>: $.context.bap_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_3_CONTEXT_TRANSACTION_ID</strong>: $.context.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_4_CONTEXT_MESSAGE_ID</strong>: $.context.message_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_5_CONTEXT_VERSION</strong>: $.context.version must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_6_CONTEXT_BAP_URI</strong>: $.context.bap_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_7_CONTEXT_TTL</strong>: $.context.ttl must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_8_CONTEXT_BPP_ID</strong>: $.context.bpp_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_9_CONTEXT_BPP_URI</strong>: $.context.bpp_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_34_CONTEXT_ACTION</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_34_CONTEXT_ACTION.1</strong>: every element of $.context.action must be in [&quot;on_init&quot;]</li>
+<li><strong>condition Enum_Required_34_CONTEXT_ACTION.2</strong>: $.context.action must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_35_COUNTRY_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_35_COUNTRY_CODE.1</strong>: every element of $.context.location.country.code must be in [&quot;IND&quot;]</li>
+<li><strong>condition Enum_Required_35_COUNTRY_CODE.2</strong>: $.context.location.country.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_36_CITY_CODE</strong>: $.context.location.city.code must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_37_CONTEXT_DOMAIN</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_37_CONTEXT_DOMAIN.1</strong>: every element of $.context.domain must be in [&quot;ONDC:TRV11&quot;]</li>
+<li><strong>condition Enum_Required_37_CONTEXT_DOMAIN.2</strong>: $.context.domain must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>on_init_Message_TESTS</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_10_ITEMS_ID</strong>: $.message.order.items[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_11_PRICE_CURRENCY</strong>: $.message.order.items[*].price.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_12_PRICE_VALUE</strong>: $.message.order.items[*].price.value must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_13_SELECTED_COUNT</strong>: $.message.order.items[*].quantity.selected.count must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_14_ITEMS_FULFILLMENT_IDS</strong>: $.message.order.items[<em>].fulfillment_ids[</em>] must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_15_TIME_LABEL</strong>: $.message.order.items[*].time.label must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_16_TIME_DURATION</strong>: $.message.order.items[*].time.duration must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_17_PROVIDER_ID</strong>: $.message.order.provider.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_18_DESCRIPTOR_NAME</strong>: $.message.order.provider.descriptor.name must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_19_FULFILLMENTS_ID</strong>: $.message.order.fulfillments[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_20_LOCATION_GPS</strong>: $.message.order.fulfillments[<em>].stops[</em>].location.gps must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_21_FULFILLMENTS_ID</strong>: $.message.order.fulfillments[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_22_PRICE_VALUE</strong>: $.message.order.quote.price.value must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_23_PRICE_CURRENCY</strong>: $.message.order.quote.price.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_24_ITEM_ID</strong>: $.message.order.quote.breakup[*].item.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_25_PAYMENTS_ID</strong>: $.message.order.payments[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_26_ITEMS_CATEGORY_IDS</strong>: $.message.order.items[<em>].category_ids[</em>] must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_27_RANGE_START</strong>: $.message.order.provider.time.range.start must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_28_RANGE_END</strong>: $.message.order.provider.time.range.end must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_29_SELECTED_COUNT</strong>: $.message.order.quote.breakup[*].item.quantity.selected.count must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_30_PRICE_VALUE</strong>: $.message.order.quote.breakup[*].item.price.value must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_31_PRICE_CURRENCY</strong>: $.message.order.quote.breakup[*].item.price.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_32_EXTERNAL_REF_URL</strong>: $.message.order.cancellation_terms[*].external_ref.url must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_33_EXTERNAL_REF_MIMETYPE</strong>: $.message.order.cancellation_terms[*].external_ref.mimetype must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_38_DESCRIPTOR_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_38_DESCRIPTOR_CODE.1</strong>: every element of $.message.order.items[*].descriptor.code must be in [&quot;SJT&quot;, &quot;SFSJT&quot;, &quot;RJT&quot;, &quot;PASS&quot;]</li>
+<li><strong>condition Enum_Required_38_DESCRIPTOR_CODE.2</strong>: $.message.order.items[*].descriptor.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_39_VEHICLE_CATEGORY</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_39_VEHICLE_CATEGORY.1</strong>: every element of $.message.order.fulfillments[*].vehicle.category must be in [&quot;BUS&quot;, &quot;METRO&quot;]</li>
+<li><strong>condition Enum_Required_39_VEHICLE_CATEGORY.2</strong>: $.message.order.fulfillments[*].vehicle.category must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_40_FULFILLMENTS_TYPE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_40_FULFILLMENTS_TYPE.1</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;ROUTE&quot;, &quot;TRIP&quot;]</li>
+<li><strong>condition Enum_Required_40_FULFILLMENTS_TYPE.2</strong>: $.message.order.fulfillments[*].type must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_41_FULFILLMENTS_TYPE</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;START&quot;, &quot;END&quot;, &quot;INTERMEDIATE_STOP&quot;, &quot;TRANSIT_STOP&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_41_FULFILLMENTS_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_42_AUTHORIZATION_TYPE</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.type must be in [&quot;QR&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_42_AUTHORIZATION_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_43_AUTHORIZATION_STATUS</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.status must be in [&quot;UNCLAIMED&quot;, &quot;CLAIMED&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_43_AUTHORIZATION_STATUS</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.status must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_44_PAYMENTS_STATUS</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_44_PAYMENTS_STATUS.1</strong>: every element of $.message.order.payments[*].status must be in [&quot;NOT-PAID&quot;, &quot;PAID&quot;]</li>
+<li><strong>condition Enum_Required_44_PAYMENTS_STATUS.2</strong>: $.message.order.payments[*].status must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_45_PAYMENTS_COLLECTED_BY</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_45_PAYMENTS_COLLECTED_BY.1</strong>: every element of $.message.order.payments[*].collected_by must be in [&quot;BPP&quot;, &quot;BAP&quot;]</li>
+<li><strong>condition Enum_Required_45_PAYMENTS_COLLECTED_BY.2</strong>: $.message.order.payments[*].collected_by must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_46_PAYMENTS_TYPE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_46_PAYMENTS_TYPE.1</strong>: every element of $.message.order.payments[*].type must be in [&quot;PRE-ORDER&quot;, &quot;ON-FULFILLMENT&quot;, &quot;POST-FULFILLMENT&quot;]</li>
+<li><strong>condition Enum_Required_46_PAYMENTS_TYPE.2</strong>: $.message.order.payments[*].type must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_47_BREAKUP_TITLE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_47_BREAKUP_TITLE.1</strong>: every element of $.message.order.quote.breakup[*].title must be in [&quot;BASE_PRICE&quot;, &quot;REFUND&quot;, &quot;CANCELLATION_CHARGES&quot;, &quot;OFFER&quot;, &quot;TOLL&quot;]</li>
+<li><strong>condition Enum_Required_47_BREAKUP_TITLE.2</strong>: $.message.order.quote.breakup[*].title must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition ROUTE_INFO_Tag_Required_48_DESCRIPTOR_CODE</strong>: every element of $.message.order.fulfillments[<em>].tags[</em>].descriptor.code must be in [&quot;ROUTE_INFO&quot;, &quot;TICKET_INFO&quot;, &quot;TRIP_DETAILS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition ROUTE_INFO_Tag_Required_48_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_0_ROUTE_INFO</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;ROUTE_INFO&#39;)].list[</em>].descriptor.code must be in [&quot;ROUTE_ID&quot;, &quot;ROUTE_DIRECTION&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_0_TICKET_INFO</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;TICKET_INFO&#39;)].list[</em>].descriptor.code must be in [&quot;NUMBER&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_0_TRIP_DETAILS</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;TRIP_DETAILS&#39;)].list[</em>].descriptor.code must be in [&quot;AVAILABLE_TRIPS&quot;, &quot;UTILIZED_TRIPS&quot;]</p>
+</li>
+<li><p><strong>condition FARE_POLICY_Tag_Required_52_DESCRIPTOR_CODE</strong>: every element of $.message.order.items[<em>].tags[</em>].descriptor.code must be in [&quot;FARE_POLICY&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition FARE_POLICY_Tag_Required_52_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.items[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_1_FARE_POLICY</strong>: every element of $.message.order.items[<em>].tags[?(@.descriptor.code==&#39;FARE_POLICY&#39;)].list[</em>].descriptor.code must be in [&quot;RESTRICTED_PERSON&quot;, &quot;RESTRICTION_PROOF&quot;]</p>
+</li>
+<li><p><strong>condition BUYER_FINDER_FEES_Tag_Required_54_DESCRIPTOR_CODE</strong>: every element of $.message.order.payments[<em>].tags[</em>].descriptor.code must be in [&quot;BUYER_FINDER_FEES&quot;, &quot;SETTLEMENT_TERMS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition BUYER_FINDER_FEES_Tag_Required_54_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.payments[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_2_BUYER_FINDER_FEES</strong>: every element of $.message.order.payments[<em>].tags[?(@.descriptor.code==&#39;BUYER_FINDER_FEES&#39;)].list[</em>].descriptor.code must be in [&quot;BUYER_FINDER_FEES_TYPE&quot;, &quot;BUYER_FINDER_FEES_PERCENTAGE&quot;, &quot;BUYER_FINDER_FEES_AMOUNT&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_2_SETTLEMENT_TERMS</strong>: every element of $.message.order.payments[<em>].tags[?(@.descriptor.code==&#39;SETTLEMENT_TERMS&#39;)].list[</em>].descriptor.code must be in [&quot;SETTLEMENT_WINDOW&quot;, &quot;SETTLEMENT_BASIS&quot;, &quot;SETTLEMENT_TYPE&quot;, &quot;MANDATORY_ARBITRATION&quot;, &quot;COURT_JURISDICTION&quot;, &quot;DELAY_INTEREST&quot;, &quot;STATIC_TERMS&quot;, &quot;SETTLEMENT_AMOUNT&quot;]</p>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><strong>on_confirm</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_1_CONTEXT_TIMESTAMP</strong>: $.context.timestamp must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_2_CONTEXT_BAP_ID</strong>: $.context.bap_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_3_CONTEXT_TRANSACTION_ID</strong>: $.context.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_4_CONTEXT_MESSAGE_ID</strong>: $.context.message_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_5_CONTEXT_VERSION</strong>: $.context.version must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_6_CONTEXT_BAP_URI</strong>: $.context.bap_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_7_CONTEXT_TTL</strong>: $.context.ttl must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_8_CONTEXT_BPP_ID</strong>: $.context.bpp_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_9_CONTEXT_BPP_URI</strong>: $.context.bpp_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_43_CONTEXT_ACTION</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_43_CONTEXT_ACTION.1</strong>: every element of $.context.action must be in [&quot;on_confirm&quot;]</li>
+<li><strong>condition Enum_Required_43_CONTEXT_ACTION.2</strong>: $.context.action must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_44_COUNTRY_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_44_COUNTRY_CODE.1</strong>: every element of $.context.location.country.code must be in [&quot;IND&quot;]</li>
+<li><strong>condition Enum_Required_44_COUNTRY_CODE.2</strong>: $.context.location.country.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_45_CITY_CODE</strong>: $.context.location.city.code must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_46_CONTEXT_DOMAIN</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_46_CONTEXT_DOMAIN.1</strong>: every element of $.context.domain must be in [&quot;ONDC:TRV11&quot;]</li>
+<li><strong>condition Enum_Required_46_CONTEXT_DOMAIN.2</strong>: $.context.domain must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>on_confirm_Message_TESTS</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_10_ORDER_ID</strong>: $.message.order.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_11_ITEMS_ID</strong>: $.message.order.items[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_12_DESCRIPTOR_NAME</strong>: $.message.order.items[*].descriptor.name must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_13_PRICE_CURRENCY</strong>: $.message.order.items[*].price.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_14_PRICE_VALUE</strong>: $.message.order.items[*].price.value must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_15_SELECTED_COUNT</strong>: $.message.order.items[*].quantity.selected.count must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_16_ITEMS_FULFILLMENT_IDS</strong>: $.message.order.items[<em>].fulfillment_ids[</em>] must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_17_TIME_LABEL</strong>: $.message.order.items[*].time.label must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_18_TIME_DURATION</strong>: $.message.order.items[*].time.duration must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_19_PROVIDER_ID</strong>: $.message.order.provider.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_20_DESCRIPTOR_NAME</strong>: $.message.order.provider.descriptor.name must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_21_FULFILLMENTS_ID</strong>: $.message.order.fulfillments[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_22_LOCATION_GPS</strong>: $.message.order.fulfillments[<em>].stops[</em>].location.gps must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_23_FULFILLMENTS_ID</strong>: $.message.order.fulfillments[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_24_PRICE_VALUE</strong>: $.message.order.quote.price.value must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_25_PRICE_CURRENCY</strong>: $.message.order.quote.price.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_26_ITEM_ID</strong>: $.message.order.quote.breakup[*].item.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_27_PAYMENTS_ID</strong>: $.message.order.payments[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_28_PARAMS_TRANSACTION_ID</strong>: $.message.order.payments[*].params.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_29_PARAMS_CURRENCY</strong>: $.message.order.payments[*].params.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_30_PARAMS_AMOUNT</strong>: $.message.order.payments[*].params.amount must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_31_CANCEL_BY_DURATION</strong>: $.message.order.cancellation_terms[*].cancel_by.duration must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_32_ORDER_STATUS</strong>: $.message.order.status must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_33_ITEMS_CATEGORY_IDS</strong>: $.message.order.items[<em>].category_ids[</em>] must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_34_RANGE_START</strong>: $.message.order.provider.time.range.start must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_35_RANGE_END</strong>: $.message.order.provider.time.range.end must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_36_PRICE_VALUE</strong>: $.message.order.quote.breakup[*].item.price.value must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_37_PRICE_CURRENCY</strong>: $.message.order.quote.breakup[*].item.price.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_38_SELECTED_COUNT</strong>: $.message.order.quote.breakup[*].item.quantity.selected.count must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_39_EXTERNAL_REF_URL</strong>: $.message.order.cancellation_terms[*].external_ref.url must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_40_EXTERNAL_REF_MIMETYPE</strong>: $.message.order.cancellation_terms[*].external_ref.mimetype must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_41_ORDER_CREATED_AT</strong>: $.message.order.created_at must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_42_ORDER_UPDATED_AT</strong>: $.message.order.updated_at must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_47_DESCRIPTOR_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_47_DESCRIPTOR_CODE.1</strong>: every element of $.message.order.items[*].descriptor.code must be in [&quot;SJT&quot;, &quot;SFSJT&quot;, &quot;RJT&quot;, &quot;PASS&quot;]</li>
+<li><strong>condition Enum_Required_47_DESCRIPTOR_CODE.2</strong>: $.message.order.items[*].descriptor.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_48_VEHICLE_CATEGORY</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_48_VEHICLE_CATEGORY.1</strong>: every element of $.message.order.fulfillments[*].vehicle.category must be in [&quot;BUS&quot;, &quot;METRO&quot;]</li>
+<li><strong>condition Enum_Required_48_VEHICLE_CATEGORY.2</strong>: $.message.order.fulfillments[*].vehicle.category must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_49_FULFILLMENTS_TYPE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_49_FULFILLMENTS_TYPE.1</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;ROUTE&quot;, &quot;TRIP&quot;]</li>
+<li><strong>condition Enum_Required_49_FULFILLMENTS_TYPE.2</strong>: $.message.order.fulfillments[*].type must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_50_FULFILLMENTS_TYPE</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;START&quot;, &quot;END&quot;, &quot;INTERMEDIATE_STOP&quot;, &quot;TRANSIT_STOP&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_50_FULFILLMENTS_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_51_AUTHORIZATION_TYPE</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.type must be in [&quot;QR&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_51_AUTHORIZATION_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_52_AUTHORIZATION_STATUS</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.status must be in [&quot;UNCLAIMED&quot;, &quot;CLAIMED&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_52_AUTHORIZATION_STATUS</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.status must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_53_PAYMENTS_STATUS</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_53_PAYMENTS_STATUS.1</strong>: every element of $.message.order.payments[*].status must be in [&quot;NOT-PAID&quot;, &quot;PAID&quot;]</li>
+<li><strong>condition Enum_Required_53_PAYMENTS_STATUS.2</strong>: $.message.order.payments[*].status must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_54_PAYMENTS_COLLECTED_BY</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_54_PAYMENTS_COLLECTED_BY.1</strong>: every element of $.message.order.payments[*].collected_by must be in [&quot;BPP&quot;, &quot;BAP&quot;]</li>
+<li><strong>condition Enum_Required_54_PAYMENTS_COLLECTED_BY.2</strong>: $.message.order.payments[*].collected_by must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_55_PAYMENTS_TYPE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_55_PAYMENTS_TYPE.1</strong>: every element of $.message.order.payments[*].type must be in [&quot;PRE-ORDER&quot;, &quot;ON-FULFILLMENT&quot;, &quot;POST-FULFILLMENT&quot;]</li>
+<li><strong>condition Enum_Required_55_PAYMENTS_TYPE.2</strong>: $.message.order.payments[*].type must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_56_BREAKUP_TITLE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_56_BREAKUP_TITLE.1</strong>: every element of $.message.order.quote.breakup[*].title must be in [&quot;BASE_PRICE&quot;, &quot;REFUND&quot;, &quot;CANCELLATION_CHARGES&quot;, &quot;OFFER&quot;, &quot;TOLL&quot;]</li>
+<li><strong>condition Enum_Required_56_BREAKUP_TITLE.2</strong>: $.message.order.quote.breakup[*].title must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition ROUTE_INFO_Tag_Required_57_DESCRIPTOR_CODE</strong>: every element of $.message.order.fulfillments[<em>].tags[</em>].descriptor.code must be in [&quot;ROUTE_INFO&quot;, &quot;TICKET_INFO&quot;, &quot;TRIP_DETAILS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition ROUTE_INFO_Tag_Required_57_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_0_ROUTE_INFO</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;ROUTE_INFO&#39;)].list[</em>].descriptor.code must be in [&quot;ROUTE_ID&quot;, &quot;ROUTE_DIRECTION&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_0_TICKET_INFO</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;TICKET_INFO&#39;)].list[</em>].descriptor.code must be in [&quot;NUMBER&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_0_TRIP_DETAILS</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;TRIP_DETAILS&#39;)].list[</em>].descriptor.code must be in [&quot;AVAILABLE_TRIPS&quot;, &quot;UTILIZED_TRIPS&quot;]</p>
+</li>
+<li><p><strong>condition FARE_POLICY_Tag_Required_61_DESCRIPTOR_CODE</strong>: every element of $.message.order.items[<em>].tags[</em>].descriptor.code must be in [&quot;FARE_POLICY&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition FARE_POLICY_Tag_Required_61_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.items[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_1_FARE_POLICY</strong>: every element of $.message.order.items[<em>].tags[?(@.descriptor.code==&#39;FARE_POLICY&#39;)].list[</em>].descriptor.code must be in [&quot;RESTRICTED_PERSON&quot;, &quot;RESTRICTION_PROOF&quot;]</p>
+</li>
+<li><p><strong>condition BUYER_FINDER_FEES_Tag_Required_63_DESCRIPTOR_CODE</strong>: every element of $.message.order.payments[<em>].tags[</em>].descriptor.code must be in [&quot;BUYER_FINDER_FEES&quot;, &quot;SETTLEMENT_TERMS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition BUYER_FINDER_FEES_Tag_Required_63_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.payments[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_2_BUYER_FINDER_FEES</strong>: every element of $.message.order.payments[<em>].tags[?(@.descriptor.code==&#39;BUYER_FINDER_FEES&#39;)].list[</em>].descriptor.code must be in [&quot;BUYER_FINDER_FEES_TYPE&quot;, &quot;BUYER_FINDER_FEES_PERCENTAGE&quot;, &quot;BUYER_FINDER_FEES_AMOUNT&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_2_SETTLEMENT_TERMS</strong>: every element of $.message.order.payments[<em>].tags[?(@.descriptor.code==&#39;SETTLEMENT_TERMS&#39;)].list[</em>].descriptor.code must be in [&quot;SETTLEMENT_WINDOW&quot;, &quot;SETTLEMENT_BASIS&quot;, &quot;SETTLEMENT_TYPE&quot;, &quot;MANDATORY_ARBITRATION&quot;, &quot;COURT_JURISDICTION&quot;, &quot;DELAY_INTEREST&quot;, &quot;STATIC_TERMS&quot;, &quot;SETTLEMENT_AMOUNT&quot;]</p>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><strong>on_cancel</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_1_CONTEXT_TIMESTAMP</strong>: $.context.timestamp must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_2_CONTEXT_BAP_ID</strong>: $.context.bap_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_3_CONTEXT_TRANSACTION_ID</strong>: $.context.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_4_CONTEXT_MESSAGE_ID</strong>: $.context.message_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_5_CONTEXT_VERSION</strong>: $.context.version must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_6_CONTEXT_BAP_URI</strong>: $.context.bap_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_7_CONTEXT_TTL</strong>: $.context.ttl must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_8_CONTEXT_BPP_ID</strong>: $.context.bpp_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_9_CONTEXT_BPP_URI</strong>: $.context.bpp_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_38_CONTEXT_ACTION</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_38_CONTEXT_ACTION.1</strong>: every element of $.context.action must be in [&quot;on_cancel&quot;]</li>
+<li><strong>condition Enum_Required_38_CONTEXT_ACTION.2</strong>: $.context.action must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_39_COUNTRY_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_39_COUNTRY_CODE.1</strong>: every element of $.context.location.country.code must be in [&quot;IND&quot;]</li>
+<li><strong>condition Enum_Required_39_COUNTRY_CODE.2</strong>: $.context.location.country.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_40_CITY_CODE</strong>: $.context.location.city.code must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_41_CONTEXT_DOMAIN</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_41_CONTEXT_DOMAIN.1</strong>: every element of $.context.domain must be in [&quot;ONDC:TRV11&quot;]</li>
+<li><strong>condition Enum_Required_41_CONTEXT_DOMAIN.2</strong>: $.context.domain must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>on_cancel_Message_TESTS</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_10_ORDER_ID</strong>: $.message.order.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_11_ORDER_STATUS</strong>: $.message.order.status must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_12_ITEMS_ID</strong>: $.message.order.items[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_13_DESCRIPTOR_NAME</strong>: $.message.order.items[*].descriptor.name must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_14_PRICE_CURRENCY</strong>: $.message.order.items[*].price.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_15_PRICE_VALUE</strong>: $.message.order.items[*].price.value must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_16_SELECTED_COUNT</strong>: $.message.order.items[*].quantity.selected.count must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_17_ITEMS_FULFILLMENT_IDS</strong>: $.message.order.items[<em>].fulfillment_ids[</em>] must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_18_ITEMS_CATEGORY_IDS</strong>: $.message.order.items[<em>].category_ids[</em>] must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_19_TIME_LABEL</strong>: $.message.order.items[*].time.label must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_20_TIME_DURATION</strong>: $.message.order.items[*].time.duration must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_21_PROVIDER_ID</strong>: $.message.order.provider.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_22_DESCRIPTOR_NAME</strong>: $.message.order.provider.descriptor.name must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_23_IMAGES_URL</strong>: $.message.order.provider.descriptor.images[*].url must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_24_RANGE_START</strong>: $.message.order.provider.time.range.start must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_25_RANGE_END</strong>: $.message.order.provider.time.range.end must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_26_FULFILLMENTS_ID</strong>: $.message.order.fulfillments[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_27_FULFILLMENTS_ID</strong>: $.message.order.fulfillments[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_28_LOCATION_GPS</strong>: $.message.order.fulfillments[<em>].stops[</em>].location.gps must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_29_PRICE_VALUE</strong>: $.message.order.quote.price.value must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_30_PRICE_CURRENCY</strong>: $.message.order.quote.price.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_31_PAYMENTS_ID</strong>: $.message.order.payments[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_32_PARAMS_BANK_CODE</strong>: $.message.order.payments[*].params.bank_code must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_33_PARAMS_BANK_ACCOUNT_NUMBER</strong>: $.message.order.payments[*].params.bank_account_number must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_34_EXTERNAL_REF_URL</strong>: $.message.order.cancellation_terms[*].external_ref.url must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_35_EXTERNAL_REF_MIMETYPE</strong>: $.message.order.cancellation_terms[*].external_ref.mimetype must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_36_CANCELLATION_CANCELLED_BY</strong>: $.message.order.cancellation.cancelled_by must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_37_CANCELLATION_TIME</strong>: $.message.order.cancellation.time must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_42_DESCRIPTOR_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_42_DESCRIPTOR_CODE.1</strong>: every element of $.message.order.items[*].descriptor.code must be in [&quot;SJT&quot;, &quot;SFSJT&quot;, &quot;RJT&quot;, &quot;PASS&quot;]</li>
+<li><strong>condition Enum_Required_42_DESCRIPTOR_CODE.2</strong>: $.message.order.items[*].descriptor.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_43_VEHICLE_CATEGORY</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_43_VEHICLE_CATEGORY.1</strong>: every element of $.message.order.fulfillments[*].vehicle.category must be in [&quot;BUS&quot;, &quot;METRO&quot;]</li>
+<li><strong>condition Enum_Required_43_VEHICLE_CATEGORY.2</strong>: $.message.order.fulfillments[*].vehicle.category must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_44_FULFILLMENTS_TYPE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_44_FULFILLMENTS_TYPE.1</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;ROUTE&quot;, &quot;TRIP&quot;]</li>
+<li><strong>condition Enum_Required_44_FULFILLMENTS_TYPE.2</strong>: $.message.order.fulfillments[*].type must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_45_FULFILLMENTS_TYPE</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;START&quot;, &quot;END&quot;, &quot;INTERMEDIATE_STOP&quot;, &quot;TRANSIT_STOP&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_45_FULFILLMENTS_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_46_AUTHORIZATION_TYPE</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.type must be in [&quot;QR&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_46_AUTHORIZATION_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_47_AUTHORIZATION_STATUS</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.status must be in [&quot;UNCLAIMED&quot;, &quot;CLAIMED&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_47_AUTHORIZATION_STATUS</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.status must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_48_PAYMENTS_STATUS</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_48_PAYMENTS_STATUS.1</strong>: every element of $.message.order.payments[*].status must be in [&quot;NOT-PAID&quot;, &quot;PAID&quot;]</li>
+<li><strong>condition Enum_Required_48_PAYMENTS_STATUS.2</strong>: $.message.order.payments[*].status must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_49_PAYMENTS_COLLECTED_BY</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_49_PAYMENTS_COLLECTED_BY.1</strong>: every element of $.message.order.payments[*].collected_by must be in [&quot;BPP&quot;, &quot;BAP&quot;]</li>
+<li><strong>condition Enum_Required_49_PAYMENTS_COLLECTED_BY.2</strong>: $.message.order.payments[*].collected_by must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_50_PAYMENTS_TYPE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_50_PAYMENTS_TYPE.1</strong>: every element of $.message.order.payments[*].type must be in [&quot;PRE-ORDER&quot;, &quot;ON-FULFILLMENT&quot;, &quot;POST-FULFILLMENT&quot;]</li>
+<li><strong>condition Enum_Required_50_PAYMENTS_TYPE.2</strong>: $.message.order.payments[*].type must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_51_BREAKUP_TITLE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_51_BREAKUP_TITLE.1</strong>: every element of $.message.order.quote.breakup[*].title must be in [&quot;BASE_PRICE&quot;, &quot;REFUND&quot;, &quot;CANCELLATION_CHARGES&quot;, &quot;OFFER&quot;, &quot;TOLL&quot;]</li>
+<li><strong>condition Enum_Required_51_BREAKUP_TITLE.2</strong>: $.message.order.quote.breakup[*].title must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition ROUTE_INFO_Tag_Required_52_DESCRIPTOR_CODE</strong>: every element of $.message.order.fulfillments[<em>].tags[</em>].descriptor.code must be in [&quot;ROUTE_INFO&quot;, &quot;TICKET_INFO&quot;, &quot;TRIP_DETAILS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition ROUTE_INFO_Tag_Required_52_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_0_ROUTE_INFO</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;ROUTE_INFO&#39;)].list[</em>].descriptor.code must be in [&quot;ROUTE_ID&quot;, &quot;ROUTE_DIRECTION&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_0_TICKET_INFO</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;TICKET_INFO&#39;)].list[</em>].descriptor.code must be in [&quot;NUMBER&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_0_TRIP_DETAILS</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;TRIP_DETAILS&#39;)].list[</em>].descriptor.code must be in [&quot;AVAILABLE_TRIPS&quot;, &quot;UTILIZED_TRIPS&quot;]</p>
+</li>
+<li><p><strong>condition FARE_POLICY_Tag_Required_56_DESCRIPTOR_CODE</strong>: every element of $.message.order.items[<em>].tags[</em>].descriptor.code must be in [&quot;FARE_POLICY&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition FARE_POLICY_Tag_Required_56_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.items[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_1_FARE_POLICY</strong>: every element of $.message.order.items[<em>].tags[?(@.descriptor.code==&#39;FARE_POLICY&#39;)].list[</em>].descriptor.code must be in [&quot;RESTRICTED_PERSON&quot;, &quot;RESTRICTION_PROOF&quot;]</p>
+</li>
+<li><p><strong>condition BUYER_FINDER_FEES_Tag_Required_58_DESCRIPTOR_CODE</strong>: every element of $.message.order.payments[<em>].tags[</em>].descriptor.code must be in [&quot;BUYER_FINDER_FEES&quot;, &quot;SETTLEMENT_TERMS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition BUYER_FINDER_FEES_Tag_Required_58_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.payments[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_2_BUYER_FINDER_FEES</strong>: every element of $.message.order.payments[<em>].tags[?(@.descriptor.code==&#39;BUYER_FINDER_FEES&#39;)].list[</em>].descriptor.code must be in [&quot;BUYER_FINDER_FEES_TYPE&quot;, &quot;BUYER_FINDER_FEES_PERCENTAGE&quot;, &quot;BUYER_FINDER_FEES_AMOUNT&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_2_SETTLEMENT_TERMS</strong>: every element of $.message.order.payments[<em>].tags[?(@.descriptor.code==&#39;SETTLEMENT_TERMS&#39;)].list[</em>].descriptor.code must be in [&quot;SETTLEMENT_WINDOW&quot;, &quot;SETTLEMENT_BASIS&quot;, &quot;SETTLEMENT_TYPE&quot;, &quot;MANDATORY_ARBITRATION&quot;, &quot;COURT_JURISDICTION&quot;, &quot;DELAY_INTEREST&quot;, &quot;STATIC_TERMS&quot;, &quot;SETTLEMENT_AMOUNT&quot;]</p>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><strong>on_update</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_1_CONTEXT_TIMESTAMP</strong>: $.context.timestamp must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_2_CONTEXT_BAP_ID</strong>: $.context.bap_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_3_CONTEXT_TRANSACTION_ID</strong>: $.context.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_4_CONTEXT_MESSAGE_ID</strong>: $.context.message_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_5_CONTEXT_VERSION</strong>: $.context.version must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_6_CONTEXT_BAP_URI</strong>: $.context.bap_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_7_CONTEXT_TTL</strong>: $.context.ttl must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_8_CONTEXT_BPP_ID</strong>: $.context.bpp_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_9_CONTEXT_BPP_URI</strong>: $.context.bpp_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_39_CONTEXT_ACTION</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_39_CONTEXT_ACTION.1</strong>: every element of $.context.action must be in [&quot;on_cancel&quot;]</li>
+<li><strong>condition Enum_Required_39_CONTEXT_ACTION.2</strong>: $.context.action must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_40_COUNTRY_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_40_COUNTRY_CODE.1</strong>: every element of $.context.location.country.code must be in [&quot;IND&quot;]</li>
+<li><strong>condition Enum_Required_40_COUNTRY_CODE.2</strong>: $.context.location.country.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_41_CITY_CODE</strong>: $.context.location.city.code must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_42_CONTEXT_DOMAIN</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_42_CONTEXT_DOMAIN.1</strong>: every element of $.context.domain must be in [&quot;ONDC:TRV11&quot;]</li>
+<li><strong>condition Enum_Required_42_CONTEXT_DOMAIN.2</strong>: $.context.domain must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>on_update_Message_TESTS</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_10_ORDER_ID</strong>: $.message.order.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_11_ITEMS_ID</strong>: $.message.order.items[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_12_DESCRIPTOR_NAME</strong>: $.message.order.items[*].descriptor.name must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_13_PRICE_CURRENCY</strong>: $.message.order.items[*].price.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_14_PRICE_VALUE</strong>: $.message.order.items[*].price.value must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_15_SELECTED_COUNT</strong>: $.message.order.items[*].quantity.selected.count must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_16_ITEMS_FULFILLMENT_IDS</strong>: $.message.order.items[<em>].fulfillment_ids[</em>] must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_17_TIME_LABEL</strong>: $.message.order.items[*].time.label must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_18_TIME_DURATION</strong>: $.message.order.items[*].time.duration must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_19_PROVIDER_ID</strong>: $.message.order.provider.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_20_DESCRIPTOR_NAME</strong>: $.message.order.provider.descriptor.name must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_21_FULFILLMENTS_ID</strong>: $.message.order.fulfillments[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_22_INSTRUCTIONS_NAME</strong>: $.message.order.fulfillments[<em>].stops[</em>].instructions.name must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_23_DESCRIPTOR_NAME</strong>: $.message.order.fulfillments[<em>].stops[</em>].location.descriptor.name must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_24_DESCRIPTOR_CODE</strong>: $.message.order.fulfillments[<em>].stops[</em>].location.descriptor.code must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_25_LOCATION_GPS</strong>: $.message.order.fulfillments[<em>].stops[</em>].location.gps must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_26_AUTHORIZATION_TOKEN</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.token must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_27_AUTHORIZATION_VALID_TO</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.valid_to must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_28_FULFILLMENTS_ID</strong>: $.message.order.fulfillments[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_29_PRICE_VALUE</strong>: $.message.order.quote.price.value must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_30_PRICE_CURRENCY</strong>: $.message.order.quote.price.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_31_ITEM_ID</strong>: $.message.order.quote.breakup[*].item.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_32_PRICE_CURRENCY</strong>: $.message.order.quote.breakup[*].price.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_33_PRICE_VALUE</strong>: $.message.order.quote.breakup[*].price.value must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_34_PAYMENTS_ID</strong>: $.message.order.payments[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_35_PARAMS_TRANSACTION_ID</strong>: $.message.order.payments[*].params.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_36_PARAMS_CURRENCY</strong>: $.message.order.payments[*].params.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_37_PARAMS_AMOUNT</strong>: $.message.order.payments[*].params.amount must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_38_CANCEL_BY_DURATION</strong>: $.message.order.cancellation_terms[*].cancel_by.duration must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_43_DESCRIPTOR_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_43_DESCRIPTOR_CODE.1</strong>: every element of $.message.order.items[*].descriptor.code must be in [&quot;SJT&quot;, &quot;SFSJT&quot;, &quot;RJT&quot;, &quot;PASS&quot;]</li>
+<li><strong>condition Enum_Required_43_DESCRIPTOR_CODE.2</strong>: $.message.order.items[*].descriptor.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_44_VEHICLE_CATEGORY</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_44_VEHICLE_CATEGORY.1</strong>: every element of $.message.order.fulfillments[*].vehicle.category must be in [&quot;BUS&quot;, &quot;METRO&quot;]</li>
+<li><strong>condition Enum_Required_44_VEHICLE_CATEGORY.2</strong>: $.message.order.fulfillments[*].vehicle.category must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_45_FULFILLMENTS_TYPE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_45_FULFILLMENTS_TYPE.1</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;ROUTE&quot;, &quot;TRIP&quot;]</li>
+<li><strong>condition Enum_Required_45_FULFILLMENTS_TYPE.2</strong>: $.message.order.fulfillments[*].type must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_46_FULFILLMENTS_TYPE</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;START&quot;, &quot;END&quot;, &quot;INTERMEDIATE_STOP&quot;, &quot;TRANSIT_STOP&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_46_FULFILLMENTS_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_47_AUTHORIZATION_TYPE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_47_AUTHORIZATION_TYPE.1</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.type must be in [&quot;QR&quot;]</li>
+<li><strong>condition Enum_Required_47_AUTHORIZATION_TYPE.2</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.type must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_48_AUTHORIZATION_STATUS</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.status must be in [&quot;UNCLAIMED&quot;, &quot;CLAIMED&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_48_AUTHORIZATION_STATUS</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.status must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_49_PAYMENTS_STATUS</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_49_PAYMENTS_STATUS.1</strong>: every element of $.message.order.payments[*].status must be in [&quot;NOT-PAID&quot;, &quot;PAID&quot;]</li>
+<li><strong>condition Enum_Required_49_PAYMENTS_STATUS.2</strong>: $.message.order.payments[*].status must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_50_PAYMENTS_COLLECTED_BY</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_50_PAYMENTS_COLLECTED_BY.1</strong>: every element of $.message.order.payments[*].collected_by must be in [&quot;BPP&quot;, &quot;BAP&quot;]</li>
+<li><strong>condition Enum_Required_50_PAYMENTS_COLLECTED_BY.2</strong>: $.message.order.payments[*].collected_by must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_51_PAYMENTS_TYPE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_51_PAYMENTS_TYPE.1</strong>: every element of $.message.order.payments[*].type must be in [&quot;PRE-ORDER&quot;, &quot;ON-FULFILLMENT&quot;, &quot;POST-FULFILLMENT&quot;]</li>
+<li><strong>condition Enum_Required_51_PAYMENTS_TYPE.2</strong>: $.message.order.payments[*].type must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_52_BREAKUP_TITLE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_52_BREAKUP_TITLE.1</strong>: every element of $.message.order.quote.breakup[*].title must be in [&quot;BASE_PRICE&quot;, &quot;REFUND&quot;, &quot;CANCELLATION_CHARGES&quot;, &quot;OFFER&quot;, &quot;TOLL&quot;]</li>
+<li><strong>condition Enum_Required_52_BREAKUP_TITLE.2</strong>: $.message.order.quote.breakup[*].title must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition ROUTE_INFO_Tag_Required_53_DESCRIPTOR_CODE</strong>: every element of $.message.order.fulfillments[<em>].tags[</em>].descriptor.code must be in [&quot;ROUTE_INFO&quot;, &quot;TICKET_INFO&quot;, &quot;TRIP_DETAILS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition ROUTE_INFO_Tag_Required_53_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_0_ROUTE_INFO</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;ROUTE_INFO&#39;)].list[</em>].descriptor.code must be in [&quot;ROUTE_ID&quot;, &quot;ROUTE_DIRECTION&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_0_TICKET_INFO</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;TICKET_INFO&#39;)].list[</em>].descriptor.code must be in [&quot;NUMBER&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_0_TRIP_DETAILS</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;TRIP_DETAILS&#39;)].list[</em>].descriptor.code must be in [&quot;AVAILABLE_TRIPS&quot;, &quot;UTILIZED_TRIPS&quot;]</p>
+</li>
+<li><p><strong>condition FARE_POLICY_Tag_Required_57_DESCRIPTOR_CODE</strong>: every element of $.message.order.items[<em>].tags[</em>].descriptor.code must be in [&quot;FARE_POLICY&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition FARE_POLICY_Tag_Required_57_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.items[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_1_FARE_POLICY</strong>: every element of $.message.order.items[<em>].tags[?(@.descriptor.code==&#39;FARE_POLICY&#39;)].list[</em>].descriptor.code must be in [&quot;RESTRICTED_PERSON&quot;, &quot;RESTRICTION_PROOF&quot;]</p>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><strong>on_status</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_1_CONTEXT_TIMESTAMP</strong>: $.context.timestamp must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_2_CONTEXT_BAP_ID</strong>: $.context.bap_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_3_CONTEXT_TRANSACTION_ID</strong>: $.context.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_4_CONTEXT_MESSAGE_ID</strong>: $.context.message_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_5_CONTEXT_VERSION</strong>: $.context.version must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_6_CONTEXT_BAP_URI</strong>: $.context.bap_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_7_CONTEXT_TTL</strong>: $.context.ttl must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_8_CONTEXT_BPP_ID</strong>: $.context.bpp_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_9_CONTEXT_BPP_URI</strong>: $.context.bpp_uri must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_43_CONTEXT_ACTION</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_43_CONTEXT_ACTION.1</strong>: every element of $.context.action must be in [&quot;on_status&quot;]</li>
+<li><strong>condition Enum_Required_43_CONTEXT_ACTION.2</strong>: $.context.action must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_44_COUNTRY_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_44_COUNTRY_CODE.1</strong>: every element of $.context.location.country.code must be in [&quot;IND&quot;]</li>
+<li><strong>condition Enum_Required_44_COUNTRY_CODE.2</strong>: $.context.location.country.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_45_CITY_CODE</strong>: $.context.location.city.code must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_46_CONTEXT_DOMAIN</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_46_CONTEXT_DOMAIN.1</strong>: every element of $.context.domain must be in [&quot;ONDC:TRV11&quot;]</li>
+<li><strong>condition Enum_Required_46_CONTEXT_DOMAIN.2</strong>: $.context.domain must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>on_status_Message_TESTS</strong> : All the following sub conditions must pass as per the api requirement</p>
+<ul>
+<li><p><strong>condition Attri_Required_10_ORDER_ID</strong>: $.message.order.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_11_ORDER_STATUS</strong>: $.message.order.status must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_12_ITEMS_ID</strong>: $.message.order.items[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_13_DESCRIPTOR_NAME</strong>: $.message.order.items[*].descriptor.name must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_14_PRICE_CURRENCY</strong>: $.message.order.items[*].price.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_15_PRICE_VALUE</strong>: $.message.order.items[*].price.value must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_16_SELECTED_COUNT</strong>: $.message.order.items[*].quantity.selected.count must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_17_ITEMS_FULFILLMENT_IDS</strong>: $.message.order.items[<em>].fulfillment_ids[</em>] must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_18_TIME_LABEL</strong>: $.message.order.items[*].time.label must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_19_TIME_DURATION</strong>: $.message.order.items[*].time.duration must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_20_PROVIDER_ID</strong>: $.message.order.provider.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_21_DESCRIPTOR_NAME</strong>: $.message.order.provider.descriptor.name must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_22_FULFILLMENTS_ID</strong>: $.message.order.fulfillments[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_23_LOCATION_GPS</strong>: $.message.order.fulfillments[<em>].stops[</em>].location.gps must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_24_FULFILLMENTS_ID</strong>: $.message.order.fulfillments[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_25_PRICE_VALUE</strong>: $.message.order.quote.price.value must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_26_PRICE_CURRENCY</strong>: $.message.order.quote.price.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_27_ITEM_ID</strong>: $.message.order.quote.breakup[*].item.id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_28_PAYMENTS_ID</strong>: $.message.order.payments[*].id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_29_PARAMS_TRANSACTION_ID</strong>: $.message.order.payments[*].params.transaction_id must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_30_PARAMS_CURRENCY</strong>: $.message.order.payments[*].params.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_31_PARAMS_AMOUNT</strong>: $.message.order.payments[*].params.amount must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_32_CANCEL_BY_DURATION</strong>: $.message.order.cancellation_terms[*].cancel_by.duration must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_33_ITEMS_CATEGORY_IDS</strong>: $.message.order.items[<em>].category_ids[</em>] must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_34_RANGE_START</strong>: $.message.order.provider.time.range.start must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_35_RANGE_END</strong>: $.message.order.provider.time.range.end must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_36_PRICE_CURRENCY</strong>: $.message.order.quote.breakup[*].item.price.currency must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_37_PRICE_VALUE</strong>: $.message.order.quote.breakup[*].item.price.value must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_38_SELECTED_COUNT</strong>: $.message.order.quote.breakup[*].item.quantity.selected.count must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_39_EXTERNAL_REF_URL</strong>: $.message.order.cancellation_terms[*].external_ref.url must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_40_EXTERNAL_REF_MIMETYPE</strong>: $.message.order.cancellation_terms[*].external_ref.mimetype must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_41_ORDER_CREATED_AT</strong>: $.message.order.created_at must be present in the payload</p>
+</li>
+<li><p><strong>condition Attri_Required_42_ORDER_UPDATED_AT</strong>: $.message.order.updated_at must be present in the payload</p>
+</li>
+<li><p><strong>condition Enum_Required_47_DESCRIPTOR_CODE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_47_DESCRIPTOR_CODE.1</strong>: every element of $.message.order.items[*].descriptor.code must be in [&quot;SJT&quot;, &quot;SFSJT&quot;, &quot;RJT&quot;, &quot;PASS&quot;]</li>
+<li><strong>condition Enum_Required_47_DESCRIPTOR_CODE.2</strong>: $.message.order.items[*].descriptor.code must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_48_VEHICLE_CATEGORY</strong>: every element of $.message.order.fulfillments[*].vehicle.category must be in [&quot;BUS&quot;, &quot;METRO&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_48_VEHICLE_CATEGORY</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].vehicle.category must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_49_FULFILLMENTS_TYPE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_49_FULFILLMENTS_TYPE.1</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;ROUTE&quot;, &quot;TRIP&quot;]</li>
+<li><strong>condition Enum_Required_49_FULFILLMENTS_TYPE.2</strong>: $.message.order.fulfillments[*].type must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_50_FULFILLMENTS_TYPE</strong>: every element of $.message.order.fulfillments[*].type must be in [&quot;START&quot;, &quot;END&quot;, &quot;INTERMEDIATE_STOP&quot;, &quot;TRANSIT_STOP&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_50_FULFILLMENTS_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[*].type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_51_AUTHORIZATION_TYPE</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.type must be in [&quot;QR&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_51_AUTHORIZATION_TYPE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.type must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_52_AUTHORIZATION_STATUS</strong>: every element of $.message.order.fulfillments[<em>].stops[</em>].authorization.status must be in [&quot;UNCLAIMED&quot;, &quot;CLAIMED&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition Enum_Required_52_AUTHORIZATION_STATUS</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].stops[</em>].authorization.status must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition Enum_Required_53_PAYMENTS_STATUS</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_53_PAYMENTS_STATUS.1</strong>: every element of $.message.order.payments[*].status must be in [&quot;NOT-PAID&quot;, &quot;PAID&quot;]</li>
+<li><strong>condition Enum_Required_53_PAYMENTS_STATUS.2</strong>: $.message.order.payments[*].status must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_54_PAYMENTS_COLLECTED_BY</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_54_PAYMENTS_COLLECTED_BY.1</strong>: every element of $.message.order.payments[*].collected_by must be in [&quot;BPP&quot;, &quot;BAP&quot;]</li>
+<li><strong>condition Enum_Required_54_PAYMENTS_COLLECTED_BY.2</strong>: $.message.order.payments[*].collected_by must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_55_PAYMENTS_TYPE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_55_PAYMENTS_TYPE.1</strong>: every element of $.message.order.payments[*].type must be in [&quot;PRE-ORDER&quot;, &quot;ON-FULFILLMENT&quot;, &quot;POST-FULFILLMENT&quot;]</li>
+<li><strong>condition Enum_Required_55_PAYMENTS_TYPE.2</strong>: $.message.order.payments[*].type must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition Enum_Required_56_BREAKUP_TITLE</strong>: all of the following sub conditions must be met:</p>
+<ul>
+<li><strong>condition Enum_Required_56_BREAKUP_TITLE.1</strong>: every element of $.message.order.quote.breakup[*].title must be in [&quot;BASE_PRICE&quot;, &quot;REFUND&quot;, &quot;CANCELLATION_CHARGES&quot;, &quot;OFFER&quot;, &quot;TOLL&quot;]</li>
+<li><strong>condition Enum_Required_56_BREAKUP_TITLE.2</strong>: $.message.order.quote.breakup[*].title must be present in the payload</li>
+</ul>
+</li>
+<li><p><strong>condition ROUTE_INFO_Tag_Required_57_DESCRIPTOR_CODE</strong>: every element of $.message.order.fulfillments[<em>].tags[</em>].descriptor.code must be in [&quot;ROUTE_INFO&quot;, &quot;TICKET_INFO&quot;, &quot;TRIP_DETAILS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition ROUTE_INFO_Tag_Required_57_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.fulfillments[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_0_ROUTE_INFO</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;ROUTE_INFO&#39;)].list[</em>].descriptor.code must be in [&quot;ROUTE_ID&quot;, &quot;ROUTE_DIRECTION&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_0_TICKET_INFO</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;TICKET_INFO&#39;)].list[</em>].descriptor.code must be in [&quot;NUMBER&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_0_TRIP_DETAILS</strong>: every element of $.message.order.fulfillments[<em>].tags[?(@.descriptor.code==&#39;TRIP_DETAILS&#39;)].list[</em>].descriptor.code must be in [&quot;AVAILABLE_TRIPS&quot;, &quot;UTILIZED_TRIPS&quot;]</p>
+</li>
+<li><p><strong>condition FARE_POLICY_Tag_Required_61_DESCRIPTOR_CODE</strong>: every element of $.message.order.items[<em>].tags[</em>].descriptor.code must be in [&quot;FARE_POLICY&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition FARE_POLICY_Tag_Required_61_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.items[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_1_FARE_POLICY</strong>: every element of $.message.order.items[<em>].tags[?(@.descriptor.code==&#39;FARE_POLICY&#39;)].list[</em>].descriptor.code must be in [&quot;RESTRICTED_PERSON&quot;, &quot;RESTRICTION_PROOF&quot;]</p>
+</li>
+<li><p><strong>condition BUYER_FINDER_FEES_Tag_Required_63_DESCRIPTOR_CODE</strong>: every element of $.message.order.payments[<em>].tags[</em>].descriptor.code must be in [&quot;BUYER_FINDER_FEES&quot;, &quot;SETTLEMENT_TERMS&quot;]</p>
+<blockquote>
+<p>Note: <strong>Condition BUYER_FINDER_FEES_Tag_Required_63_DESCRIPTOR_CODE</strong> can be skipped if the following conditions are met:</p>
+<ul>
+<li><strong>condition B</strong>: $.message.order.payments[<em>].tags[</em>].descriptor.code must <strong>not</strong> be present in the payload</li>
+</ul>
+</blockquote>
+</li>
+<li><p><strong>condition validate_tag_2_BUYER_FINDER_FEES</strong>: every element of $.message.order.payments[<em>].tags[?(@.descriptor.code==&#39;BUYER_FINDER_FEES&#39;)].list[</em>].descriptor.code must be in [&quot;BUYER_FINDER_FEES_TYPE&quot;, &quot;BUYER_FINDER_FEES_PERCENTAGE&quot;, &quot;BUYER_FINDER_FEES_AMOUNT&quot;]</p>
+</li>
+<li><p><strong>condition validate_tag_2_SETTLEMENT_TERMS</strong>: every element of $.message.order.payments[<em>].tags[?(@.descriptor.code==&#39;SETTLEMENT_TERMS&#39;)].list[</em>].descriptor.code must be in [&quot;SETTLEMENT_WINDOW&quot;, &quot;SETTLEMENT_BASIS&quot;, &quot;SETTLEMENT_TYPE&quot;, &quot;MANDATORY_ARBITRATION&quot;, &quot;COURT_JURISDICTION&quot;, &quot;DELAY_INTEREST&quot;, &quot;STATIC_TERMS&quot;, &quot;SETTLEMENT_AMOUNT&quot;]</p>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+    </div>
+</body>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Select all list items that have a nested <ul> (collapsible items)
+        const collapsibleItems = document.querySelectorAll('li > ul');
+
+        collapsibleItems.forEach(function(nestedList) {
+            const parentLi = nestedList.parentElement;
+            parentLi.classList.add('collapsible', 'collapsed');
+
+            // Add click event listener to the <p> inside the list item
+            const clickableArea = parentLi.querySelector('p');
+            clickableArea.addEventListener('click', function(e) {
+                // Prevent click events on links inside the <p>
+                if (e.target.tagName !== 'A') {
+                    parentLi.classList.toggle('collapsed');
+                }
+            });
+        });
+    });
+</script>
+</html>
