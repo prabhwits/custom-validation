@@ -1,5 +1,5 @@
 import { RedisService } from "ondc-automation-cache-lib";
-import { taxNotInlcusive } from "../../../../utils/helper";
+import { addActionToRedisSet, taxNotInlcusive } from "../../../../utils/helper";
 import {
   checkBppIdOrBapId,
   checkContext,
@@ -64,6 +64,27 @@ const onSelect = async (data: any) => {
 
   const contextRes: any = checkContext(context, constants.ON_SELECT);
   const result: any[] = [];
+
+  try {
+    const previousCallPresent = await addActionToRedisSet(
+      context.transaction_id,
+      ApiSequence.SELECT,
+      ApiSequence.ON_SELECT
+    );
+    if (!previousCallPresent) {
+      result.push({
+        valid: false,
+        code: 20000,
+        description: `Previous call doesn't exist`,
+      });
+    }
+    return result;
+  } catch (error: any) {
+    console.error(
+      `!!Error while previous action call /${constants.ON_SELECT}, ${error.stack}`
+    );
+  }
+
   const checkBap = checkBppIdOrBapId(context.bap_id);
   const checkBpp = checkBppIdOrBapId(context.bpp_id);
 
@@ -157,10 +178,12 @@ const onSelect = async (data: any) => {
     console.info(
       `Comparing timestamp of /${constants.SELECT} and /${constants.ON_SELECT}`
     );
-    const tmpstmpRaw = await RedisService.getKey(`${transaction_id}_${ApiSequence.SELECT}_tmpstmp`,);
+    const tmpstmpRaw = await RedisService.getKey(
+      `${transaction_id}_${ApiSequence.SELECT}_tmpstmp`
+    );
     const tmpstmp = tmpstmpRaw ? JSON.parse(tmpstmpRaw) : null;
 
-    console.log("timstamp", tmpstmp, context.timestamp)
+    console.log("timstamp", tmpstmp, context.timestamp);
 
     if (_.gte(tmpstmp, context.timestamp)) {
       result.push({
@@ -475,7 +498,11 @@ const onSelect = async (data: any) => {
             result.push({
               valid: false,
               code: 20000,
-              description: `In Fulfillment${idx}, @ondc/org/category is not a valid value in ${constants.ON_SELECT} and should have one of these values ${[ffCategory[selfPickupOrDelivery]]}`,
+              description: `In Fulfillment${idx}, @ondc/org/category is not a valid value in ${
+                constants.ON_SELECT
+              } and should have one of these values ${[
+                ffCategory[selfPickupOrDelivery],
+              ]}`,
             });
           }
           const domain = data.context.domain.split(":")[1];
@@ -711,7 +738,9 @@ const onSelect = async (data: any) => {
       );
       onSelectPrice = onSelectPrice.toFixed(2);
       console.info(
-        `Matching quoted Price ${parseFloat(on_select.quote.price.value)} with Breakup Price ${onSelectPrice}`
+        `Matching quoted Price ${parseFloat(
+          on_select.quote.price.value
+        )} with Breakup Price ${onSelectPrice}`
       );
       if (
         Math.round(onSelectPrice) !=
@@ -824,7 +853,11 @@ const onSelect = async (data: any) => {
             result.push({
               valid: false,
               code: 20000,
-              description: `Quote breakup Payment title "${item.title}" comes under the title type "${retailPymntTtl[item.title.toLowerCase().trim()]}"`,
+              description: `Quote breakup Payment title "${
+                item.title
+              }" comes under the title type "${
+                retailPymntTtl[item.title.toLowerCase().trim()]
+              }"`,
             });
           }
         }
@@ -946,7 +979,8 @@ const onSelect = async (data: any) => {
         result.push({
           valid: false,
           code: 20000,
-          description: "FullfillmentID can't be equal to ProviderID on ${constants.ON_SELECT}",
+          description:
+            "FullfillmentID can't be equal to ProviderID on ${constants.ON_SELECT}",
         });
       }
       i++;

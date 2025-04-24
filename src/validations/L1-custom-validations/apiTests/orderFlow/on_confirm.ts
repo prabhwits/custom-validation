@@ -17,6 +17,7 @@ import {
   timeDiff as timeDifference,
   payment_status,
   addFulfillmentIdToRedisSet,
+  addActionToRedisSet,
 } from "../../../../utils/helper";
 import constants, {
   ApiSequence,
@@ -411,7 +412,11 @@ async function validateFulfillments(
     ) {
       result.push(
         createError(
-          `TAT Mismatch between /${constants.ON_CONFIRM} i.e ${isoDurToSec(fulfillment["@ondc/org/TAT"])} seconds & /${constants.ON_SELECT} i.e ${on_select_fulfillment_tat_obj[fulfillment.id]} seconds`,
+          `TAT Mismatch between /${constants.ON_CONFIRM} i.e ${isoDurToSec(
+            fulfillment["@ondc/org/TAT"]
+          )} seconds & /${constants.ON_SELECT} i.e ${
+            on_select_fulfillment_tat_obj[fulfillment.id]
+          } seconds`,
           ERROR_CODES.INVALID_RESPONSE
         )
       );
@@ -424,7 +429,9 @@ async function validateFulfillments(
     ) {
       result.push(
         createError(
-          `fulfillment id ${fulfillment.id || "missing"} does not exist in /${constants.ON_SELECT}`,
+          `fulfillment id ${fulfillment.id || "missing"} does not exist in /${
+            constants.ON_SELECT
+          }`,
           ERROR_CODES.INVALID_RESPONSE
         )
       );
@@ -714,7 +721,7 @@ async function validateQuote(
 
   const quoteObjRaw = await RedisService.getKey(`${transaction_id}_quoteObj`);
   const on_select_quote = quoteObjRaw ? JSON.parse(quoteObjRaw) : null;
-  
+
   const quoteErrors = compareQuoteObjects(
     on_select_quote,
     order.quote,
@@ -1034,6 +1041,26 @@ const onConfirm = async (data: any): Promise<ValidationError[]> => {
         )
       );
       return result;
+    }
+
+    try {
+      const previousCallPresent = await addActionToRedisSet(
+        context.transaction_id,
+        ApiSequence.CONFIRM,
+        ApiSequence.ON_CONFIRM
+      );
+      if (!previousCallPresent) {
+        result.push({
+          valid: false,
+          code: 20000,
+          description: `Previous call doesn't exist`,
+        });
+      }
+      return result;
+    } catch (error: any) {
+      console.error(
+        `!!Error while previous action call /${constants.ON_CONFIRM}, ${error.stack}`
+      );
     }
 
     const { transaction_id } = context;

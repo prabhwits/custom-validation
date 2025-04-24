@@ -187,69 +187,6 @@ export const checkContext = (
     : { valid: false, ERRORS: errObj };
 };
 
-// export const addMsgIdToRedisSet = async (
-//   transactionId: string,
-//   messageId: string,
-//   action: string
-// ): Promise<boolean> => {
-//   try {
-//     const key = `${transactionId}_msgId_set`;
-//     let existingSet: string[][] = [[], []];
-
-//     const existing = await RedisService.getKey(key);
-//     if (existing) {
-//       existingSet = JSON.parse(existing);
-//     }
-
-//     if (_.isEmpty()) {
-//       existingSet[0].push(messageId);
-//       existingSet[1].push(action);
-//       await RedisService.setKey(
-//         key,
-//         JSON.stringify(existingSet),
-//         TTL_IN_SECONDS
-//       );
-//       return false;
-//     }
-
-//     if (!existingSet[1].includes(action)) {
-//       existingSet[0].push(messageId);
-//       existingSet[1].push(action);
-//     } else {
-//       if (existingSet[0].includes(messageId)) {
-//         await RedisService.setKey(
-//           key,
-//           JSON.stringify(existingSet),
-//           TTL_IN_SECONDS
-//         );
-//         return false;
-//       }
-//       return true;
-//     }
-
-//     if (!existingSet[0].includes(messageId)) {
-//       existingSet[0].push(messageId);
-//       existingSet[1].push(action);
-//     } else {
-//       if (existingSet[1].includes(action)) {
-//         await RedisService.setKey(
-//           key,
-//           JSON.stringify(existingSet),
-//           TTL_IN_SECONDS
-//         );
-//         return false;
-//       }
-//       return true;
-//     }
-    
-
-//     return true;
-//   } catch (error: any) {
-//     console.error(`Error in addMsgIdToRedisSet: ${error.stack}`);
-//     throw error;
-//   }
-// };
-
 export const addMsgIdToRedisSet = async (
   transactionId: string,
   messageId: string,
@@ -284,7 +221,39 @@ export const addMsgIdToRedisSet = async (
   }
 };
 
+export const addActionToRedisSet = async (
+  transactionId: string,
+  previousAction: string,
+  presentAction: string
+): Promise<boolean> => {
+  try {
+    const key = `${transactionId}_previousCall`;
+    let existingSet: string[] = [];
 
+    const existing = await RedisService.getKey(key);
+    if (existing) {
+      existingSet = JSON.parse(existing);
+    }
+
+    if (
+      previousAction === presentAction ||
+      (!_.isEmpty(existingSet) && existingSet.includes(previousAction))
+    ) {
+      existingSet.push(presentAction);
+      await RedisService.setKey(
+        key,
+        JSON.stringify(existingSet),
+        TTL_IN_SECONDS
+      );
+      return true;
+    }
+
+    return false;
+  } catch (error: any) {
+    console.error(`Error in addActionToRedisSet: ${error.stack}`);
+    throw error;
+  }
+};
 
 export const addFulfillmentIdToRedisSet = async (
   transactionId: string,
@@ -1078,19 +1047,23 @@ export function compareLists(list1: any[], list2: any[]): string[] {
   return errors;
 }
 
-
-export function compareTimeRanges(data1: any, action1: any, data2: any, action2: any): string[] | null {
-  const keys = ['start', 'end']
-  const errors: string[] = []
+export function compareTimeRanges(
+  data1: any,
+  action1: any,
+  data2: any,
+  action2: any
+): string[] | null {
+  const keys = ["start", "end"];
+  const errors: string[] = [];
 
   keys.forEach((key) => {
     if (!data1[key]?.time?.range || !data2[key]?.time?.range) {
-      errors.push(`/${key}/range is not provided in one or both objects`)
-      return // Skip comparison if range is not provided
+      errors.push(`/${key}/range is not provided in one or both objects`);
+      return; // Skip comparison if range is not provided
     }
 
-    const range1 = data1[key].time.range
-    const range2 = data2[key].time.range
+    const range1 = data1[key].time.range;
+    const range2 = data2[key].time.range;
 
     if (
       !isValidTimestamp(range1.start) ||
@@ -1098,70 +1071,79 @@ export function compareTimeRanges(data1: any, action1: any, data2: any, action2:
       !isValidTimestamp(range2.start) ||
       !isValidTimestamp(range2.end)
     ) {
-      errors.push(`/${key}/range has invalid timestamp format`)
-      return // Skip comparison if timestamp format is invalid
+      errors.push(`/${key}/range has invalid timestamp format`);
+      return; // Skip comparison if timestamp format is invalid
     }
 
     if (range1.start !== range2.start) {
       errors.push(
-        `/${key}/range/start_time "${range1.start}" of ${action1} mismatched with /${key}/range/start_time "${range2.start}" of ${action2}`,
-      )
+        `/${key}/range/start_time "${range1.start}" of ${action1} mismatched with /${key}/range/start_time "${range2.start}" of ${action2}`
+      );
     }
 
     if (range1.end !== range2.end) {
       errors.push(
-        `/${key}/range/end_time "${range1.end}" of ${action1} mismatched with /${key}/range/end_time "${range2.end}" of ${action2}`,
-      )
+        `/${key}/range/end_time "${range1.end}" of ${action1} mismatched with /${key}/range/end_time "${range2.end}" of ${action2}`
+      );
     }
-  })
+  });
 
-  return errors.length === 0 ? null : errors
+  return errors.length === 0 ? null : errors;
 }
-export function compareFulfillmentObject(obj1: any, obj2: any, keys: string[], i: number, apiSeq: string) {
-  const errors: any[] = []
+export function compareFulfillmentObject(
+  obj1: any,
+  obj2: any,
+  keys: string[],
+  i: number,
+  apiSeq: string
+) {
+  const errors: any[] = [];
 
   keys.forEach((key: string) => {
     if (_.isArray(obj1[key])) {
-      obj1[key] = _.sortBy(obj1[key], ['code'])
+      obj1[key] = _.sortBy(obj1[key], ["code"]);
     }
     if (_.isArray(obj2[key])) {
-      obj2[key] = _.sortBy(obj2[key], ['code'])
+      obj2[key] = _.sortBy(obj2[key], ["code"]);
     }
 
     if (!_.isEqual(obj1[key], obj2[key])) {
       if (
-        typeof obj1[key] === 'object' &&
-        typeof obj2[key] === 'object' &&
+        typeof obj1[key] === "object" &&
+        typeof obj2[key] === "object" &&
         Object.keys(obj1[key]).length > 0 &&
         Object.keys(obj2[key]).length > 0
       ) {
-        const obj1_nested = obj1[key]
-        const obj2_nested = obj2[key]
+        const obj1_nested = obj1[key];
+        const obj2_nested = obj2[key];
 
-        const obj1_nested_keys = Object.keys(obj1_nested)
-        const obj2_nested_keys = Object.keys(obj2_nested)
+        const obj1_nested_keys = Object.keys(obj1_nested);
+        const obj2_nested_keys = Object.keys(obj2_nested);
 
-        const nestedKeys = obj1_nested_keys.length > obj2_nested_keys.length ? obj1_nested_keys : obj2_nested_keys
+        const nestedKeys =
+          obj1_nested_keys.length > obj2_nested_keys.length
+            ? obj1_nested_keys
+            : obj2_nested_keys;
 
         nestedKeys.forEach((key_nested: string) => {
           if (!_.isEqual(obj1_nested[key_nested], obj2_nested[key_nested])) {
-            const errKey = `message/order.fulfillments/${i}/${key}/${key_nested}`
-            const errMsg = `Mismatch occurred while comparing '${obj1.type}' fulfillment object with ${apiSeq} on key '${key}/${key_nested}'`
-            errors.push({ errKey, errMsg })
+            const errKey = `message/order.fulfillments/${i}/${key}/${key_nested}`;
+            const errMsg = `Mismatch occurred while comparing '${obj1.type}' fulfillment object with ${apiSeq} on key '${key}/${key_nested}'`;
+            errors.push({ errKey, errMsg });
           }
-        })
+        });
       } else {
-        const errKey = `message/order.fulfillments/${i}/${key}`
-        const errMsg = `Mismatch occurred while comparing '${obj1.type}' fulfillment object with ${apiSeq} on key '${key}'`
-        errors.push({ errKey, errMsg })
+        const errKey = `message/order.fulfillments/${i}/${key}`;
+        const errMsg = `Mismatch occurred while comparing '${obj1.type}' fulfillment object with ${apiSeq} on key '${key}'`;
+        errors.push({ errKey, errMsg });
       }
     }
-  })
+  });
 
-  return errors
+  return errors;
 }
 function isValidTimestamp(timestamp: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(timestamp)
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(timestamp);
 }
 
 // export async function notExist  (transactionId: string) : boolean{

@@ -2,6 +2,7 @@ import _ from "lodash";
 
 import { RedisService } from "ondc-automation-cache-lib";
 import {
+  addActionToRedisSet,
   addMsgIdToRedisSet,
   checkBppIdOrBapId,
   checkContext,
@@ -62,6 +63,26 @@ const init = async (data: any) => {
       : null;
 
     const contextRes: any = checkContext(context, constants.INIT);
+
+    try {
+      const previousCallPresent = await addActionToRedisSet(
+        context.transaction_id,
+        ApiSequence.ON_SELECT,
+        ApiSequence.INIT
+      );
+      if (!previousCallPresent) {
+        result.push({
+          valid: false,
+          code: 20000,
+          description: `Previous call doesn't exist`,
+        });
+      }
+      return result;
+    } catch (error: any) {
+      console.error(
+        `!!Error while previous action call /${constants.INIT}, ${error.stack}`
+      );
+    }
 
     const checkBap = checkBppIdOrBapId(context.bap_id);
     const checkBpp = checkBppIdOrBapId(context.bpp_id);
