@@ -6,7 +6,6 @@ import {
   checkContext,
   checkTagConditions,
   addMsgIdToRedisSet,
-  addActionToRedisSet,
 } from "../../../../utils/helper";
 import { RedisService } from "ondc-automation-cache-lib";
 
