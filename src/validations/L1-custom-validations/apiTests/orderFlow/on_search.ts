@@ -13,6 +13,7 @@ import {
   validateObjectString,
   validateBapUri,
   validateBppUri,
+  addActionToRedisSet,
 } from "../../../../utils/helper";
 import _, { isEmpty } from "lodash";
 import {
@@ -70,12 +71,27 @@ export default async function onSearch(
     }
 
     const transaction_id = context?.transaction_id;
-    // if (notExist) {
-    //   addError(
-    //     20006,
-    //     `Previos action or on_action call doesn't exist!`
-    //   );
-    // }
+
+    try {
+      const previousCallPresent = await addActionToRedisSet(
+        context.transaction_id,
+        ApiSequence.SEARCH,
+        ApiSequence.ON_SEARCH
+      );
+      if (!previousCallPresent) {
+        result.push({
+          valid: false,
+          code: 20000,
+          description: `Previous call doesn't exist`,
+        });
+      }
+      return result;
+    } catch (error: any) {
+      console.error(
+        `!!Error while previous action call /${constants.ON_SEARCH}, ${error.stack}`
+      );
+    }
+
     await RedisService.setKey(
       `${transaction_id}_${ApiSequence.ON_SEARCH}_context`,
       JSON.stringify(context),
@@ -86,7 +102,6 @@ export default async function onSearch(
       JSON.stringify(message),
       TTL_IN_SECONDS
     );
-    
 
     const storedDomain = await RedisService.getKey(`${transaction_id}_domain`);
     if (!_.isEqual(payload.context.domain.split(":")[1], storedDomain)) {
@@ -163,8 +178,6 @@ export default async function onSearch(
         `!!Error while comparing timestamp of /${ApiSequence.SEARCH} /${ApiSequence.ON_SEARCH}, ${error.stack}`
       );
     }
-
-    
 
     try {
       console.info(
