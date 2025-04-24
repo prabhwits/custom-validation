@@ -748,7 +748,9 @@ const onInit = async (data: any) => {
         result.push({
           valid: false,
           code: 20000,
-          description: `Invalid settlement basis in /${constants.ON_INIT}. Expected one of: ${validSettlementBasis.join(", ")}`,
+          description: `Invalid settlement basis in /${
+            constants.ON_INIT
+          }. Expected one of: ${validSettlementBasis.join(", ")}`,
         });
       }
     } catch (error: any) {
@@ -762,7 +764,8 @@ const onInit = async (data: any) => {
       const validSettlementWindow = {
         code: "SETTLEMENT_WINDOW",
         type: "time",
-        value: /^P(?=\d|T\d)(\d+Y)?(\d+M)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+(\.\d+)?S)?)?$/,
+        value:
+          /^P(?=\d|T\d)(\d+Y)?(\d+M)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+(\.\d+)?S)?)?$/,
       };
       const settlementWindow = on_init.payment["@ondc/org/settlement_window"];
       if (!validSettlementWindow.value.test(settlementWindow)) {
@@ -834,12 +837,16 @@ const onInit = async (data: any) => {
 
         if (missingFields.length > 0) {
           console.error(
-            `Payment details are missing: ${missingFields.join(", ")} /${constants.ON_INIT}`
+            `Payment details are missing: ${missingFields.join(", ")} /${
+              constants.ON_INIT
+            }`
           );
           result.push({
             valid: false,
             code: 20000,
-            description: `Payment details are missing: ${missingFields.join(", ")}/${constants.ON_INIT}`,
+            description: `Payment details are missing: ${missingFields.join(
+              ", "
+            )}/${constants.ON_INIT}`,
           });
         }
       } else {
@@ -892,7 +899,11 @@ const onInit = async (data: any) => {
         ? JSON.parse(on_select_quoteRaw)
         : null;
 
-      console.log("quoteDiff", on_select_quote, on_init.quote )
+      console.log(
+        "quoteDiff",
+        JSON.stringify(on_select_quote),
+        JSON.stringify(on_init.quote)
+      );
       const quoteErrors = compareQuoteObjects(
         on_select_quote,
         on_init.quote,

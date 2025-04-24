@@ -86,25 +86,7 @@ export default async function onSearch(
       JSON.stringify(message),
       TTL_IN_SECONDS
     );
-
-    try {
-      console.info(
-        `Comparing Message Ids of /${constants.SEARCH} and /${constants.ON_SEARCH}`
-      );
-      const searchMsgId = await RedisService.getKey(
-        `${transaction_id}_${ApiSequence.SEARCH}_msgId`
-      );
-      if (!_.isEqual(searchMsgId, context.message_id)) {
-        addError(
-          20006,
-          `Message Ids for /${constants.SEARCH} and /${constants.ON_SEARCH} api should be same`
-        );
-      }
-    } catch (error: any) {
-      console.error(
-        `!!Error while checking message id for /${constants.ON_SEARCH}, ${error.stack}`
-      );
-    }
+    
 
     const storedDomain = await RedisService.getKey(`${transaction_id}_domain`);
     if (!_.isEqual(payload.context.domain.split(":")[1], storedDomain)) {

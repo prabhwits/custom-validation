@@ -100,12 +100,12 @@ const confirm = async (data: any) => {
     try {
       console.info(`Adding Message Id /${constants.CONFIRM}`);
 
-     const msgId =  await RedisService.setKey(
+      const msgId = await RedisService.setKey(
         `${transaction_id}_${ApiSequence.CONFIRM}_msgId`,
         data.context.message_id,
         TTL_IN_SECONDS
       );
-      console.log("first", msgId)
+      console.log("first", msgId);
 
       const isMsgIdNotPresent = await addMsgIdToRedisSet(
         context.transaction_id,
@@ -554,7 +554,7 @@ const confirm = async (data: any) => {
         });
       } else {
         const tmpstmpRaw = await RedisService.getKey(
-          `${transaction_id}_tmpstmp`
+          `${transaction_id}_${ApiSequence.ON_INIT}_tmpstmp`
         );
         const tmpstmp = tmpstmpRaw ? JSON.parse(tmpstmpRaw) : null;
         if (!_.isEqual(confirm.created_at, tmpstmp)) {

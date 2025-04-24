@@ -6,6 +6,7 @@ import {
   checkContext,
   checkTagConditions,
   addMsgIdToRedisSet,
+  addActionToRedisSet,
 } from "../../../../utils/helper";
 import { RedisService } from "ondc-automation-cache-lib";
 
@@ -53,6 +54,30 @@ export default async function search(payload: any): Promise<ValidationOutput> {
       addError(40000, "Transaction_id is missing");
       return result;
     }
+
+    // try {
+    //   const previousCallPresent = await addActionToRedisSet(
+    //     context.transaction_id,
+    //     ApiSequence.SEARCH,
+    //     ApiSequence.SEARCH
+    //   );
+    //   if (!previousCallPresent) {
+    //     result.push({
+    //       valid: false,
+    //       code: 20000,
+    //       description: `Previous call doesn't exist`,
+    //     });
+    //   }
+    //   await RedisService.setKey(
+    //     `${context.transaction_id}_${ApiSequence.SEARCH}_msgId`,
+    //     context.message_id,
+    //     TTL_IN_SECONDS
+    //   );
+    // } catch (error: any) {
+    //   console.error(
+    //     `!!Error while checking message id for /${constants.SEARCH}, ${error.stack}`
+    //   );
+    // }
 
     // Validate message.intent
     const { intent } = message;
