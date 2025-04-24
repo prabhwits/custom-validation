@@ -109,9 +109,10 @@ const confirm = async (data: any) => {
 
       const isMsgIdNotPresent = await addMsgIdToRedisSet(
         context.transaction_id,
-        context.message_id
+        context.message_id,
+        ApiSequence.CONFIRM
       );
-      if (isMsgIdNotPresent) {
+      if (!isMsgIdNotPresent) {
         result.push({
           valid: false,
           code: 20000,
