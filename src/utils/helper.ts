@@ -253,66 +253,38 @@ export const checkContext = (
 export const addMsgIdToRedisSet = async (
   transactionId: string,
   messageId: string,
-  _action: string
-) => {
+  action: string
+): Promise<boolean> => {
   try {
-    const key = `${transactionId}_msgId_set`;
-    let existingSet: string[] = [];
+    const key = `${transactionId}_msgId_map`;
+    let msgMap: Record<string, string> = {};
 
     const existing = await RedisService.getKey(key);
     if (existing) {
-      existingSet = JSON.parse(existing);
+      msgMap = JSON.parse(existing);
     }
 
-    if (!existingSet.includes(messageId)) {
-      existingSet.push(messageId);
-      await RedisService.setKey(
-        key,
-        JSON.stringify(existingSet),
-        TTL_IN_SECONDS
-      );
+    const existingAction = msgMap[messageId];
 
+    if (existingAction) {
+      return existingAction === action;
+    }
+
+    const isActionUsed = Object.values(msgMap).includes(action);
+    if (isActionUsed) {
       return false;
     }
+
+    msgMap[messageId] = action;
+    await RedisService.setKey(key, JSON.stringify(msgMap), TTL_IN_SECONDS);
     return true;
   } catch (error: any) {
     console.error(`Error in addMsgIdToRedisSet: ${error.stack}`);
-  }
-};
-
-export const addActionToRedisSet = async (
-  transactionId: string,
-  action1: string,
-  action2: string
-): Promise<boolean> => {
-  try {
-    const key = `${transactionId}_previousCall`;
-    let existingSet: string[] = [];
-
-    const existing = await RedisService.getKey(key);
-    if (existing) {
-      existingSet = JSON.parse(existing);
-    }
-
-    if (
-      action1 === action2 ||
-      (!_.isEmpty(existingSet) && existingSet.includes(action1))
-    ) {
-      existingSet.push(action2);
-      await RedisService.setKey(
-        key,
-        JSON.stringify(existingSet),
-        TTL_IN_SECONDS
-      );
-      return false;
-    }
-
-    return true;
-  } catch (error: any) {
-    console.error(`Error in addActionToRedisSet: ${error.stack}`);
     throw error;
   }
 };
+
+
 
 export const addFulfillmentIdToRedisSet = async (
   transactionId: string,
@@ -1106,23 +1078,19 @@ export function compareLists(list1: any[], list2: any[]): string[] {
   return errors;
 }
 
-export function compareTimeRanges(
-  data1: any,
-  action1: any,
-  data2: any,
-  action2: any
-): string[] | null {
-  const keys = ["start", "end"];
-  const errors: string[] = [];
+
+export function compareTimeRanges(data1: any, action1: any, data2: any, action2: any): string[] | null {
+  const keys = ['start', 'end']
+  const errors: string[] = []
 
   keys.forEach((key) => {
     if (!data1[key]?.time?.range || !data2[key]?.time?.range) {
-      errors.push(`/${key}/range is not provided in one or both objects`);
-      return; // Skip comparison if range is not provided
+      errors.push(`/${key}/range is not provided in one or both objects`)
+      return // Skip comparison if range is not provided
     }
 
-    const range1 = data1[key].time.range;
-    const range2 = data2[key].time.range;
+    const range1 = data1[key].time.range
+    const range2 = data2[key].time.range
 
     if (
       !isValidTimestamp(range1.start) ||
@@ -1130,77 +1098,79 @@ export function compareTimeRanges(
       !isValidTimestamp(range2.start) ||
       !isValidTimestamp(range2.end)
     ) {
-      errors.push(`/${key}/range has invalid timestamp format`);
-      return; // Skip comparison if timestamp format is invalid
+      errors.push(`/${key}/range has invalid timestamp format`)
+      return // Skip comparison if timestamp format is invalid
     }
 
     if (range1.start !== range2.start) {
       errors.push(
-        `/${key}/range/start_time "${range1.start}" of ${action1} mismatched with /${key}/range/start_time "${range2.start}" of ${action2}`
-      );
+        `/${key}/range/start_time "${range1.start}" of ${action1} mismatched with /${key}/range/start_time "${range2.start}" of ${action2}`,
+      )
     }
 
     if (range1.end !== range2.end) {
       errors.push(
-        `/${key}/range/end_time "${range1.end}" of ${action1} mismatched with /${key}/range/end_time "${range2.end}" of ${action2}`
-      );
+        `/${key}/range/end_time "${range1.end}" of ${action1} mismatched with /${key}/range/end_time "${range2.end}" of ${action2}`,
+      )
     }
-  });
+  })
 
-  return errors.length === 0 ? null : errors;
+  return errors.length === 0 ? null : errors
 }
-export function compareFulfillmentObject(
-  obj1: any,
-  obj2: any,
-  keys: string[],
-  i: number,
-  apiSeq: string
-) {
-  const errors: any[] = [];
+export function compareFulfillmentObject(obj1: any, obj2: any, keys: string[], i: number, apiSeq: string) {
+  const errors: any[] = []
 
   keys.forEach((key: string) => {
     if (_.isArray(obj1[key])) {
-      obj1[key] = _.sortBy(obj1[key], ["code"]);
+      obj1[key] = _.sortBy(obj1[key], ['code'])
     }
     if (_.isArray(obj2[key])) {
-      obj2[key] = _.sortBy(obj2[key], ["code"]);
+      obj2[key] = _.sortBy(obj2[key], ['code'])
     }
 
     if (!_.isEqual(obj1[key], obj2[key])) {
       if (
-        typeof obj1[key] === "object" &&
-        typeof obj2[key] === "object" &&
+        typeof obj1[key] === 'object' &&
+        typeof obj2[key] === 'object' &&
         Object.keys(obj1[key]).length > 0 &&
         Object.keys(obj2[key]).length > 0
       ) {
-        const obj1_nested = obj1[key];
-        const obj2_nested = obj2[key];
+        const obj1_nested = obj1[key]
+        const obj2_nested = obj2[key]
 
-        const obj1_nested_keys = Object.keys(obj1_nested);
-        const obj2_nested_keys = Object.keys(obj2_nested);
+        const obj1_nested_keys = Object.keys(obj1_nested)
+        const obj2_nested_keys = Object.keys(obj2_nested)
 
-        const nestedKeys =
-          obj1_nested_keys.length > obj2_nested_keys.length
-            ? obj1_nested_keys
-            : obj2_nested_keys;
+        const nestedKeys = obj1_nested_keys.length > obj2_nested_keys.length ? obj1_nested_keys : obj2_nested_keys
 
         nestedKeys.forEach((key_nested: string) => {
           if (!_.isEqual(obj1_nested[key_nested], obj2_nested[key_nested])) {
-            const errKey = `message/order.fulfillments/${i}/${key}/${key_nested}`;
-            const errMsg = `Mismatch occurred while comparing '${obj1.type}' fulfillment object with ${apiSeq} on key '${key}/${key_nested}'`;
-            errors.push({ errKey, errMsg });
+            const errKey = `message/order.fulfillments/${i}/${key}/${key_nested}`
+            const errMsg = `Mismatch occurred while comparing '${obj1.type}' fulfillment object with ${apiSeq} on key '${key}/${key_nested}'`
+            errors.push({ errKey, errMsg })
           }
-        });
+        })
       } else {
-        const errKey = `message/order.fulfillments/${i}/${key}`;
-        const errMsg = `Mismatch occurred while comparing '${obj1.type}' fulfillment object with ${apiSeq} on key '${key}'`;
-        errors.push({ errKey, errMsg });
+        const errKey = `message/order.fulfillments/${i}/${key}`
+        const errMsg = `Mismatch occurred while comparing '${obj1.type}' fulfillment object with ${apiSeq} on key '${key}'`
+        errors.push({ errKey, errMsg })
       }
     }
-  });
+  })
 
-  return errors;
+  return errors
 }
 function isValidTimestamp(timestamp: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(timestamp);
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(timestamp)
 }
+
+// export async function notExist  (transactionId: string) : boolean{
+//   const key = await RedisService.getKey(`${transactionId}_`);
+//   if (key) {
+//     const existingSet = JSON.parse(key);
+//     if (existingSet[0].length > 0) {
+//       return false;
+//     }
+//   }
+//   return true;
+// }

@@ -106,7 +106,7 @@ const select = async (data: any) => {
       context.message_id,
       ApiSequence.SELECT
     );
-    if (isMsgIdNotPresent) {
+    if (!isMsgIdNotPresent) {
       result.push({
         valid: false,
         code: 20000,

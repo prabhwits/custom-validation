@@ -714,6 +714,7 @@ async function validateQuote(
 
   const quoteObjRaw = await RedisService.getKey(`${transaction_id}_quoteObj`);
   const on_select_quote = quoteObjRaw ? JSON.parse(quoteObjRaw) : null;
+  
   const quoteErrors = compareQuoteObjects(
     on_select_quote,
     order.quote,

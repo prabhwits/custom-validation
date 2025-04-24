@@ -112,7 +112,7 @@ const confirm = async (data: any) => {
         context.message_id,
         ApiSequence.CONFIRM
       );
-      if (isMsgIdNotPresent) {
+      if (!isMsgIdNotPresent) {
         result.push({
           valid: false,
           code: 20000,

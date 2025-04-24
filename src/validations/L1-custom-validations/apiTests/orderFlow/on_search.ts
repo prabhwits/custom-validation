@@ -70,6 +70,12 @@ export default async function onSearch(
     }
 
     const transaction_id = context?.transaction_id;
+    // if (notExist) {
+    //   addError(
+    //     20006,
+    //     `Previos action or on_action call doesn't exist!`
+    //   );
+    // }
     await RedisService.setKey(
       `${transaction_id}_${ApiSequence.ON_SEARCH}_context`,
       JSON.stringify(context),
@@ -158,21 +164,7 @@ export default async function onSearch(
       );
     }
 
-    try {
-      console.info(
-        `Comparing transaction Ids of /${constants.SEARCH} and /${constants.ON_SEARCH}`
-      );
-      if (!_.isEqual(searchContext.transaction_id, context.transaction_id)) {
-        addError(
-          20006,
-          `Transaction Id for /${constants.SEARCH} and /${constants.ON_SEARCH} api should be same`
-        );
-      }
-    } catch (error: any) {
-      console.info(
-        `Error while comparing transaction ids for /${constants.SEARCH} and /${constants.ON_SEARCH} api, ${error.stack}`
-      );
-    }
+    
 
     try {
       console.info(

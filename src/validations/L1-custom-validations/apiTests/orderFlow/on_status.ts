@@ -1,6 +1,6 @@
 /* eslint-disable no-prototype-builtins */
-import _ from "lodash";
-import { RedisService } from "ondc-automation-cache-lib";
+import _ from 'lodash';
+import { RedisService } from 'ondc-automation-cache-lib';
 import {
   checkContext,
   isObjectEmpty,
@@ -9,13 +9,9 @@ import {
   compareFulfillmentObject,
   payment_status,
   addMsgIdToRedisSet,
-} from "../../../../utils/helper";
-import constants, {
-  ApiSequence,
-  PAYMENT_STATUS,
-  ROUTING_ENUMS,
-} from "../../../../utils/constants";
-import { FLOW } from "../../../../utils/enums";
+} from '../../../../utils/helper';
+import constants, { ApiSequence, PAYMENT_STATUS, ROUTING_ENUMS } from '../../../../utils/constants';
+import { FLOW } from '../../../../utils/enums';
 
 // Minimal interface for validation error
 interface ValidationError {
@@ -56,7 +52,7 @@ async function validateContext(
 
   const domainRaw = await RedisService.getKey(`${transaction_id}_domain`);
   const domain = domainRaw ? JSON.parse(domainRaw) : null;
-  if (!_.isEqual(context.domain?.split(":")[1], domain)) {
+  if (!_.isEqual(context.domain?.split(':')[1], domain)) {
     result.push(
       createError(
         `Domain should be same in each action`,
@@ -83,22 +79,22 @@ async function validateMessageId(
   context: any,
   transaction_id: string,
   state: string,
-
+ 
   result: ValidationError[]
 ): Promise<void> {
   try {
     const isMsgIdNotPresent = await addMsgIdToRedisSet(
-      context.transaction_id,
-      context.message_id,
-      `on_status_${state}`
-    );
-    if (isMsgIdNotPresent) {
-      result.push({
-        valid: false,
-        code: 20000,
-        description: `Message id should not be same with previous calls`,
-      });
-    }
+        context.transaction_id,
+        context.message_id,
+        `on_status_${state}`
+      );
+      if (!isMsgIdNotPresent) {
+        result.push({
+          valid: false,
+          code: 20000,
+          description: `Message id should not be same with previous calls`,
+        });
+      }
 
     // Check message ID uniqueness across phases
     const prevMsgIdKeys = {
@@ -117,9 +113,7 @@ async function validateMessageId(
         if (prevMsgId && prevMsgId === context.message_id) {
           result.push(
             createError(
-              `Message_id cannot be same for ${
-                prevMsgIdKey.split("_")[1]
-              } and ${state}`,
+              `Message_id cannot be same for ${prevMsgIdKey.split('_')[1]} and ${state}`,
               ERROR_CODES.OUT_OF_SEQUENCE
             )
           );
@@ -137,16 +131,10 @@ async function validateMessageId(
     }[state];
 
     if (stateMsgIdKey) {
-      await RedisService.setKey(
-        stateMsgIdKey,
-        JSON.stringify(context.message_id),
-        300
-      );
+      await RedisService.setKey(stateMsgIdKey, JSON.stringify(context.message_id), 300);
     }
   } catch (error: any) {
-    console.error(
-      `!!Error while checking message id for /${constants.ON_STATUS}_${state}, ${error.stack}`
-    );
+    console.error(`!!Error while checking message id for /${constants.ON_STATUS}_${state}, ${error.stack}`);
     result.push(
       createError(
         `Internal error while checking message ID`,
@@ -173,9 +161,7 @@ async function validateTimestamp(
 
     if (prevStateKey) {
       const prevTimestampRaw = await RedisService.getKey(prevStateKey);
-      const prevTimestamp = prevTimestampRaw
-        ? JSON.parse(prevTimestampRaw)
-        : null;
+      const prevTimestamp = prevTimestampRaw ? JSON.parse(prevTimestampRaw) : null;
       if (prevTimestamp && _.gte(prevTimestamp, context.timestamp)) {
         result.push(
           createError(
@@ -186,15 +172,9 @@ async function validateTimestamp(
       }
     }
 
-    await RedisService.setKey(
-      `${transaction_id}_tmpstmp`,
-      JSON.stringify(context.timestamp),
-      300
-    );
+    await RedisService.setKey(`${transaction_id}_tmpstmp`, JSON.stringify(context.timestamp), 300);
   } catch (error: any) {
-    console.error(
-      `!!Error while checking timestamp for /${constants.ON_STATUS}_${state}, ${error.stack}`
-    );
+    console.error(`!!Error while checking timestamp for /${constants.ON_STATUS}_${state}, ${error.stack}`);
     result.push(
       createError(
         `Internal error while checking timestamp`,
@@ -221,9 +201,7 @@ async function validateTransactionId(
       );
     }
   } catch (error: any) {
-    console.error(
-      `!!Error while checking transaction id for /${constants.ON_STATUS}, ${error.stack}`
-    );
+    console.error(`!!Error while checking transaction id for /${constants.ON_STATUS}, ${error.stack}`);
     result.push(
       createError(
         `Internal error while checking transaction ID`,
@@ -240,9 +218,7 @@ async function validateOrder(
   result: ValidationError[]
 ): Promise<void> {
   try {
-    const cnfrmOrdrIdRaw = await RedisService.getKey(
-      `${transaction_id}_cnfrmOrdrId`
-    );
+    const cnfrmOrdrIdRaw = await RedisService.getKey(`${transaction_id}_cnfrmOrdrId`);
     const cnfrmOrdrId = cnfrmOrdrIdRaw ? JSON.parse(cnfrmOrdrIdRaw) : null;
     if (cnfrmOrdrId && cnfrmOrdrId !== order.id) {
       result.push(
@@ -253,9 +229,7 @@ async function validateOrder(
       );
     }
 
-    const cnfrmTmpstmpRaw = await RedisService.getKey(
-      `${transaction_id}_cnfrmTmpstmp`
-    );
+    const cnfrmTmpstmpRaw = await RedisService.getKey(`${transaction_id}_cnfrmTmpstmp`);
     const cnfrmTmpstmp = cnfrmTmpstmpRaw ? JSON.parse(cnfrmTmpstmpRaw) : null;
     if (cnfrmTmpstmp && !_.isEqual(cnfrmTmpstmp, order.created_at)) {
       result.push(
@@ -292,9 +266,7 @@ async function validateOrder(
       );
     }
   } catch (error: any) {
-    console.error(
-      `!!Error while checking order for /${constants.ON_STATUS}, ${error.stack}`
-    );
+    console.error(`!!Error while checking order for /${constants.ON_STATUS}, ${error.stack}`);
     result.push(
       createError(
         `Internal error while checking order`,
@@ -313,14 +285,12 @@ async function validateOrderState(
   context: any
 ): Promise<void> {
   try {
-    const onCnfrmStateRaw = await RedisService.getKey(
-      `${transaction_id}_onCnfrmState`
-    );
-    const onCnfrmState = onCnfrmStateRaw;
+    const onCnfrmStateRaw = await RedisService.getKey(`${transaction_id}_onCnfrmState`);
+    const onCnfrmState = onCnfrmStateRaw 
 
     switch (state) {
       case ApiSequence.ON_STATUS_PENDING: {
-        if (onCnfrmState === "Accepted") {
+        if (onCnfrmState === 'Accepted') {
           result.push(
             createError(
               `When the onConfirm Order State is 'Accepted', the on_status_pending is not required!`,
@@ -330,7 +300,7 @@ async function validateOrderState(
           return;
         }
 
-        if (order.state !== "Accepted") {
+        if (order.state !== 'Accepted') {
           result.push(
             createError(
               `Order state should be 'Accepted' for /${constants.ON_STATUS}_${state}. Current state: ${order.state}`,
@@ -339,16 +309,12 @@ async function validateOrderState(
           );
         }
 
-        await RedisService.setKey(
-          `${transaction_id}_orderState`,
-          order.state,
-          300
-        );
+        await RedisService.setKey(`${transaction_id}_orderState`, order.state, 300);
         break;
       }
 
       case ApiSequence.ON_STATUS_PACKED: {
-        if (order.state !== "In-progress") {
+        if (order.state !== 'In-progress') {
           result.push(
             createError(
               `order/state should be "In-progress" for /${constants.ON_STATUS}_${state}`,
@@ -360,7 +326,7 @@ async function validateOrderState(
       }
 
       case ApiSequence.ON_STATUS_PICKED: {
-        if (order.state !== "In-progress") {
+        if (order.state !== 'In-progress') {
           result.push(
             createError(
               `order/state should be "In-progress" for /${constants.ON_STATUS}_${state}`,
@@ -372,7 +338,7 @@ async function validateOrderState(
         let orderPicked = false;
         const pickupTimestamps: any = {};
         order.fulfillments.forEach((fulfillment: any) => {
-          if (fulfillment.type !== "Delivery") return;
+          if (fulfillment.type !== 'Delivery') return;
           const ffState = fulfillment.state?.descriptor?.code;
           if (ffState === constants.ORDER_PICKED) {
             orderPicked = true;
@@ -415,24 +381,16 @@ async function validateOrderState(
           );
         }
 
-        await RedisService.setKey(
-          `${transaction_id}_pickupTimestamps`,
-          pickupTimestamps,
-          300
-        );
+        await RedisService.setKey(`${transaction_id}_pickupTimestamps`, pickupTimestamps, 300);
 
         order.fulfillments.forEach((ff: any) => {
-          if (ff.type === "Delivery") {
-            RedisService.setKey(
-              `${transaction_id}_deliveryTmpStmp`,
-              ff?.start?.time?.timestamp,
-              300
-            );
+          if (ff.type === 'Delivery') {
+            RedisService.setKey(`${transaction_id}_deliveryTmpStmp`, ff?.start?.time?.timestamp, 300);
           }
         });
 
         // Routing tags validation
-        const DELobj = _.filter(order.fulfillments, { type: "Delivery" });
+        const DELobj = _.filter(order.fulfillments, { type: 'Delivery' });
         if (!DELobj.length) {
           result.push(
             createError(
@@ -451,7 +409,7 @@ async function validateOrderState(
             );
           } else {
             const tags = deliveryObj.tags;
-            const routingTagArr = _.filter(tags, { code: "routing" });
+            const routingTagArr = _.filter(tags, { code: 'routing' });
             if (!routingTagArr.length) {
               result.push(
                 createError(
@@ -470,9 +428,7 @@ async function validateOrderState(
                   )
                 );
               } else {
-                const routingTagTypeArr = _.filter(routingTagList, {
-                  code: "type",
-                });
+                const routingTagTypeArr = _.filter(routingTagList, { code: 'type' });
                 if (!routingTagTypeArr.length) {
                   result.push(
                     createError(
@@ -499,7 +455,7 @@ async function validateOrderState(
       }
 
       case ApiSequence.ON_STATUS_OUT_FOR_DELIVERY: {
-        if (order.state !== "In-progress") {
+        if (order.state !== 'In-progress') {
           result.push(
             createError(
               `order/state should be "In-progress" for /${constants.ON_STATUS}_${state}`,
@@ -511,7 +467,7 @@ async function validateOrderState(
         let orderOutForDelivery = false;
         const outforDeliveryTimestamps: any = {};
         order.fulfillments.forEach((fulfillment: any) => {
-          if (fulfillment.type !== "Delivery") return;
+          if (fulfillment.type !== 'Delivery') return;
           const ffState = fulfillment.state?.descriptor?.code;
           if (ffState === constants.ORDER_OUT_FOR_DELIVERY) {
             orderOutForDelivery = true;
@@ -560,7 +516,7 @@ async function validateOrderState(
           300
         );
 
-        const DELobj = _.filter(order.fulfillments, { type: "Delivery" });
+        const DELobj = _.filter(order.fulfillments, { type: 'Delivery' });
         if (!DELobj.length) {
           result.push(
             createError(
@@ -584,7 +540,7 @@ async function validateOrderState(
             );
           } else {
             const tags = deliveryObj.tags;
-            const routingTagArr = _.filter(tags, { code: "routing" });
+            const routingTagArr = _.filter(tags, { code: 'routing' });
             if (!routingTagArr.length) {
               result.push(
                 createError(
@@ -603,9 +559,7 @@ async function validateOrderState(
                   )
                 );
               } else {
-                const routingTagTypeArr = _.filter(routingTagList, {
-                  code: "type",
-                });
+                const routingTagTypeArr = _.filter(routingTagList, { code: 'type' });
                 if (!routingTagTypeArr.length) {
                   result.push(
                     createError(
@@ -632,7 +586,7 @@ async function validateOrderState(
       }
 
       case ApiSequence.ON_STATUS_DELIVERED: {
-        if (order.state !== "Completed") {
+        if (order.state !== 'Completed') {
           result.push(
             createError(
               `order/state should be "Completed" for /${constants.ON_STATUS}_${state}`,
@@ -644,7 +598,7 @@ async function validateOrderState(
         let orderDelivered = false;
         const deliveryTimestamps: any = {};
         order.fulfillments.forEach((fulfillment: any) => {
-          if (fulfillment.type !== "Delivery") return;
+          if (fulfillment.type !== 'Delivery') return;
           const ffState = fulfillment.state?.descriptor?.code;
           if (ffState === constants.ORDER_DELIVERED) {
             orderDelivered = true;
@@ -702,7 +656,7 @@ async function validateOrderState(
           300
         );
 
-        const DELobj = _.filter(order.fulfillments, { type: "Delivery" });
+        const DELobj = _.filter(order.fulfillments, { type: 'Delivery' });
         if (!DELobj.length) {
           result.push(
             createError(
@@ -721,7 +675,7 @@ async function validateOrderState(
             );
           } else {
             const tags = deliveryObj.tags;
-            const routingTagArr = _.filter(tags, { code: "routing" });
+            const routingTagArr = _.filter(tags, { code: 'routing' });
             if (!routingTagArr.length) {
               result.push(
                 createError(
@@ -740,9 +694,7 @@ async function validateOrderState(
                   )
                 );
               } else {
-                const routingTagTypeArr = _.filter(routingTagList, {
-                  code: "type",
-                });
+                const routingTagTypeArr = _.filter(routingTagList, { code: 'type' });
                 if (!routingTagTypeArr.length) {
                   result.push(
                     createError(
@@ -770,13 +722,14 @@ async function validateOrderState(
 
       default:
         result.push(
-          createError(`Invalid state: ${state}`, ERROR_CODES.INVALID_RESPONSE)
+          createError(
+            `Invalid state: ${state}`,
+            ERROR_CODES.INVALID_RESPONSE
+          )
         );
     }
   } catch (error: any) {
-    console.error(
-      `!!Error while checking order state for /${constants.ON_STATUS}_${state}, ${error.stack}`
-    );
+    console.error(`!!Error while checking order state for /${constants.ON_STATUS}_${state}, ${error.stack}`);
     result.push(
       createError(
         `Internal error while checking order state`,
@@ -803,13 +756,11 @@ async function validateFulfillments(
           )
         );
       }
-      if (ff.type !== "Cancel") {
-        const ffTrackingRaw = RedisService.getKey(
-          `${transaction_id}_${ff.id}_tracking`
-        );
-        const ffTracking = ffTrackingRaw;
+      if (ff.type !== 'Cancel') {
+        const ffTrackingRaw = RedisService.getKey(`${transaction_id}_${ff.id}_tracking`);
+        const ffTracking = ffTrackingRaw
         if (ffTracking) {
-          if (typeof ff.tracking !== "boolean") {
+          if (typeof ff.tracking !== 'boolean') {
             result.push(
               createError(
                 `Tracking must be present for fulfillment ID: ${ff.id} in boolean form`,
@@ -828,38 +779,19 @@ async function validateFulfillments(
       }
     });
 
-    const deliveryFulfillment = _.filter(order.fulfillments, {
-      type: "Delivery",
-    });
+    const deliveryFulfillment = _.filter(order.fulfillments, { type: 'Delivery' });
     if (deliveryFulfillment.length) {
-      const storedFulfillmentRaw = await RedisService.getKey(
-        `${transaction_id}_deliveryFulfillment`
-      );
-      const storedFulfillment = storedFulfillmentRaw;
+      const storedFulfillmentRaw = await RedisService.getKey(`${transaction_id}_deliveryFulfillment`);
+      const storedFulfillment = storedFulfillmentRaw 
       if (!storedFulfillment) {
         await Promise.all([
-          RedisService.setKey(
-            `${transaction_id}_deliveryFulfillment`,
-            JSON.stringify(deliveryFulfillment[0]),
-            300
-          ),
-          RedisService.setKey(
-            `${transaction_id}_deliveryFulfillmentAction`,
-            state,
-            300
-          ),
+          RedisService.setKey(`${transaction_id}_deliveryFulfillment`, JSON.stringify(deliveryFulfillment[0]), 300),
+          RedisService.setKey(`${transaction_id}_deliveryFulfillmentAction`,state, 300),
         ]);
       } else {
-        const storedFulfillmentActionRaw = await RedisService.getKey(
-          `${transaction_id}_deliveryFulfillmentAction`
-        );
-        const storedFulfillmentAction = storedFulfillmentActionRaw;
-        const fulfillmentRangeErrors = compareTimeRanges(
-          storedFulfillment,
-          storedFulfillmentAction,
-          deliveryFulfillment[0],
-          state
-        );
+        const storedFulfillmentActionRaw = await RedisService.getKey(`${transaction_id}_deliveryFulfillmentAction`);
+        const storedFulfillmentAction = storedFulfillmentActionRaw
+        const fulfillmentRangeErrors = compareTimeRanges(storedFulfillment, storedFulfillmentAction, deliveryFulfillment[0], state);
         if (fulfillmentRangeErrors) {
           fulfillmentRangeErrors.forEach((error: string, i: number) => {
             result.push(
@@ -874,8 +806,8 @@ async function validateFulfillments(
     }
 
     const flowRaw = await RedisService.getKey(`${transaction_id}_flow`);
-    const flow: any = flowRaw;
-    if (["2", "3", "5", "6"].includes(flow)) {
+    const flow : any = flowRaw 
+    if (['2', '3', '5', '6'].includes(flow)) {
       const fulfillments = order.fulfillments;
       if (!fulfillments.length) {
         result.push(
@@ -888,14 +820,9 @@ async function validateFulfillments(
         if (state === ApiSequence.ON_STATUS_DELIVERED) {
           const fulfillmentsItemsStatusSet = new Set();
           fulfillments.forEach((ff: any, i: number) => {
-            const deliveryTmpStmpRaw = RedisService.getKey(
-              `${transaction_id}_deliveryTmpStmp`
-            );
-            const deliveryTmpStmp = deliveryTmpStmpRaw;
-            if (
-              ff.type === "Delivery" &&
-              !_.isEqual(ff?.start?.time?.timestamp, deliveryTmpStmp)
-            ) {
+            const deliveryTmpStmpRaw = RedisService.getKey(`${transaction_id}_deliveryTmpStmp`);
+            const deliveryTmpStmp = deliveryTmpStmpRaw 
+            if (ff.type === 'Delivery' && !_.isEqual(ff?.start?.time?.timestamp, deliveryTmpStmp)) {
               result.push(
                 createError(
                   `Mismatch in ${ff.type} fulfillment start timestamp with ${ApiSequence.ON_STATUS_PICKED} at index ${i}`,
@@ -914,7 +841,7 @@ async function validateFulfillments(
             fulfillmentsItemsSet.add(obj);
           });
         } else {
-          if (!_.filter(fulfillments, { type: "Delivery" }).length) {
+          if (!_.filter(fulfillments, { type: 'Delivery' }).length) {
             result.push(
               createError(
                 `Delivery fulfillment must be present in ${state}`,
@@ -922,15 +849,10 @@ async function validateFulfillments(
               )
             );
           }
-          const deliveryTmpStmpRaw = await RedisService.getKey(
-            `${transaction_id}_deliveryTmpStmp`
-          );
-          const deliveryTmpStmp = deliveryTmpStmpRaw;
+          const deliveryTmpStmpRaw = await RedisService.getKey(`${transaction_id}_deliveryTmpStmp`);
+          const deliveryTmpStmp = deliveryTmpStmpRaw 
           fulfillments.forEach((ff: any, i: number) => {
-            if (
-              ff.type === "Delivery" &&
-              !_.isEqual(ff?.start?.time?.timestamp, deliveryTmpStmp)
-            ) {
+            if (ff.type === 'Delivery' && !_.isEqual(ff?.start?.time?.timestamp, deliveryTmpStmp)) {
               result.push(
                 createError(
                   `Mismatch in ${ff.type} fulfillment start timestamp with ${ApiSequence.ON_STATUS_PICKED} at index ${i}`,
@@ -940,22 +862,15 @@ async function validateFulfillments(
             }
           });
           let i = 0;
-          const onCnfrmStateRaw = await RedisService.getKey(
-            `${transaction_id}_onCnfrmState`
-          );
-          const onCnfrmState = onCnfrmStateRaw;
+          const onCnfrmStateRaw = await RedisService.getKey(`${transaction_id}_onCnfrmState`);
+          const onCnfrmState = onCnfrmStateRaw 
           fulfillmentsItemsSet.forEach((obj1: any) => {
             const keys = Object.keys(obj1);
-            let obj2: any = _.filter(fulfillments, { type: obj1.type });
-            let apiSeq =
-              obj1.type === "Cancel"
-                ? ApiSequence.ON_UPDATE_PART_CANCEL
-                : onCnfrmState === "Accepted"
-                ? ApiSequence.ON_CONFIRM
-                : ApiSequence.ON_STATUS_PENDING;
+            let obj2 : any= _.filter(fulfillments, { type: obj1.type });
+            let apiSeq = obj1.type === 'Cancel' ? ApiSequence.ON_UPDATE_PART_CANCEL : (onCnfrmState === 'Accepted' ? ApiSequence.ON_CONFIRM : ApiSequence.ON_STATUS_PENDING);
             if (obj2.length > 0) {
               obj2 = obj2[0];
-              if (obj2.type === "Delivery") {
+              if (obj2.type === 'Delivery') {
                 delete obj2?.start?.instructions;
                 delete obj2?.end?.instructions;
                 delete obj2?.tags;
@@ -968,17 +883,14 @@ async function validateFulfillments(
                   delete obj2?.end?.time?.timestamp;
                 }
               }
-              const errors = compareFulfillmentObject(
-                obj1,
-                obj2,
-                keys,
-                i,
-                apiSeq
-              );
+              const errors = compareFulfillmentObject(obj1, obj2, keys, i, apiSeq);
               if (errors.length > 0) {
                 errors.forEach((item: any) => {
                   result.push(
-                    createError(item.errMsg, ERROR_CODES.INVALID_RESPONSE)
+                    createError(
+                      item.errMsg,
+                      ERROR_CODES.INVALID_RESPONSE
+                    )
                   );
                 });
               }
@@ -993,7 +905,7 @@ async function validateFulfillments(
             i++;
           });
           if (state === ApiSequence.ON_STATUS_PENDING) {
-            const deliveryObj = _.filter(fulfillments, { type: "Delivery" })[0];
+            const deliveryObj = _.filter(fulfillments, { type: 'Delivery' })[0];
             if (deliveryObj) {
               delete deliveryObj?.state;
               delete deliveryObj?.tags;
@@ -1006,9 +918,7 @@ async function validateFulfillments(
       }
     }
   } catch (error: any) {
-    console.error(
-      `!!Error while checking fulfillments for /${constants.ON_STATUS}_${state}, ${error.stack}`
-    );
+    console.error(`!!Error while checking fulfillments for /${constants.ON_STATUS}_${state}, ${error.stack}`);
     result.push(
       createError(
         `Internal error while checking fulfillments`,
@@ -1026,7 +936,7 @@ async function validatePayment(
 ): Promise<void> {
   try {
     const flowRaw = await RedisService.getKey(`${transaction_id}_flow`);
-    const flow: any = flowRaw;
+    const flow : any = flowRaw 
     if (flow === FLOW.FLOW2A) {
       const payment = order.payment;
       if (state === ApiSequence.ON_STATUS_DELIVERED) {
@@ -1062,9 +972,7 @@ async function validatePayment(
       }
     }
   } catch (error: any) {
-    console.error(
-      `!!Error while checking payment for /${constants.ON_STATUS}_${state}, ${error.stack}`
-    );
+    console.error(`!!Error while checking payment for /${constants.ON_STATUS}_${state}, ${error.stack}`);
     result.push(
       createError(
         `Internal error while checking payment`,
@@ -1082,27 +990,19 @@ const onStatus = async (
   try {
     if (!data || isObjectEmpty(data)) {
       result.push(
-        createError(`JSON cannot be empty`, ERROR_CODES.INVALID_RESPONSE)
+        createError(
+          `JSON cannot be empty`,
+          ERROR_CODES.INVALID_RESPONSE
+        )
       );
       return result;
     }
 
     const { context, message } = data;
-    if (
-      !message ||
-      !context ||
-      !message.order ||
-      isObjectEmpty(message) ||
-      isObjectEmpty(message.order)
-    ) {
-      const onCnfrmStateRaw = await RedisService.getKey(
-        `${context.transaction_id}_onCnfrmState`
-      );
-      const onCnfrmState = onCnfrmStateRaw;
-      if (
-        message?.order?.state === ApiSequence.ON_STATUS_PENDING &&
-        onCnfrmState === "Accepted"
-      ) {
+    if (!message || !context || !message.order || isObjectEmpty(message) || isObjectEmpty(message.order)) {
+      const onCnfrmStateRaw = await RedisService.getKey(`${context.transaction_id}_onCnfrmState`);
+      const onCnfrmState = onCnfrmStateRaw 
+      if (message?.order?.state === ApiSequence.ON_STATUS_PENDING && onCnfrmState === 'Accepted') {
         result.push(
           createError(
             `When the onConfirm Order State is 'Accepted', the on_status_pending is not required!`,
@@ -1129,29 +1029,9 @@ const onStatus = async (
       validateMessageId(context, transaction_id, state, result),
       validateTimestamp(context, transaction_id, state, result),
       validateTransactionId(context, transaction_id, result),
-      validateOrderState(
-        order,
-        transaction_id,
-        state,
-        fulfillmentsItemsSet,
-        result,
-        context
-      ),
-      validateOrderState(
-        order,
-        transaction_id,
-        state,
-        fulfillmentsItemsSet,
-        result,
-        context
-      ),
-      validateFulfillments(
-        order,
-        transaction_id,
-        state,
-        fulfillmentsItemsSet,
-        result
-      ),
+      validateOrderState(order, transaction_id, state, fulfillmentsItemsSet, result, context),
+      validateOrderState(order, transaction_id, state, fulfillmentsItemsSet, result, context),
+      validateFulfillments(order, transaction_id, state, fulfillmentsItemsSet, result),
       validatePayment(order, transaction_id, state, result),
       RedisService.setKey(`${transaction_id}_on_status_${state}`, data, 300),
     ]);
@@ -1167,10 +1047,7 @@ const onStatus = async (
 
     return result;
   } catch (err: any) {
-    console.error(
-      `!!Some error occurred while checking /${constants.ON_STATUS} API`,
-      err
-    );
+    console.error(`!!Some error occurred while checking /${constants.ON_STATUS} API`, err);
     result.push(
       createError(
         `Internal error processing /${constants.ON_STATUS} request`,
