@@ -67,8 +67,9 @@ const select = async (data: any) => {
         code: 20000,
         description: `Previous call doesn't exist`,
       });
+      return result;
     }
-    return result;
+    
   } catch (error: any) {
     console.error(
       `!!Error while previous action call /${constants.SELECT}, ${error.stack}`
@@ -121,12 +122,14 @@ const select = async (data: any) => {
 
   const select = message.order;
   try {
+    
     console.info(`Adding Message Id /${constants.SELECT}`);
     const isMsgIdNotPresent = await addMsgIdToRedisSet(
       context.transaction_id,
       context.message_id,
       ApiSequence.SELECT
     );
+    
     if (!isMsgIdNotPresent) {
       result.push({
         valid: false,
@@ -222,6 +225,11 @@ const select = async (data: any) => {
       JSON.stringify(context.timestamp),
       TTL_IN_SECONDS
     );
+    await RedisService.setKey(
+      `${transaction_id}_txnId`,
+      transaction_id,
+      TTL_IN_SECONDS
+    )
   } catch (error: any) {
     console.log(
       `Error while comparing timestamp for /${constants.ON_SEARCH} and /${constants.SELECT} api, ${error.stack}`

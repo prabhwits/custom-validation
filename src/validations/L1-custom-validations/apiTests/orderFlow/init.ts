@@ -76,8 +76,8 @@ const init = async (data: any) => {
           code: 20000,
           description: `Previous call doesn't exist`,
         });
+        return result;
       }
-      return result;
     } catch (error: any) {
       console.error(
         `!!Error while previous action call /${constants.INIT}, ${error.stack}`
