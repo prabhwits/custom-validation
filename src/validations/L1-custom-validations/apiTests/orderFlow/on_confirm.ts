@@ -630,6 +630,7 @@ async function validateFulfillments(
       }
     }
   }
+  await RedisService.setKey('fulfillmentsItemsSet', JSON.stringify(order?.fulfillments[0]), TTL_IN_SECONDS);
 }
 
 async function validatePayment(
@@ -994,7 +995,123 @@ async function validateTags(
     );
   }
 }
+async function validateItems(
+  transactionId : any,
+  items : any,
+  result: any,
+  options = {
+    currentApi: ApiSequence.INIT,
+    previousApi: ApiSequence.ON_SELECT,
+    checkParentItemId: true,
+    checkQuantity: true,
+    checkTags: true,
+  }
+) {
+  const {
+    currentApi,
+    previousApi = ApiSequence.ON_CONFIRM,
+    checkParentItemId = true,
+    checkQuantity = true,
+    checkTags = true,
+  } = options;
 
+  try {
+    // Fetch required data from Redis
+    const redisKeys = [
+      RedisService.getKey(`${transactionId}_itemFlfllmnts`),
+      RedisService.getKey(`${transactionId}_itemsIdList`),
+    ];
+    if (checkParentItemId) {
+      redisKeys.push(RedisService.getKey(`${transactionId}_parentItemIdSet`));
+    }
+    if (checkTags) {
+      redisKeys.push(RedisService.getKey(`${transactionId}_select_customIdArray`));
+    }
+
+    const [itemFlfllmntsRaw, itemsIdListRaw, parentItemIdSetRaw, customIdArrayRaw] = await Promise.all(redisKeys);
+
+    const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
+    const itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
+    const parentItemIdSet = parentItemIdSetRaw ? JSON.parse(parentItemIdSetRaw) : null;
+    const select_customIdArray = customIdArrayRaw ? JSON.parse(customIdArrayRaw) : null;
+
+    // Validate each item
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const itemId = item.id;
+
+      // Check if item ID exists
+      if (!itemId) {
+        result.push({
+          valid: false,
+          code: 20000,
+          description: `items[${i}].id is missing in /${currentApi}`,
+        });
+        continue;
+      }
+
+      // Validate item ID existence in /on_select
+      if (!itemFlfllmnts || !(itemId in itemFlfllmnts)) {
+        result.push({
+          valid: false,
+          code: 20000,
+          description: `Item Id ${itemId} does not exist in /${previousApi}`,
+        });
+        continue;
+      }
+
+      // Validate fulfillment ID
+      if (item.fulfillment_id && item.fulfillment_id !== itemFlfllmnts[itemId]) {
+        result.push({
+          valid: false,
+          code: 20000,
+          description: `items[${i}].fulfillment_id mismatches for Item ${itemId} in /${previousApi} and /${currentApi}`,
+        });
+      }
+
+      // Validate quantity
+      if (checkQuantity && itemsIdList && itemId in itemsIdList) {
+        if (item.quantity?.count !== itemsIdList[itemId]) {
+          result.push({
+            valid: false,
+            code: 20000,
+            description: `Warning: items[${i}].quantity.count for item ${itemId} mismatches with the items quantity selected in /${constants.SELECT}`,
+          });
+        }
+      }
+
+      // Validate parent item ID
+      if (checkParentItemId && parentItemIdSet && item.parent_item_id) {
+        if (!parentItemIdSet.includes(item.parent_item_id)) {
+          result.push({
+            valid: false,
+            code: 20000,
+            description: `items[${i}].parent_item_id mismatches for Item ${itemId} in /${constants.ON_SEARCH} and /${currentApi}`,
+          });
+        }
+      }
+
+      // Validate custom ID tags
+      if (checkTags && select_customIdArray && checkItemTag(item, select_customIdArray)) {
+        result.push({
+          valid: false,
+          code: 20000,
+          description: `items[${i}].tags.parent_id mismatches for Item ${itemId} in /${constants.ON_SEARCH} and /${currentApi}`,
+        });
+      }
+    }
+
+    return result;
+  } catch (error:any) {
+    console.error(`!!Error while validating items in /${currentApi}: ${error.stack}`);
+    result.push({
+      valid: false,
+      code: 20000,
+      description: `Error occurred while validating items in /${currentApi}`,
+    });
+    return result;
+  }
+}
 async function validateBilling(
   order: any,
   transaction_id: string,
@@ -1092,6 +1209,7 @@ const onConfirm = async (data: any): Promise<ValidationError[]> => {
       validatePayment(order, transaction_id, flow, result),
       validateQuote(order, transaction_id, result),
       validateTags(order, transaction_id, context, result),
+      validateItems(transaction_id, order.items, result),
       validateBilling(order, transaction_id, result),
       RedisService.setKey(
         `${transaction_id}_${ApiSequence.ON_CONFIRM}`,
