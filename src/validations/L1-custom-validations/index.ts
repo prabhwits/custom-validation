@@ -7,6 +7,7 @@ import {
   onInit,
   confirm,
   onConfirm,
+  onStatusRouter,
 } from "../L1-custom-validations/apiTests/index";
 import { validationOutput } from "./types";
 
@@ -43,6 +44,8 @@ export async function performL1CustomValidations(
     case "on_confirm":
       result = await onConfirm(payload);
       break;
+    case "on_status":
+      result = await onStatusRouter(payload)
 
     default:
       break;
