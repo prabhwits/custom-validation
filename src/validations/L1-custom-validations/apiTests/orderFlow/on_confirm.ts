@@ -630,7 +630,7 @@ async function validateFulfillments(
       }
     }
   }
-  await RedisService.setKey('fulfillmentsItemsSet', JSON.stringify(order?.fulfillments[0]), TTL_IN_SECONDS);
+  await RedisService.setKey('fulfillmentsItemsSet', JSON.stringify(order?.fulfillments), TTL_IN_SECONDS);
 }
 
 async function validatePayment(
