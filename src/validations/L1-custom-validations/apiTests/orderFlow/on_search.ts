@@ -250,11 +250,22 @@ export default async function onSearch(
     let customMenu = false;
 
     try {
-      console.info(`Saving static fulfillment ids in /${constants.ON_SEARCH}`);
+      console.info(
+        `Saving static fulfillment ids nd checking rating in bpp/providers in /${constants.ON_SEARCH}`
+      );
       onSearchCatalog["bpp/providers"].forEach((provider: any) => {
         const onSearchFFIds = new Set();
         const bppFF = provider.fulfillments;
         const len = bppFF.length;
+
+        const rating = provider?.rating;
+        if (rating !== undefined) {
+          const numericRating = parseFloat(rating);
+
+          if (isNaN(numericRating) || numericRating < 1 || numericRating > 5) {
+            addError(40000, "provider.rating must be a number between 1 and 5");
+          }
+        }
 
         let i = 0;
         while (i < len) {
@@ -979,6 +990,19 @@ export default async function onSearch(
               `Validating uniqueness for item id in bpp/providers[${i}].items[${j}]...`
             );
             const item = items[j];
+            const rating = item?.rating;
+
+            if (rating !== undefined) {
+              const numericRating = parseFloat(rating);
+
+              if (
+                isNaN(numericRating) ||
+                numericRating < 1 ||
+                numericRating > 5
+              ) {
+                addError(40000, "item.rating must be a number between 1 and 5");
+              }
+            }
 
             if ("category_id" in item) {
               itemCategory_id.add(item.category_id);

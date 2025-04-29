@@ -251,10 +251,120 @@ const onSelect = async (data: any) => {
     const fulfillments = message.order.fulfillments;
     const selectFlflmntSet: any = [];
     const fulfillment_tat_obj: any = {};
+
     fulfillments.forEach((flflmnt: any) => {
       fulfillment_tat_obj[flflmnt.id] = isoDurToSec(flflmnt["@ondc/org/TAT"]);
       selectFlflmntSet.push(flflmnt.id);
     });
+
+    fulfillments.forEach((ff: any) => {
+      const type = ff?.type;
+      switch (type) {
+        case "Delivery":
+          if (ff?.end) {
+            const timeRange = ff?.end?.time?.range;
+            const start = timeRange?.start ? new Date(timeRange.start) : null;
+            const end = timeRange?.end ? new Date(timeRange.end) : null;
+            const contextTime = context.timestamp;
+
+            if (!start || !end) {
+              result.push({
+                valid: false,
+                code: 20001,
+                description: `Missing start or end time in Delivery fulfillment`,
+              });
+              break;
+            }
+
+            if (start >= end) {
+              result.push({
+                valid: false,
+                code: 20001,
+                description: `Start time must be less than end time in Delivery fulfillment}`,
+              });
+            }
+
+            if (start <= contextTime) {
+              result.push({
+                valid: false,
+                code: 20001,
+                description: `Start time must be after context.timestamp in Delivery fulfillment`,
+              });
+            }
+          }
+          break;
+        case "Self-Pickup":
+          if (ff?.start) {
+            const timeRange = ff?.end?.time?.range;
+            const start = timeRange?.start ? new Date(timeRange.start) : null;
+            const end = timeRange?.end ? new Date(timeRange.end) : null;
+            const contextTime = context.timestamp;
+
+            if (!start || !end) {
+              result.push({
+                valid: false,
+                code: 20001,
+                description: `Missing start or end time in Self-Pickup fulfillment`,
+              });
+              break;
+            }
+
+            if (start >= end) {
+              result.push({
+                valid: false,
+                code: 20001,
+                description: `Start time must be less than end time in Self-Pickup fulfillment}`,
+              });
+            }
+
+            if (start <= contextTime) {
+              result.push({
+                valid: false,
+                code: 20001,
+                description: `Start time must be after context.timestamp in Self-Pickup fulfillment`,
+              });
+            }
+          }
+          break;
+        case "Buyer-Delivery":
+          const orderDetailsTag = ff.tags?.find(
+            (tag: any) => tag.code === "order_details"
+          );
+          if (!orderDetailsTag) {
+            result.push({
+              valid: false,
+              code: 20007,
+              description: `Missing 'order_details' tag in fulfillments when fulfillment.type is 'Buyer-Delivery'`,
+            });
+            break;
+          }
+
+          const requiredFields = [
+            "weight_unit",
+            "weight_value",
+            "dim_unit",
+            "length",
+            "breadth",
+            "height",
+          ];
+
+          const list = orderDetailsTag.list || [];
+          for (const field of requiredFields) {
+            const item = list.find((i: any) => i.code === field);
+            if (!item || !item.value || item.value.toString().trim() === "") {
+              result.push({
+                valid: false,
+                code: 20008,
+                description: `'${field}' is missing or empty in 'order_details' tag in fulfillments`,
+              });
+            }
+          }
+          break;
+        default:
+          break;
+      }
+    });
+
     await RedisService.setKey(
       `${transaction_id}_selectFlflmntSet`,
       JSON.stringify(selectFlflmntSet),
