@@ -8,6 +8,7 @@ import {
   addMsgIdToRedisSet,
   addActionToRedisSet,
 } from "../../../../utils/helper";
+import { bap_features } from "../../../../utils/bap_features";
 import { RedisService } from "ondc-automation-cache-lib";
 
 const TTL_IN_SECONDS: number = Number(process.env.TTL_IN_SECONDS) || 3600;
@@ -200,6 +201,7 @@ export default async function search(payload: any): Promise<ValidationOutput> {
           "catalog_full",
           "catalog_inc",
           "bap_terms",
+          "bap_features",
         ];
         let hasValidTag = false;
 
@@ -224,57 +226,125 @@ export default async function search(payload: any): Promise<ValidationOutput> {
 
           hasValidTag = true;
 
-          if (tag.code === "bnp_features") {
-            if (!tag.list.some((item: any) => item.code === "000")) {
-              addError(40000, 'bnp_features tag must contain code "000"');
-            }
-          } else if (tag.code === "catalog_full") {
-            const payloadType = tag.list.find(
-              (item: any) => item.code === "payload_type"
-            );
-            if (!payloadType) {
-              addError(
-                40000,
-                'catalog_full tag must contain code "payload_type"'
-              );
-            } else if (!["link", "inline"].includes(payloadType.value)) {
-              addError(
-                40000,
-                'payload_type value must be either "link" or "inline"'
-              );
-            }
-          } else if (tag.code === "catalog_inc") {
-            const hasMode = tag.list.some((item: any) => item.code === "mode");
-            const hasStartTime = tag.list.some(
-              (item: any) => item.code === "start_time"
-            );
-            const hasEndTime = tag.list.some(
-              (item: any) => item.code === "end_time"
-            );
+          try {
+            switch (tag.code) {
+              case "bnp_features":
+                if (!tag.list.some((item: any) => item.code === "000")) {
+                  addError(40000, 'bnp_features tag must contain code "000"');
+                }
+                break;
 
-            if (!hasMode && !(hasStartTime && hasEndTime)) {
-              addError(
-                40000,
-                'catalog_inc tag must contain either "mode" or both "start_time" and "end_time"'
-              );
-            }
-          } else if (tag.code === "bap_terms") {
-            const hasStaticTerms = tag.list.some(
-              (item: any) => item.code === "static_terms"
-            );
-            const hasStaticTermsNew = tag.list.some(
-              (item: any) => item.code === "static_terms_new"
-            );
-            const hasEffectiveDate = tag.list.some(
-              (item: any) => item.code === "effective_date"
-            );
+              case "catalog_full":
+                const payloadType = tag.list.find(
+                  (item: any) => item.code === "payload_type"
+                );
+                if (!payloadType) {
+                  addError(
+                    40000,
+                    'catalog_full tag must contain code "payload_type"'
+                  );
+                } else if (!["link", "inline"].includes(payloadType.value)) {
+                  addError(
+                    40000,
+                    'payload_type value must be either "link" or "inline"'
+                  );
+                }
+                break;
 
-            if (!hasStaticTerms || !hasStaticTermsNew || !hasEffectiveDate) {
-              addError(
-                40000,
-                'bap_terms tag must contain "static_terms", "static_terms_new", and "effective_date"'
-              );
+              case "catalog_inc":
+                const hasMode = tag.list.some(
+                  (item: any) => item.code === "mode"
+                );
+                const hasStartTime = tag.list.some(
+                  (item: any) => item.code === "start_time"
+                );
+                const hasEndTime = tag.list.some(
+                  (item: any) => item.code === "end_time"
+                );
+
+                if (!hasMode && !(hasStartTime && hasEndTime)) {
+                  addError(
+                    40000,
+                    'catalog_inc tag must contain either "mode" or both "start_time" and "end_time"'
+                  );
+                }
+                break;
+
+              case "bap_terms":
+                const hasStaticTerms = tag.list.some(
+                  (item: any) => item.code === "static_terms"
+                );
+                const hasStaticTermsNew = tag.list.some(
+                  (item: any) => item.code === "static_terms_new"
+                );
+                const hasEffectiveDate = tag.list.some(
+                  (item: any) => item.code === "effective_date"
+                );
+
+                if (
+                  !hasStaticTerms ||
+                  !hasStaticTermsNew ||
+                  !hasEffectiveDate
+                ) {
+                  addError(
+                    40000,
+                    'bap_terms tag must contain "static_terms", "static_terms_new", and "effective_date"'
+                  );
+                }
+                break;
+
+              case "bap_features":
+                if (!Array.isArray(tag.list)) {
+                  addError(40000, "bap_features list must be an array");
+                } else {
+                  const validFeatureCodes = Object.keys(bap_features);
+
+                  for (const feature of tag.list) {
+                    if (!feature.code) {
+                      addError(40000, "Each bap_feature must have a 'code'");
+                      continue;
+                    }
+
+                    if (!validFeatureCodes.includes(feature.code)) {
+                      addError(
+                        40000,
+                        `bap_feature code '${feature.code}' is not valid`
+                      );
+                    }
+
+                    if (
+                      typeof feature.value !== "string" ||
+                      !["yes", "no"].includes(feature.value.toLowerCase())
+                    ) {
+                      addError(
+                        40000,
+                        `bap_feature '${feature.code}' has invalid value '${feature.value}'. Expected 'yes' or 'no'`
+                      );
+                    }
+
+                    // Optional Redis store for enabled features
+                    if (
+                      validFeatureCodes.includes(feature.code) &&
+                      feature.value.toLowerCase() === "yes"
+                    ) {
+                      const redisKey = `${context.transaction_id}_${feature.code}_enabled`;
+                      await RedisService.setKey(
+                        redisKey,
+                        "true",
+                        TTL_IN_SECONDS
+                      );
+                    }
+                  }
+                }
+                break;
+
+              default:
+                // No validation required
+                break;
             }
+          } catch (err) {
+            console.error("Error during tag validation:", err);
+            addError(50000, "Internal server error during tag validation");
           }
 
           for (const item of tag.list) {
@@ -304,30 +374,30 @@ export default async function search(payload: any): Promise<ValidationOutput> {
 
     // Redis operations for message ID and domain
     try {
-          console.info(`Adding Message Id /${constants.SEARCH}`);
-          const isMsgIdNotPresent = await addMsgIdToRedisSet(
-            context.transaction_id,
-            context.message_id,
-            ApiSequence.SEARCH
-          );
-          if (!isMsgIdNotPresent) {
-            result.push({
-              valid: false,
-              code: 20000,
-              description: `Message id should not be same with previous calls`,
-            });
-          }
-          await RedisService.setKey(
-            `${context.transaction_id}_${ApiSequence.SEARCH}_msgId`,
-            context.message_id,
-            TTL_IN_SECONDS
-          );
-        } catch (error: any) {
-          console.error(
-            `!!Error while checking message id for /${constants.SEARCH}, ${error.stack}`
-          );
-        }
- 
+      console.info(`Adding Message Id /${constants.SEARCH}`);
+      const isMsgIdNotPresent = await addMsgIdToRedisSet(
+        context.transaction_id,
+        context.message_id,
+        ApiSequence.SEARCH
+      );
+      if (!isMsgIdNotPresent) {
+        result.push({
+          valid: false,
+          code: 20000,
+          description: `Message id should not be same with previous calls`,
+        });
+      }
+      await RedisService.setKey(
+        `${context.transaction_id}_${ApiSequence.SEARCH}_msgId`,
+        context.message_id,
+        TTL_IN_SECONDS
+      );
+    } catch (error: any) {
+      console.error(
+        `!!Error while checking message id for /${constants.SEARCH}, ${error.stack}`
+      );
+    }
+
     const domainParts = context.domain?.split(":");
     if (domainParts?.[1]) {
       await RedisService.setKey(

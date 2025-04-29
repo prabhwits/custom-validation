@@ -45,9 +45,17 @@ export async function performL1CustomValidations(
       result = await onConfirm(payload);
       break;
     case "on_status":
-      result = await onStatusRouter(payload)
+      result = await onStatusRouter(payload);
 
     default:
+      result = [
+        {
+          valid: false,
+          code: 403,
+          description: "Not a valid action call", // description is optional
+        },
+      ];
+
       break;
   }
   console.log("resulttttt", result);
