@@ -1,3 +1,4 @@
+import { RedisService } from "ondc-automation-cache-lib";
 import checkOnStatusDelivered from "./on_status_delivered";
 import checkOnStatusOutForDelivery from "./on_status_out_for_delivery";
 import checkOnStatusPacked from "./on_status_packed";
@@ -7,7 +8,8 @@ import checkOnStatusPicked from "./on_status_picked";
 export const onStatusRouter = async (data: any) => {
     const state = data?.message?.order?.fulfillments[0]?.state?.descriptor?.code;
     let result: any = [];
-    let fulfillmentsItemsSet: Set<any> = new Set();
+    let fulfillmentsItemsSetRaw : any = await RedisService.getKey('fulfillmentsItemsSet');
+    let fulfillmentsItemsSet  = JSON.parse(fulfillmentsItemsSetRaw);
     switch (state) {
         case "Pending":
         result = await checkOnStatusPending(data, state, fulfillmentsItemsSet);

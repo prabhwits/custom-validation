@@ -1,16 +1,22 @@
-/* eslint-disable no-prototype-builtins */
 import _ from 'lodash';
 import { RedisService } from 'ondc-automation-cache-lib';
-
 
 import {
   isObjectEmpty,
   checkContext,
+  checkBppIdOrBapId,
   areTimestampsLessThanOrEqualTo,
   payment_status,
   compareTimeRanges,
+  compareObjects,
+  compareQuoteObjects,
+  sumQuoteBreakUp,
+  areGSTNumbersMatching,
   addActionToRedisSet,
   addMsgIdToRedisSet,
+  addFulfillmentIdToRedisSet,
+  compareCoordinates,
+  checkItemTag,
 } from '../../../../../utils/helper';
 import { FLOW } from '../../../../../utils/enums';
 import constants, { ApiSequence, PAYMENT_STATUS } from '../../../../../utils/constants';
@@ -41,7 +47,8 @@ const createError = (description: string, code: number): ValidationError => ({
   description,
 });
 
-// Validation functions
+
+
 async function validateContext(
   context: any,
   transaction_id: string,
@@ -65,13 +72,21 @@ async function validateContext(
     );
   }
 
+  if (checkBppIdOrBapId(context.bap_id)) {
+    result.push(
+      createError('context/bap_id should not be a url', ERROR_CODES.INVALID_RESPONSE)
+    );
+  }
+  if (checkBppIdOrBapId(context.bpp_id)) {
+    result.push(
+      createError('context/bpp_id should not be a url', ERROR_CODES.INVALID_RESPONSE)
+    );
+  }
+
   const domain = await RedisService.getKey(`${transaction_id}_domain`);
   if (!_.isEqual(context.domain?.split(':')[1], domain)) {
     result.push(
-      createError(
-        'Domain should be same in each action',
-        ERROR_CODES.INVALID_RESPONSE
-      )
+      createError('Domain should be same in each action', ERROR_CODES.INVALID_RESPONSE)
     );
   }
 
@@ -92,30 +107,23 @@ async function validateContext(
 async function validateMessageId(
   context: any,
   transaction_id: string,
-  
   result: ValidationError[]
 ): Promise<void> {
   try {
-     try {
-          console.info(`Adding Message Id /${constants.ON_STATUS}_pending`);
-          const isMsgIdNotPresent = await addMsgIdToRedisSet(
-            context.transaction_id,
-            context.message_id,
-            ApiSequence.ON_STATUS_PENDING
-          );
-          if (!isMsgIdNotPresent) {
-            result.push({
-              valid: false,
-              code: 20000,
-              description: `Message id should not be same with previous calls`,
-            });
-          }
-         
-        } catch (error: any) {
-          console.error(
-            `!!Error while checking message id for /${constants.INIT}, ${error.stack}`
-          );
-        }
+    console.info(`Adding Message Id /${constants.ON_STATUS}_pending`);
+    const isMsgIdNotPresent = await addMsgIdToRedisSet(
+      transaction_id,
+      context.message_id,
+      ApiSequence.ON_STATUS_PENDING
+    );
+    if (!isMsgIdNotPresent) {
+      result.push(
+        createError(
+          `Message id should not be same with previous calls`,
+          ERROR_CODES.INVALID_RESPONSE
+        )
+      );
+    }
 
     await RedisService.setKey(
       `${transaction_id}_pending_message_id`,
@@ -127,15 +135,37 @@ async function validateMessageId(
       `!!Error while checking message id for /${constants.ON_STATUS_PENDING}, ${error.stack}`
     );
     result.push(
-      createError(
-        'Internal error while checking message ID',
-        ERROR_CODES.INTERNAL_ERROR
-      )
+      createError('Internal error while checking message ID', ERROR_CODES.INTERNAL_ERROR)
     );
   }
 }
 
-
+async function validateTransactionId(
+  context: any,
+  transaction_id: string,
+  result: ValidationError[]
+): Promise<void> {
+  try {
+    const txnIdRaw = await RedisService.getKey(`${transaction_id}_txnId`);
+  
+    const txnId = txnIdRaw 
+    if (txnId && !_.isEqual(txnId, context.transaction_id)) {
+      result.push(
+        createError(
+          `Transaction Id should be same from /${constants.SELECT} onwards`,
+          ERROR_CODES.INVALID_RESPONSE
+        )
+      );
+    }
+  } catch (error: any) {
+    console.error(
+      `!!Error while validating transaction id for /${constants.ON_STATUS_PENDING}, ${error.stack}`
+    );
+    result.push(
+      createError('Internal error while checking transaction ID', ERROR_CODES.INTERNAL_ERROR)
+    );
+  }
+}
 
 async function validateOrder(
   order: any,
@@ -143,11 +173,9 @@ async function validateOrder(
   state: string,
   result: ValidationError[]
 ): Promise<void> {
-  const cnfrmOrdrIdRaw = await RedisService.getKey(
-    `${transaction_id}_cnfrmOrdrId`
-  );
+  const cnfrmOrdrIdRaw = await RedisService.getKey(`${transaction_id}_cnfrmOrdrId`);
   const cnfrmOrdrId = cnfrmOrdrIdRaw ? JSON.parse(cnfrmOrdrIdRaw) : null;
-  if (cnfrmOrdrId && order.id != cnfrmOrdrId) {
+  if (cnfrmOrdrId && order.id !== cnfrmOrdrId) {
     result.push(
       createError(
         `Order id in /${constants.CONFIRM} and /${constants.ON_STATUS}_${state} do not match`,
@@ -161,6 +189,28 @@ async function validateOrder(
       createError(
         `Order state should be accepted whenever Status is being sent 'Accepted'. Current state: ${order.state}`,
         ERROR_CODES.INVALID_ORDER_STATE
+      )
+    );
+  }
+
+  const providerIdRaw = await RedisService.getKey(`${transaction_id}_providerId`);
+  const providerId = providerIdRaw ? JSON.parse(providerIdRaw) : null;
+  if (providerId && order.provider?.id !== providerId) {
+    result.push(
+      createError(
+        `Provider Id mismatches in /${constants.ON_SEARCH} and /${constants.ON_STATUS}_${state}`,
+        ERROR_CODES.INVALID_RESPONSE
+      )
+    );
+  }
+
+  const providerLocRaw = await RedisService.getKey(`${transaction_id}_providerLoc`);
+  const providerLoc = providerLocRaw ? JSON.parse(providerLocRaw) : null;
+  if (providerLoc && order.provider?.locations?.[0]?.id !== providerLoc) {
+    result.push(
+      createError(
+        `provider.locations[0].id mismatches in /${constants.ON_SEARCH} and /${constants.ON_STATUS}_${state}`,
+        ERROR_CODES.INVALID_RESPONSE
       )
     );
   }
@@ -179,20 +229,38 @@ async function validateFulfillments(
   fulfillmentsItemsSet: Set<any>,
   result: ValidationError[]
 ): Promise<void> {
+  const [itemFlfllmntsRaw, providerGpsRaw, providerNameRaw, buyerGpsRaw, buyerAddrRaw] =
+    await Promise.all([
+      RedisService.getKey(`${transaction_id}_itemFlfllmnts`),
+      RedisService.getKey(`${transaction_id}_providerGps`),
+      RedisService.getKey(`${transaction_id}_providerName`),
+      RedisService.getKey(`${transaction_id}_buyerGps`),
+      RedisService.getKey(`${transaction_id}_buyerAddr`),
+    ]);
+  const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
+  const providerGps = providerGpsRaw ? JSON.parse(providerGpsRaw) : null;
+  const providerName = providerNameRaw ? JSON.parse(providerNameRaw) : null;
+  const buyerGps = buyerGpsRaw ? JSON.parse(buyerGpsRaw) : null;
+  const buyerAddr = buyerAddrRaw ? JSON.parse(buyerAddrRaw) : null;
+
   for (const ff of order.fulfillments || []) {
     if (!ff.id) {
       result.push(
+        createError(`Fulfillment Id must be present`, ERROR_CODES.INVALID_RESPONSE)
+      );
+    }
+
+    if (!ff.type) {
+      result.push(
         createError(
-          `Fulfillment Id must be present`,
+          `Fulfillment type does not exist in /${constants.ON_STATUS}_${state}`,
           ERROR_CODES.INVALID_RESPONSE
         )
       );
     }
 
     if (ff.type !== 'Cancel') {
-      const ffTrackingRaw = await RedisService.getKey(
-        `${transaction_id}_${ff.id}_tracking`
-      );
+      const ffTrackingRaw = await RedisService.getKey(`${transaction_id}_${ff.id}_tracking`);
       const ffTracking = ffTrackingRaw ? JSON.parse(ffTrackingRaw) : null;
       if (ffTracking !== null) {
         if (typeof ff.tracking !== 'boolean') {
@@ -212,6 +280,74 @@ async function validateFulfillments(
         }
       }
     }
+
+    if (!itemFlfllmnts || !Object.values(itemFlfllmnts).includes(ff.id)) {
+      result.push(
+        createError(
+          `Fulfillment id ${ff.id || 'missing'} does not exist in /${constants.ON_SELECT}`,
+          ERROR_CODES.INVALID_RESPONSE
+        )
+      );
+    }
+
+    const ffDesc = ff.state?.descriptor;
+    const ffStateCheck = ffDesc?.hasOwnProperty('code') && ffDesc.code === 'Pending';
+    if (!ffStateCheck) {
+      result.push(
+        createError(
+          `Fulfillment state should be 'Pending' in /${constants.ON_STATUS}_${state}`,
+          ERROR_CODES.INVALID_ORDER_STATE
+        )
+      );
+    }
+
+    if (!ff.start || !ff.end) {
+      result.push(
+        createError(
+          `fulfillments[${ff.id}] start and end locations are mandatory`,
+          ERROR_CODES.INVALID_RESPONSE
+        )
+      );
+    }
+
+    if (ff.start?.location?.gps && !compareCoordinates(ff.start.location.gps, providerGps)) {
+      result.push(
+        createError(
+          `store gps location /fulfillments[${ff.id}]/start/location/gps can't change`,
+          ERROR_CODES.INVALID_RESPONSE
+        )
+      );
+    }
+
+    if (!providerName || !_.isEqual(ff.start?.location?.descriptor?.name, providerName)) {
+      result.push(
+        createError(
+          `store name /fulfillments[${ff.id}]/start/location/descriptor/name can't change`,
+          ERROR_CODES.INVALID_RESPONSE
+        )
+      );
+    }
+
+    if (ff.end?.location?.gps && !_.isEqual(ff.end.location.gps, buyerGps)) {
+      result.push(
+        createError(
+          `fulfillments[${ff.id}].end.location gps is not matching with gps in /${constants.SELECT}`,
+          ERROR_CODES.INVALID_RESPONSE
+        )
+      );
+    }
+
+    if (
+      ff.end?.location?.address?.area_code &&
+      !_.isEqual(ff.end.location.address.area_code, buyerAddr)
+    ) {
+      result.push(
+        createError(
+          `fulfillments[${ff.id}].end.location.address.area_code is not matching with area_code in /${constants.SELECT}`,
+          ERROR_CODES.INVALID_RESPONSE
+        )
+      );
+    }
   }
 
   const storedFulfillmentRaw = await RedisService.getKey(
@@ -220,9 +356,7 @@ async function validateFulfillments(
   const storedFulfillment = storedFulfillmentRaw
     ? JSON.parse(storedFulfillmentRaw)
     : null;
-  const deliveryFulfillment = order.fulfillments.filter(
-    (f: any) => f.type === 'Delivery'
-  );
+  const deliveryFulfillment = order.fulfillments.filter((f: any) => f.type === 'Delivery');
 
   if (!storedFulfillment) {
     if (deliveryFulfillment.length > 0) {
@@ -254,18 +388,14 @@ async function validateFulfillments(
     );
 
     if (fulfillmentRangeErrors) {
-      fulfillmentRangeErrors.forEach((error: string, index: number) => {
-        result.push(
-          createError(
-            `${error}`,
-            ERROR_CODES.INVALID_RESPONSE
-          )
-        );
+      fulfillmentRangeErrors.forEach((error: string) => {
+        result.push(createError(`${error}`, ERROR_CODES.INVALID_RESPONSE));
       });
     }
   }
 
-  if (['6', '2', '3', '5'].includes(state)) {
+  const flow = await RedisService.getKey('flow') || '2';
+  if (['6', '2', '3', '5'].includes(flow)) {
     if (!order.fulfillments?.length) {
       result.push(
         createError(
@@ -274,9 +404,7 @@ async function validateFulfillments(
         )
       );
     } else {
-      const deliveryObjArr = order.fulfillments.filter(
-        (f: any) => f.type === 'Delivery'
-      );
+      const deliveryObjArr = order.fulfillments.filter((f: any) => f.type === 'Delivery');
       if (!deliveryObjArr.length) {
         result.push(
           createError(
@@ -290,7 +418,7 @@ async function validateFulfillments(
         delete deliverObj?.tags;
         delete deliverObj?.start?.instructions;
         delete deliverObj?.end?.instructions;
-        fulfillmentsItemsSet.add(deliverObj);
+        await addFulfillmentIdToRedisSet(transaction_id, JSON.stringify(deliverObj));
       }
     }
   }
@@ -303,9 +431,7 @@ async function validateTimestamps(
   state: string,
   result: ValidationError[]
 ): Promise<void> {
-  const cnfrmTmpstmpRaw = await RedisService.getKey(
-    `${transaction_id}_cnfrmTmpstmp`
-  );
+  const cnfrmTmpstmpRaw = await RedisService.getKey(`${transaction_id}_cnfrmTmpstmp`);
   const cnfrmTmpstmp = cnfrmTmpstmpRaw ? JSON.parse(cnfrmTmpstmpRaw) : null;
   if (cnfrmTmpstmp && !_.isEqual(cnfrmTmpstmp, order.created_at)) {
     result.push(
@@ -317,7 +443,7 @@ async function validateTimestamps(
   }
 
   const onCnfrmTmpstmpRaw = await RedisService.getKey(
-    `${transaction_id}_onCnfrmtmpstmp`
+    `${transaction_id}_${ApiSequence.ON_CONFIRM}_tmpstmp`
   );
   const onCnfrmTmpstmp = onCnfrmTmpstmpRaw ? JSON.parse(onCnfrmTmpstmpRaw) : null;
   if (onCnfrmTmpstmp && _.gte(onCnfrmTmpstmp, context.timestamp)) {
@@ -347,9 +473,34 @@ async function validateTimestamps(
 
 async function validatePayment(
   order: any,
+  transaction_id: string,
   flow: string,
-  result: ValidationError[]
+  result: ValidationError[],
+  state: string
 ): Promise<void> {
+  const cnfrmpymntRaw = await RedisService.getKey(`${transaction_id}_cnfrmpymnt`);
+  
+  const cnfrmpymnt = cnfrmpymntRaw ? JSON.parse(cnfrmpymntRaw) : null;
+  if (cnfrmpymnt && !_.isEqual(cnfrmpymnt, order.payment)) {
+    result.push(
+      createError(
+        `payment object mismatches in /${constants.CONFIRM} & /${constants.ON_STATUS}_${state}`,
+        ERROR_CODES.INVALID_RESPONSE
+      )
+    );
+  }
+
+  if (
+    parseFloat(order.payment?.params?.amount) !== parseFloat(order.quote?.price?.value)
+  ) {
+    result.push(
+      createError(
+        `Quoted price (/${constants.ON_STATUS}_${state}) doesn't match with the amount in payment.params`,
+        ERROR_CODES.INVALID_RESPONSE
+      )
+    );
+  }
+
   const status = payment_status(order.payment, flow);
   if (!status) {
     result.push(
@@ -370,25 +521,342 @@ async function validatePayment(
   }
 }
 
+async function validateQuote(
+  order: any,
+  transaction_id: string,
+  state: string,
+  result: ValidationError[]
+): Promise<void> {
+  if (!sumQuoteBreakUp(order.quote)) {
+    result.push(
+      createError(
+        `item quote breakup prices for ${constants.ON_STATUS}_${state} should be equal to the total price`,
+        ERROR_CODES.INVALID_RESPONSE
+      )
+    );
+  }
+
+  const quoteObjRaw = await RedisService.getKey(`${transaction_id}_quoteObj`);
+  const onSelectQuote = quoteObjRaw ? JSON.parse(quoteObjRaw) : null;
+  const quoteErrors = compareQuoteObjects(
+    onSelectQuote,
+    order.quote,
+    constants.ON_STATUS,
+    constants.ON_SELECT
+  );
+  if (quoteErrors) {
+    quoteErrors.forEach((error: string) =>
+      result.push(createError(error, ERROR_CODES.INVALID_RESPONSE))
+    );
+  }
+
+  const quotePriceRaw = await RedisService.getKey(`${transaction_id}_quotePrice`);
+  const onConfirmQuotePrice = quotePriceRaw ? JSON.parse(quotePriceRaw) : null;
+  const onStatusQuotePrice = parseFloat(order.quote?.price?.value);
+  if (onConfirmQuotePrice && onConfirmQuotePrice !== onStatusQuotePrice) {
+    result.push(
+      createError(
+        `Quoted Price in /${constants.ON_STATUS}_${state} INR ${onStatusQuotePrice} does not match with the quoted price in /${constants.ON_CONFIRM} INR ${onConfirmQuotePrice}`,
+        ERROR_CODES.INVALID_RESPONSE
+      )
+    );
+  }
+}
+
+async function validateBilling(
+  order: any,
+  transaction_id: string,
+  state: string,
+  result: ValidationError[]
+): Promise<void> {
+  const billingRaw = await RedisService.getKey(`${transaction_id}_billing`);
+  const billing = billingRaw ? JSON.parse(billingRaw) : null;
+  const billingErrors = compareObjects(billing, order.billing);
+  if (billingErrors) {
+    billingErrors.forEach((error: string) =>
+      result.push(
+        createError(
+          `${error} when compared with confirm billing object`,
+          ERROR_CODES.INVALID_RESPONSE
+        )
+      )
+    );
+  }
+}
+
+async function validateTags(
+  order: any,
+  transaction_id: string,
+  state: string,
+  result: ValidationError[]
+): Promise<void> {
+  const bpp_terms_obj = order.tags?.find((item: any) => item?.code === 'bpp_terms');
+  const list = bpp_terms_obj?.list || [];
+  const np_type_arr = list.filter((item: any) => item.code === 'np_type');
+  const np_type_on_search = await RedisService.getKey(
+    `${transaction_id}_${ApiSequence.ON_SEARCH}np_type`
+  );
+
+  if (np_type_arr.length === 0) {
+    result.push(
+      createError(
+        `np_type not found in ${constants.ON_STATUS}_${state}`,
+        ERROR_CODES.INVALID_RESPONSE
+      )
+    );
+  } else {
+    const np_type = np_type_arr[0].value;
+    if (np_type !== np_type_on_search) {
+      result.push(
+        createError(
+          `np_type of ${constants.ON_SEARCH} is not same to np_type of ${constants.ON_STATUS}_${state}`,
+          ERROR_CODES.INVALID_RESPONSE
+        )
+      );
+    }
+  }
+
+  let tax_number = '';
+  let provider_tax_number = '';
+  list.forEach((item: any) => {
+    if (item.code === 'tax_number') {
+      if (item.value.length !== 15) {
+        result.push(
+          createError(
+            `Number of digits in tax number in message.order.tags[0].list should be 15`,
+            ERROR_CODES.INVALID_RESPONSE
+          )
+        );
+      } else {
+        tax_number = item.value;
+        const taxNumberPattern = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+        if (!taxNumberPattern.test(tax_number)) {
+          result.push(
+            createError(
+              `Invalid format for tax_number in ${constants.ON_STATUS}_${state}`,
+              ERROR_CODES.INVALID_RESPONSE
+            )
+          );
+        }
+      }
+    }
+    if (item.code === 'provider_tax_number') {
+      if (item.value.length !== 10) {
+        result.push(
+          createError(
+            `Number of digits in provider tax number in message.order.tags[0].list should be 10`,
+            ERROR_CODES.INVALID_RESPONSE
+          )
+        );
+      } else {
+        provider_tax_number = item.value;
+        const taxNumberPattern = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+        if (!taxNumberPattern.test(provider_tax_number)) {
+          result.push(
+            createError(
+              `Invalid format for provider_tax_number in ${constants.ON_STATUS}_${state}`,
+              ERROR_CODES.INVALID_RESPONSE
+            )
+          );
+        }
+      }
+    }
+  });
+
+  if (!tax_number) {
+    result.push(
+      createError(
+        `tax_number must be present for ${constants.ON_STATUS}_${state}`,
+        ERROR_CODES.INVALID_RESPONSE
+      )
+    );
+  }
+  if (!provider_tax_number) {
+    result.push(
+      createError(
+        `provider_tax_number must be present for ${constants.ON_STATUS}_${state}`,
+        ERROR_CODES.INVALID_RESPONSE
+      )
+    );
+  }
+
+  if (tax_number.length === 15 && provider_tax_number.length === 10) {
+    const pan_id = tax_number.slice(2, 12);
+    if (pan_id !== provider_tax_number && np_type_on_search === 'ISN') {
+      result.push(
+        createError(
+          `Pan_id is different in tax_number and provider_tax_number in message.order.tags[0].list`,
+          ERROR_CODES.INVALID_RESPONSE
+        )
+      );
+    } else if (pan_id === provider_tax_number && np_type_on_search === 'MSN') {
+      result.push(
+        createError(
+          `Pan_id shouldn't be same in tax_number and provider_tax_number in message.order.tags[0].list`,
+          ERROR_CODES.INVALID_RESPONSE
+        )
+      );
+    }
+  }
+
+  const confirm_tagsRaw = await RedisService.getKey(`${transaction_id}_confirm_tags`);
+  const confirm_tags = confirm_tagsRaw ? JSON.parse(confirm_tagsRaw) : null;
+  if (order.tags && confirm_tags) {
+    if (!areGSTNumbersMatching(confirm_tags, order.tags, 'bpp_terms')) {
+      result.push(
+        createError(
+          `Tags should have same and valid gst_number as passed in /${constants.CONFIRM}`,
+          ERROR_CODES.INVALID_RESPONSE
+        )
+      );
+    }
+  }
+}
+async function validateItems(
+  transactionId : any,
+  items : any,
+  result: any,
+  options = {
+    currentApi: ApiSequence.INIT,
+    previousApi: ApiSequence.ON_SELECT,
+    checkParentItemId: true,
+    checkQuantity: true,
+    checkTags: true,
+  }
+) {
+  const {
+    currentApi,
+    previousApi = ApiSequence.ON_CONFIRM,
+    checkParentItemId = true,
+    checkQuantity = true,
+    checkTags = true,
+  } = options;
+
+  try {
+    // Fetch required data from Redis
+    const redisKeys = [
+      RedisService.getKey(`${transactionId}_itemFlfllmnts`),
+      RedisService.getKey(`${transactionId}_itemsIdList`),
+    ];
+    if (checkParentItemId) {
+      redisKeys.push(RedisService.getKey(`${transactionId}_parentItemIdSet`));
+    }
+    if (checkTags) {
+      redisKeys.push(RedisService.getKey(`${transactionId}_select_customIdArray`));
+    }
+
+    const [itemFlfllmntsRaw, itemsIdListRaw, parentItemIdSetRaw, customIdArrayRaw] = await Promise.all(redisKeys);
+
+    const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
+    const itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
+    const parentItemIdSet = parentItemIdSetRaw ? JSON.parse(parentItemIdSetRaw) : null;
+    const select_customIdArray = customIdArrayRaw ? JSON.parse(customIdArrayRaw) : null;
+  
+
+
+
+    // Validate each item
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const itemId = item.id;
+
+      // Check if item ID exists
+      if (!itemId) {
+        result.push({
+          valid: false,
+          code: 20000,
+          description: `items[${i}].id is missing in /${currentApi}`,
+        });
+        continue;
+      }
+
+      // Validate item ID existence in /on_select
+      if (!itemFlfllmnts || !(itemId in itemFlfllmnts)) {
+        result.push({
+          valid: false,
+          code: 20000,
+          description: `Item Id ${itemId} does not exist in /${previousApi}`,
+        });
+        continue;
+      }
+
+      // Validate fulfillment ID
+      if (item.fulfillment_id && item.fulfillment_id !== itemFlfllmnts[itemId]) {
+        result.push({
+          valid: false,
+          code: 20000,
+          description: `items[${i}].fulfillment_id mismatches for Item ${itemId} in /${previousApi} and /${currentApi}`,
+        });
+      }
+
+      // Validate quantity
+      if (checkQuantity && itemsIdList && itemId in itemsIdList) {
+        if (item.quantity?.count !== itemsIdList[itemId]) {
+          result.push({
+            valid: false,
+            code: 20000,
+            description: `Warning: items[${i}].quantity.count for item ${itemId} mismatches with the items quantity selected in /${constants.SELECT}`,
+          });
+        }
+      }
+
+      // Validate parent item ID
+      if (checkParentItemId && parentItemIdSet && item.parent_item_id) {
+        if (!parentItemIdSet.includes(item.parent_item_id)) {
+          result.push({
+            valid: false,
+            code: 20000,
+            description: `items[${i}].parent_item_id mismatches for Item ${itemId} in /${constants.ON_SEARCH} and /${currentApi}`,
+          });
+        }
+      }
+
+      // Validate custom ID tags
+      if (checkTags && select_customIdArray && checkItemTag(item, select_customIdArray)) {
+        result.push({
+          valid: false,
+          code: 20000,
+          description: `items[${i}].tags.parent_id mismatches for Item ${itemId} in /${constants.ON_SEARCH} and /${currentApi}`,
+        });
+      }
+    }
+
+    return result;
+  } catch (error:any) {
+    console.error(`!!Error while validating items in /${currentApi}: ${error.stack}`);
+    result.push({
+      valid: false,
+      code: 20000,
+      description: `Error occurred while validating items in /${currentApi}`,
+    });
+    return result;
+  }
+}
 const checkOnStatusPending = async (
   data: any,
   state: string,
   fulfillmentsItemsSet: Set<any>
 ): Promise<ValidationError[]> => {
   const result: ValidationError[] = [];
-  
+
   try {
     if (!data || isObjectEmpty(data)) {
-      
       const onConfirmOrderStateRaw = await RedisService.getKey(
         `${data?.context?.transaction_id}_onCnfrmState`
       );
       const onConfirmOrderState = onConfirmOrderStateRaw
-        
-      if (onConfirmOrderState === 'Accepted') return result;
-      result.push(
-        createError('JSON cannot be empty', ERROR_CODES.INVALID_RESPONSE)
-      );
+        ? JSON.parse(onConfirmOrderStateRaw)
+        : null;
+      if (onConfirmOrderState === 'Accepted') {
+        result.push(
+          createError(
+            "When the onConfirm Order State is 'Accepted', the on_status_pending is not required!",
+            ERROR_CODES.INVALID_RESPONSE
+          )
+        );
+        return result;
+      }
+      result.push(createError('JSON cannot be empty', ERROR_CODES.INVALID_RESPONSE));
       return result;
     }
 
@@ -398,8 +866,17 @@ const checkOnStatusPending = async (
         `${data?.context?.transaction_id}_onCnfrmState`
       );
       const onConfirmOrderState = onConfirmOrderStateRaw
-       
-      if (onConfirmOrderState === 'Accepted') return result;
+        ? JSON.parse(onConfirmOrderStateRaw)
+        : null;
+      if (onConfirmOrderState === 'Accepted') {
+        result.push(
+          createError(
+            "When the onConfirm Order State is 'Accepted', the on_status_pending is not required!",
+            ERROR_CODES.INVALID_RESPONSE
+          )
+        );
+        return result;
+      }
       result.push(
         createError(
           '/context, /message, /order or /message/order is missing or empty',
@@ -409,15 +886,16 @@ const checkOnStatusPending = async (
       return result;
     }
 
-    const onConfirmOrderStateRaw = await RedisService.getKey(`${data?.context?.transaction_id}_onCnfrmState`);
+    const onConfirmOrderStateRaw = await RedisService.getKey(
+      `${context.transaction_id}_onCnfrmState`
+    );
     const onConfirmOrderState = onConfirmOrderStateRaw
-      
+      ? JSON.parse(onConfirmOrderStateRaw)
+      : null;
 
     const flow = await RedisService.getKey('flow') || '2';
     const { transaction_id } = context;
     const order = message.order;
-
-   
 
     try {
       const previousCallPresent = await addActionToRedisSet(
@@ -439,12 +917,18 @@ const checkOnStatusPending = async (
     }
 
     await Promise.all([
+    
       validateContext(context, transaction_id, result, onConfirmOrderState),
-      validateMessageId(context, transaction_id,  result),
+      validateMessageId(context, transaction_id, result),
+      validateTransactionId(context, transaction_id, result),
       validateOrder(order, transaction_id, state, result),
       validateFulfillments(order, transaction_id, state, fulfillmentsItemsSet, result),
       validateTimestamps(order, context, transaction_id, state, result),
-      validatePayment(order, flow, result),
+      validatePayment(order, transaction_id, flow, result, state),
+      validateQuote(order, transaction_id, state, result),
+      validateBilling(order, transaction_id, state, result),
+      validateItems(transaction_id, order.items, result),
+      validateTags(order, transaction_id, state, result),
       RedisService.setKey(
         `${transaction_id}_${ApiSequence.ON_STATUS_PENDING}`,
         JSON.stringify(data),
@@ -455,8 +939,7 @@ const checkOnStatusPending = async (
     return result;
   } catch (err: any) {
     console.error(
-      `!!Some error occurred while checking /${constants.ON_STATUS} API`,
-      err
+      `!!Some error occurred while checking /${constants.ON_STATUS} API, ${err.stack}`
     );
     result.push(
       createError(
