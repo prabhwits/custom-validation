@@ -21,6 +21,7 @@ import {
   checkItemTag,
 } from '../../../../../utils/helper';
 import { FLOW } from '../../../../../utils/enums';
+import chalk from 'chalk';
 
 // Minimal interface for validation error
 interface ValidationError {
@@ -486,6 +487,7 @@ async function validateFulfillments(
       });
 
       let i = 0;
+      console.log('🍔', fulfillmentsItemsSet)
       for (const obj1 of fulfillmentsItemsSet) {
         const keys = Object.keys(obj1);
         let obj2 = order.fulfillments.filter((f: any) => f.type === obj1.type);

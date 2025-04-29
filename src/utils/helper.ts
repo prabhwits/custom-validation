@@ -1156,3 +1156,16 @@ function isValidTimestamp(timestamp: string): boolean {
 //   }
 //   return true;
 // }
+
+export const tagFinder = (item: { tags: any[] }, value: string): any => {
+  const res = item?.tags?.find((tag: any) => {
+    return (
+      tag.code === "type" &&
+      tag.list &&
+      tag.list.find((listItem: any) => {
+        return listItem.code === "type" && listItem.value == value;
+      })
+    );
+  });
+  return res;
+};

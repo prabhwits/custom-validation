@@ -1,9 +1,8 @@
 import { RedisService } from "ondc-automation-cache-lib";
-import { addActionToRedisSet, taxNotInlcusive } from "../../../../utils/helper";
+import { addActionToRedisSet, tagFinder, taxNotInlcusive } from "../../../../utils/helper";
 import {
   checkBppIdOrBapId,
   checkContext,
-  findItemByItemType,
   isObjectEmpty,
   isoDurToSec,
   timeDiff,
@@ -345,6 +344,42 @@ const onSelect = async (data: any) => {
   } catch (error: any) {
     console.error(
       `!!Error while checking Item Id and Fulfillment Id Mapping in /${constants.ON_SELECT}, ${error.stack}`
+    );
+  }
+  try {
+    console.info(`Checking parent_item_id and type tags in /${constants.ON_SELECT}`);
+    const items = on_select.items || [];
+    items.forEach((item: any, index: number) => {
+      const isItemType = tagFinder(item, "item");
+      const isCustomizationType = tagFinder(item, "customization");
+      
+      // Check 1: If item has type: item or type: customization, parent_item_id must be present
+      if ((isItemType || isCustomizationType) && !item.parent_item_id) {
+        console.info(
+          `Missing parent_item_id for item with ID: ${item.id || 'undefined'} at index ${index}`
+        );
+        result.push({
+          valid: false,
+          code: 20000,
+          description: `/message/order/items[${index}]: parent_item_id is required for items with type 'item' or 'customization'`,
+        });
+      }
+      
+      // Check 2: If item has parent_item_id, it must have type: item or type: customization
+      if (item.parent_item_id && !(isItemType || isCustomizationType)) {
+        console.info(
+          `Missing type: item or type: customization tag for item with parent_item_id: ${item.parent_item_id} at index ${index}`
+        );
+        result.push({
+          valid: false,
+          code: 20000,
+          description: `/message/order/items[${index}]: items with parent_item_id must have a type tag of 'item' or 'customization'`,
+        });
+      }
+    });
+  } catch (error: any) {
+    console.error(
+      `Error while checking parent_item_id and type tags in /${constants.ON_SELECT}, ${error.stack}`
     );
   }
 

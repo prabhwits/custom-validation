@@ -526,7 +526,7 @@ async function validateFulfillments(
         i++;
       }
 
-      fulfillmentsItemsSet.clear();
+      // fulfillmentsItemsSet.clear();
       fulfillmentsItemsStatusSet.forEach((ff: any) => {
         const obj: any = JSON.parse(ff);
         delete obj?.state;
