@@ -591,6 +591,200 @@ try {
       console.error(`!!Error while checking fulfillments id, type and tracking in /${constants.ON_INIT}, ${error.stack}`);
     }
 
+    try {
+      const fulfillment = on_init.fulfillments[0];
+      if (fulfillment?.type === "Buyer-Delivery") {
+        on_init.items.forEach((item: any, index: any) => {
+          const itemPath = `order.items[${index}]`;
+
+          const rtoTag = item.tags?.find(
+            (tag: any) => tag.code === "rto_action"
+          );
+
+          if (!rtoTag) {
+            result.push({
+              valid: false,
+              code: 20011,
+              description: `'rto_action' tag is missing in ${itemPath}`,
+            });
+          } else {
+            const returnToOrigin = rtoTag.list?.find(
+              (i: any) => i.code === "return_to_origin"
+            );
+
+            if (
+              !returnToOrigin ||
+              returnToOrigin.value?.toLowerCase() !== "yes"
+            ) {
+              result.push({
+                valid: false,
+                code: 20012,
+                description: `'return_to_origin' must be 'yes' in 'rto_action' tag of ${itemPath}`,
+              });
+            }
+          }
+        });
+
+        const orderDetailsTag = fulfillment.tags?.find(
+          (tag: any) => tag.code === "order_details"
+        );
+        if (!orderDetailsTag) {
+          result.push({
+            valid: false,
+            code: 20007,
+            description: `Missing 'order_details' tag in fulfillments when fulfillment.type is 'Buyer-Delivery'`,
+          });
+        } else {
+          const requiredFields = [
+            "weight_unit",
+            "weight_value",
+            "dim_unit",
+            "length",
+            "breadth",
+            "height",
+          ];
+
+          const list = orderDetailsTag.list || [];
+          for (const field of requiredFields) {
+            const item = list.find((i: any) => i.code === field);
+            if (!item || !item.value || item.value.toString().trim() === "") {
+              result.push({
+                valid: false,
+                code: 20008,
+                description: `'${field}' is missing or empty in 'order_details' tag in fulfillments`,
+              });
+            }
+          }
+
+          const rtoTag = fulfillment.tags?.find(
+            (tag: any) => tag.code === "rto_action"
+          );
+
+          if (!rtoTag) {
+            result.push({
+              valid: false,
+              code: 20009,
+              description: `'rto_action' tag is missing in fulfillments for Buyer-Delivery fulfillment`,
+            });
+          } else {
+            const returnToOrigin = rtoTag.list?.find(
+              (i: any) => i.code === "return_to_origin"
+            );
+
+            if (
+              !returnToOrigin ||
+              returnToOrigin.value?.toLowerCase() !== "yes"
+            ) {
+              result.push({
+                valid: false,
+                code: 20010,
+                description: `'return_to_origin' must be set to 'yes' in 'rto_action' tag in fulfillments`,
+              });
+            }
+          }
+        }
+      }
+    } catch (error: any) {
+      `Error while checking fulfillments type for buyer delivery/${constants.ON_INIT}`;
+    }
+
+    try {
+      const fulfillment = on_init.fulfillments[0];
+      if (fulfillment?.type === "Buyer-Delivery") {
+        on_init.items.forEach((item: any, index: any) => {
+          const itemPath = `order.items[${index}]`;
+
+          const rtoTag = item.tags?.find(
+            (tag: any) => tag.code === "rto_action"
+          );
+
+          if (!rtoTag) {
+            result.push({
+              valid: false,
+              code: 20011,
+              description: `'rto_action' tag is missing in ${itemPath}`,
+            });
+          } else {
+            const returnToOrigin = rtoTag.list?.find(
+              (i: any) => i.code === "return_to_origin"
+            );
+
+            if (
+              !returnToOrigin ||
+              returnToOrigin.value?.toLowerCase() !== "yes"
+            ) {
+              result.push({
+                valid: false,
+                code: 20012,
+                description: `'return_to_origin' must be 'yes' in 'rto_action' tag of ${itemPath}`,
+              });
+            }
+          }
+        });
+
+        const orderDetailsTag = fulfillment.tags?.find(
+          (tag: any) => tag.code === "order_details"
+        );
+        if (!orderDetailsTag) {
+          result.push({
+            valid: false,
+            code: 20007,
+            description: `Missing 'order_details' tag in fulfillments when fulfillment.type is 'Buyer-Delivery'`,
+          });
+        } else {
+          const requiredFields = [
+            "weight_unit",
+            "weight_value",
+            "dim_unit",
+            "length",
+            "breadth",
+            "height",
+          ];
+
+          const list = orderDetailsTag.list || [];
+          for (const field of requiredFields) {
+            const item = list.find((i: any) => i.code === field);
+            if (!item || !item.value || item.value.toString().trim() === "") {
+              result.push({
+                valid: false,
+                code: 20008,
+                description: `'${field}' is missing or empty in 'order_details' tag in fulfillments`,
+              });
+            }
+          }
+
+          const rtoTag = fulfillment.tags?.find(
+            (tag: any) => tag.code === "rto_action"
+          );
+
+          if (!rtoTag) {
+            result.push({
+              valid: false,
+              code: 20009,
+              description: `'rto_action' tag is missing in fulfillments for Buyer-Delivery fulfillment`,
+            });
+          } else {
+            const returnToOrigin = rtoTag.list?.find(
+              (i: any) => i.code === "return_to_origin"
+            );
+
+            if (
+              !returnToOrigin ||
+              returnToOrigin.value?.toLowerCase() !== "yes"
+            ) {
+              result.push({
+                valid: false,
+                code: 20010,
+                description: `'return_to_origin' must be set to 'yes' in 'rto_action' tag in fulfillments`,
+              });
+            }
+          }
+        }
+      }
+    } catch (error: any) {
+      `Error while checking fulfillments type for buyer delivery/${constants.ON_INIT}`;
+    }
+
     // Compare billing object
     try {
       console.info(`Comparing billing object in /${constants.INIT} and /${constants.ON_INIT}`);
@@ -633,7 +827,7 @@ try {
           result.push({
             valid: false,
             code: 20000,
-            description: `fulfillments[].id is missing in /${constants.ON_INIT}`,
+            description: `fulfillments.id is missing in /${constants.ON_INIT}`,
           });
         }
       }
