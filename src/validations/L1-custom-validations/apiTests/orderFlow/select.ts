@@ -437,7 +437,147 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
     console.error(
       `Error while checking for valid and present location ID inside item list for /${constants.SELECT}, ${error.stack}`
     );
-  }
+  }// Placeholder for constants (assumed to be defined elsewhere)
+
+// Validation function
+// try {
+//   console.info(`Checking offers in /${constants.SELECT}`);
+//   console.log("offers in select call", JSON.stringify(select.offers));
+
+
+//   if (select?.offers && select.offers.length > 0) {
+//     const providerOffers: any = RedisService.getKey(`${constants.ON_SEARCH}_offers`) || [];
+//     const applicableOffers: any[] = [];
+//     const orderItemIds = select?.items?.map((item: any) => item.id).filter((id: any) => !!id) || [];
+//     const orderLocationIds = select?.provider?.locations?.map((location: any) => location.id).filter((id: any) => !!id) || [];
+
+//     select.offers.forEach((offer: any, index: number) => {
+//       const providerOffer = providerOffers.find((providedOffer: any) => providedOffer?.id === offer?.id);
+//       console.log("providerOffer in select call", JSON.stringify(providerOffer));
+
+//       if (!providerOffer) {
+//         result.push({
+//           valid: false,
+//           code: 20006,
+//           description: `Offer with id ${offer.id || 'unknown'} is not available for the provider.`,
+//         });
+//         return;
+//       }
+
+//       const offerLocationIds = providerOffer?.location_ids || [];
+//       const locationMatch = offerLocationIds.some((id: any) => orderLocationIds.includes(id));
+//       if (!locationMatch) {
+//         result.push({
+//           valid: false,
+//           code: 20006,
+//           description: `Offer with id '${offer.id || 'unknown'}' is not applicable for any of the order's locations [${orderLocationIds.join(', ')}].`,
+//         });
+//         return;
+//       }
+
+//       const offerItemIds = providerOffer?.item_ids || [];
+//       const itemMatch = offerItemIds.some((id: any) => orderItemIds.includes(id));
+//       if (!itemMatch) {
+//         result.push({
+//           valid: false,
+//           code: 20006,
+//           description: `Offer with id '${offer.id || 'unknown'}' is not applicable for any of the ordered item(s) [${orderItemIds.join(', ')}].`,
+//         });
+//         return;
+//       }
+
+//       const { label, range } = providerOffer?.time || {};
+//       const start = range?.start;
+//       const end = range?.end;
+//       if (label !== 'valid' || !start || !end) {
+//         result.push({
+//           valid: false,
+//           code: 20006,
+//           description: `Offer with id ${offer.id || 'unknown'} has an invalid or missing time configuration.`,
+//         });
+//         return;
+//       }
+
+//       const currentTimeStamp = new Date(context?.timestamp || '');
+//       const startTime = new Date(start);
+//       const endTime = new Date(end);
+//       if (!(currentTimeStamp >= startTime && currentTimeStamp <= endTime)) {
+//         result.push({
+//           valid: false,
+//           code: 20006,
+//           description: `Offer with id ${offer.id || 'unknown'} is not currently valid based on time range.`,
+//         });
+//         return;
+//       }
+
+//       const isSelected = offer?.tags?.some(
+//         (tag: any) =>
+//           tag.code === 'selection' &&
+//           tag.list?.some((entry: any) => entry.code === 'apply' && entry.value === 'yes')
+//       );
+//       if (!isSelected) {
+//         result.push({
+//           valid: false,
+//           code: 20006,
+//           description: `Offer with id ${offer.id || 'unknown'} is not selected (apply: "yes" missing).`,
+//         });
+//         return;
+//       }
+
+//       applicableOffers.push({ ...providerOffer, index });
+//       console.log("applicableOffers", JSON.stringify(applicableOffers));
+//     });
+
+//     // Additive validation
+//     const additiveOffers = applicableOffers.filter((offer: any) => {
+//       const metaTag = offer.tags?.find((tag: any) => tag.code === 'meta');
+//       return metaTag?.list?.some((entry: any) => entry.code === 'additive' && entry.value?.toLowerCase() === 'yes');
+//     });
+
+//     const nonAdditiveOffers = applicableOffers.filter((offer: any) => {
+//       const metaTag = offer.tags?.find((tag: any) => tag.code === 'meta');
+//       return metaTag?.list?.some((entry: any) => entry.code === 'additive' && entry.value?.toLowerCase() === 'no');
+//     });
+
+//     if (additiveOffers.length > 0) {
+//       // Apply all additive offers
+//       applicableOffers.length = 0;
+//       additiveOffers.forEach((offer: any) => {
+//         const providerOffer = providerOffers.find((o: any) => o.id === offer.id);
+//         if (providerOffer) {
+//           applicableOffers.push(providerOffer);
+//         }
+//       });
+//     } else if (nonAdditiveOffers.length === 1) {
+//       // Apply the single non-additive offer
+//       applicableOffers.length = 0;
+//       const offer = nonAdditiveOffers[0];
+//       const providerOffer = providerOffers.find((o: any) => o.id === offer.id);
+//       if (providerOffer) {
+//         applicableOffers.push(providerOffer);
+//       }
+//     } else if (nonAdditiveOffers.length > 1){
+//       // Multiple non-additive offers selected; add errors
+//       applicableOffers.length = 0
+//       nonAdditiveOffers.forEach((offer: any) => {
+//       result.push({
+//         valid: false,
+//         code: 20006,
+//         description: `Offer ${offer.id || 'unknown'} is non-additive and cannot be combined with other non-additive offers.`,
+//       });
+//       return;
+//     }
+
+//     RedisService.setKey('selected_offer', JSON.stringify(applicableOffers));
+//     }
+// } catch (error: any) {
+//   console.error(`Error while checking for offers in /${constants.SELECT}, ${error.stack}`);
+//   result.push({
+//     valid: false,
+//     code: 20006,
+//     description: `Unexpected error while validating offers in /${constants.SELECT}: ${error.message}`,
+//   });
+// }
 
   // Duplicate parent_item_id check
   try {
@@ -700,4 +840,4 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
   return result;
 };
 
-export default select;
+export default select;  
