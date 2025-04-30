@@ -18,6 +18,7 @@ import {
   payment_status,
   addFulfillmentIdToRedisSet,
   addActionToRedisSet,
+  tagFinder,
 } from "../../../../utils/helper";
 import constants, {
   ApiSequence,
@@ -996,23 +997,25 @@ async function validateTags(
   }
 }
 async function validateItems(
-  transactionId : any,
-  items : any,
+  transactionId: any,
+  items: any,
   result: any,
   options = {
-    currentApi: ApiSequence.INIT,
+    currentApi: ApiSequence.ON_CONFIRM,
     previousApi: ApiSequence.ON_SELECT,
     checkParentItemId: true,
     checkQuantity: true,
     checkTags: true,
+    checkLocationId: true,
   }
 ) {
   const {
-    currentApi,
-    previousApi = ApiSequence.ON_CONFIRM,
+    currentApi = ApiSequence.ON_CONFIRM,
+    previousApi = ApiSequence.ON_SELECT,
     checkParentItemId = true,
     checkQuantity = true,
     checkTags = true,
+    checkLocationId = true,
   } = options;
 
   try {
@@ -1027,25 +1030,53 @@ async function validateItems(
     if (checkTags) {
       redisKeys.push(RedisService.getKey(`${transactionId}_select_customIdArray`));
     }
+    if (checkLocationId) {
+      redisKeys.push(RedisService.getKey(`${transactionId}_onSearchItems`));
+    }
 
-    const [itemFlfllmntsRaw, itemsIdListRaw, parentItemIdSetRaw, customIdArrayRaw] = await Promise.all(redisKeys);
+    const redisResults = await Promise.all(
+      redisKeys.map(async (key, index) => {
+        try {
+          return await key;
+        } catch (error: any) {
+          console.error(`!!Error fetching Redis key ${index}: ${error.message}`);
+          return null;
+        }
+      })
+    );
+
+    const [itemFlfllmntsRaw, itemsIdListRaw, parentItemIdSetRaw, customIdArrayRaw, onSearchItemsRaw] = redisResults;
 
     const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
-    const itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
+    let itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
     const parentItemIdSet = parentItemIdSetRaw ? JSON.parse(parentItemIdSetRaw) : null;
     const select_customIdArray = customIdArrayRaw ? JSON.parse(customIdArrayRaw) : null;
+    const allOnSearchItems = onSearchItemsRaw ? JSON.parse(onSearchItemsRaw) : [];
+    const onSearchItems = Array.isArray(allOnSearchItems) ? allOnSearchItems.flat() : [];
+
+    let itemsCountChange = false;
+
+    // Validate items array
+    if (!Array.isArray(items) || items.length === 0) {
+      result.push({
+        valid: false,
+        code: 20000,
+        description: `items array is missing or empty in /${currentApi}`,
+      });
+      return result;
+    }
 
     // Validate each item
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      const itemId = item.id;
+      const itemId = item?.id;
 
       // Check if item ID exists
-      if (!itemId) {
+      if (!itemId || typeof itemId !== "string" || itemId.trim() === "") {
         result.push({
           valid: false,
           code: 20000,
-          description: `items[${i}].id is missing in /${currentApi}`,
+          description: `items[${i}].id is missing or invalid in /${currentApi}`,
         });
         continue;
       }
@@ -1070,28 +1101,122 @@ async function validateItems(
       }
 
       // Validate quantity
-      if (checkQuantity && itemsIdList && itemId in itemsIdList) {
-        if (item.quantity?.count !== itemsIdList[itemId]) {
+      if (checkQuantity) {
+        if (!item.quantity || item.quantity.count == null) {
           result.push({
             valid: false,
             code: 20000,
-            description: `Warning: items[${i}].quantity.count for item ${itemId} mismatches with the items quantity selected in /${constants.SELECT}`,
+            description: `items[${i}].quantity.count is missing or undefined for Item ${itemId} in /${currentApi}`,
           });
-        }
-      }
-
-      // Validate parent item ID
-      if (checkParentItemId && parentItemIdSet && item.parent_item_id) {
-        if (!parentItemIdSet.includes(item.parent_item_id)) {
+        } else if (!Number.isInteger(item.quantity.count) || item.quantity.count <= 0) {
           result.push({
             valid: false,
             code: 20000,
-            description: `items[${i}].parent_item_id mismatches for Item ${itemId} in /${constants.ON_SEARCH} and /${currentApi}`,
+            description: `items[${i}].quantity.count must be a positive integer for Item ${itemId} in /${currentApi}`,
           });
+        } else if (itemsIdList && itemId in itemsIdList) {
+          if (item.quantity.count !== itemsIdList[itemId]) {
+            itemsIdList[itemId] = item.quantity.count;
+            itemsCountChange = true;
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `Warning: items[${i}].quantity.count for item ${itemId} mismatches with the items quantity selected in /${constants.SELECT}`,
+            });
+          }
         }
       }
 
-      // Validate custom ID tags
+      // Validate parent item ID and type tags
+      if (checkParentItemId) {
+        const tags = Array.isArray(item.tags) ? item.tags : [];
+        const typeTag = tags.find((tag: any) => tag.code === "type");
+        const typeValue = typeTag?.list?.find((listItem: any) => listItem.code === "type")?.value;
+        const isItemType = typeValue === "item";
+        const isCustomizationType = typeValue === "customization";
+
+        if ((isItemType || isCustomizationType) && (!item.parent_item_id || item.parent_item_id.trim() === "")) {
+          console.info(`Missing parent_item_id for item ID: ${itemId} at index ${i}`);
+          result.push({
+            valid: false,
+            code: 20000,
+            description: `items[${i}]: parent_item_id is required and must be non-empty for items with type 'item' or 'customization' in /${currentApi}`,
+          });
+        }
+
+        if (item.parent_item_id && !(isItemType || isCustomizationType)) {
+          console.info(`Missing type tag for item with parent_item_id: ${item.parent_item_id}, ID: ${itemId} at index ${i}`);
+          result.push({
+            valid: false,
+            code: 20000,
+            description: `items[${i}]: items with parent_item_id must have a type tag of 'item' or 'customization' in /${currentApi}`,
+          });
+        }
+
+        if (item.parent_item_id && parentItemIdSet && !parentItemIdSet.includes(item.parent_item_id)) {
+          result.push({
+            valid: false,
+            code: 20000,
+            description: `items[${i}].parent_item_id ${item.parent_item_id} not found in parentItemIdSet for Item ${itemId} in /${currentApi}`,
+          });
+        }
+
+        if (checkTags && isCustomizationType && select_customIdArray) {
+          const parentTag = tags.find((tag: any) => tag.code === "parent");
+          if (!parentTag) {
+            console.info(`Missing parent tag for customization item ID: ${itemId} at index ${i}`);
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `items[${i}]: customization items must have a parent tag in /${currentApi}`,
+            });
+          } else {
+            const parentId = parentTag.list?.find((listItem: any) => listItem.code === "id")?.value;
+            if (!parentId || checkItemTag(item, select_customIdArray)) {
+              console.info(`Invalid or missing parent tag id for customization item ID: ${itemId} at index ${i}`);
+              result.push({
+                valid: false,
+                code: 20000,
+                description: `items[${i}]: parent tag id must be valid and present in select_customIdArray for customization item ${itemId} in /${currentApi}`,
+              });
+            }
+          }
+        }
+      }
+
+      // Validate location ID
+      // if (checkLocationId) {
+      //   if (!item.location_id || typeof item.location_id !== "string" || item.location_id.trim() === "") {
+      //     console.info(`Missing or invalid location_id for item ID: ${itemId} at index ${i}`);
+      //     result.push({
+      //       valid: false,
+      //       code: 20000,
+      //       description: `items[${i}]: location_id is required and must be a non-empty string in /${currentApi}`,
+      //     });
+      //   } else if (onSearchItems.length > 0) {
+      //     const matchingSearchItem = onSearchItems.find((searchItem: any) => searchItem.id === itemId);
+      //     if (matchingSearchItem) {
+      //       const isCustomization = tagFinder(matchingSearchItem, "customization");
+      //       const isNotCustomization = !isCustomization;
+      //       if (isNotCustomization && matchingSearchItem.location_id !== item.location_id) {
+      //         console.info(`Location_id mismatch for item ID: ${itemId} at index ${i}`);
+      //         result.push({
+      //           valid: false,
+      //           code: 20000,
+      //           description: `items[${i}]: location_id ${item.location_id} for item ${itemId} does not match location_id in /${constants.ON_SEARCH}`,
+      //         });
+      //       }
+      //     } else {
+      //       result.push({
+      //         valid: false,
+      //         code: 20000,
+      //         description: `items[${i}]: item ${itemId} not found in /${constants.ON_SEARCH} for location_id validation`,
+      //       });
+      //     }
+      //   }
+      // }
+
+      // Validate custom ID tags (existing logic)
       if (checkTags && select_customIdArray && checkItemTag(item, select_customIdArray)) {
         result.push({
           valid: false,
@@ -1101,9 +1226,18 @@ async function validateItems(
       }
     }
 
+    // Update itemsIdList in Redis if quantities changed
+    if (checkQuantity && itemsCountChange) {
+      await RedisService.setKey(
+        `${transactionId}_itemsIdList`,
+        JSON.stringify(itemsIdList),
+        Number(process.env.TTL_IN_SECONDS) || 3600
+      );
+    }
+
     return result;
-  } catch (error:any) {
-    console.error(`!!Error while validating items in /${currentApi}: ${error.stack}`);
+  } catch (error: any) {
+    console.error(`!!Error while validating items in /${currentApi} for transaction ${transactionId}: ${error.stack}`);
     result.push({
       valid: false,
       code: 20000,
@@ -1112,6 +1246,7 @@ async function validateItems(
     return result;
   }
 }
+
 async function validateBilling(
   order: any,
   transaction_id: string,

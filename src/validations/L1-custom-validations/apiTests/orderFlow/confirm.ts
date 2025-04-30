@@ -14,6 +14,7 @@ import {
   isTagsValid,
   payment_status,
   sumQuoteBreakUp,
+  tagFinder,
 } from "../../../../utils/helper";
 import constants, { ApiSequence } from "../../../../utils/constants";
 
@@ -68,6 +69,13 @@ const confirm = async (data: any) => {
     const select_customIdArray = select_customIdArrayRaw
       ? JSON.parse(select_customIdArrayRaw)
       : null;
+    const allOnSearchItemsRaw = await RedisService.getKey(
+      `${transaction_id}_onSearchItems`
+    );
+    const allOnSearchItems = allOnSearchItemsRaw
+      ? JSON.parse(allOnSearchItemsRaw)
+      : [];
+    const onSearchItems = allOnSearchItems.flat();
 
     const contextRes: any = checkContext(context, constants.CONFIRM);
 
@@ -120,7 +128,6 @@ const confirm = async (data: any) => {
 
     try {
       console.info(`Adding Message Id /${constants.CONFIRM}`);
-
       const msgId = await RedisService.setKey(
         `${transaction_id}_${ApiSequence.CONFIRM}_msgId`,
         data.context.message_id,
@@ -249,7 +256,12 @@ const confirm = async (data: any) => {
         });
       }
 
-      if (confirm.provider.locations[0].id != providerLoc) {
+      if (
+        confirm.provider.locations &&
+        isArray(confirm.provider.locations) &&
+        confirm.provider.locations.length > 0 &&
+        confirm.provider.locations[0].id != providerLoc
+      ) {
         result.push({
           valid: false,
           code: 20000,
@@ -277,11 +289,12 @@ const confirm = async (data: any) => {
       );
       let itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
       let i = 0;
-      const len = confirm.items.length;
+      const len = confirm.items?.length || 0;
       let itemsCountChange = false;
       while (i < len) {
         const itemId = confirm.items[i].id;
         const item = confirm.items[i];
+
         if (checkItemTag(item, select_customIdArray)) {
           result.push({
             valid: false,
@@ -289,6 +302,7 @@ const confirm = async (data: any) => {
             description: `items[${i}].tags.parent_id mismatches for Item ${itemId} in /${constants.SELECT} and /${constants.CONFIRM}`,
           });
         }
+
         if (
           parentItemIdSet &&
           item.parent_item_id &&
@@ -300,6 +314,7 @@ const confirm = async (data: any) => {
             description: `items[${i}].parent_item_id mismatches for Item ${itemId} in /${constants.ON_SEARCH} and /${constants.CONFIRM}`,
           });
         }
+
         if (itemId in itemFlfllmnts) {
           if (confirm.items[i].fulfillment_id != itemFlfllmnts[itemId]) {
             result.push({
@@ -316,8 +331,14 @@ const confirm = async (data: any) => {
           });
         }
 
-        if (itemId in itemsIdList) {
-          if (confirm.items[i].quantity.count != itemsIdList[itemId]) {
+        if (itemsIdList && itemId in itemsIdList) {
+          if (!item.quantity || item.quantity.count == null) {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `items[${i}].quantity.count is missing or undefined for Item ${itemId} in /${constants.CONFIRM}`,
+            });
+          } else if (confirm.items[i].quantity.count != itemsIdList[itemId]) {
             itemsIdList[itemId] = confirm.items[i].quantity.count;
             itemsCountChange = true;
             result.push({
@@ -341,6 +362,111 @@ const confirm = async (data: any) => {
     } catch (error: any) {
       console.error(
         `!!Error while comparing Item and Fulfillment Id in /${constants.ON_SELECT} and /${constants.CONFIRM}, ${error.stack}`
+      );
+    }
+
+    try {
+      console.info(`Checking parent_item_id and type tags in /${constants.CONFIRM}`);
+      const items = confirm.items || [];
+      items.forEach((item: any, index: number) => {
+        let isItemType = false;
+        let isCustomizationType = false;
+        if (item.tags) {
+          const typeTag = item.tags.find((tag: any) => tag.code === "type");
+          if (typeTag && typeTag.list) {
+            const typeValue = typeTag.list.find(
+              (listItem: any) => listItem.code === "type"
+            )?.value;
+            isItemType = typeValue === "item";
+            isCustomizationType = typeValue === "customization";
+          }
+        }
+
+        if ((isItemType || isCustomizationType) && !item.parent_item_id) {
+          console.info(
+            `Missing parent_item_id for item with ID: ${item.id || "undefined"} at index ${index}`
+          );
+          result.push({
+            valid: false,
+            code: 20000,
+            description: `items[${index}]: parent_item_id is required for items with type 'item' or 'customization'`,
+          });
+        }
+
+        if (item.parent_item_id && !(isItemType || isCustomizationType)) {
+          console.info(
+            `Missing type: item or type: customization tag for item with parent_item_id: ${item.parent_item_id} at index ${index}`
+          );
+          result.push({
+            valid: false,
+            code: 20000,
+            description: `items[${index}]: items with parent_item_id must have a type tag of 'item' or 'customization'`,
+          });
+        }
+
+        if (isCustomizationType && select_customIdArray) {
+          const parentTag = item.tags.find((tag: any) => tag.code === "parent");
+          if (!parentTag) {
+            console.info(
+              `Missing parent tag for customization item with ID: ${item.id || "undefined"} at index ${index}`
+            );
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `items[${index}]: customization items must have a parent tag`,
+            });
+          } else {
+            const parentId = parentTag.list.find(
+              (listItem: any) => listItem.code === "id"
+            )?.value;
+            if (parentId && checkItemTag(item, select_customIdArray)) {
+              console.info(
+                `Invalid parent tag id: ${parentId} for customization item with ID: ${item.id || "undefined"} at index ${index}`
+              );
+              result.push({
+                valid: false,
+                code: 20000,
+                description: `items[${index}]: parent tag id ${parentId} must be in select_customIdArray for customization items`,
+              });
+            }
+          }
+        }
+      });
+    } catch (error: any) {
+      console.error(
+        `!!Error while checking parent_item_id and type tags in /${constants.CONFIRM}, ${error.stack}`
+      );
+    }
+
+    try {
+      console.info(
+        `Checking for valid and present location ID inside item list for /${constants.CONFIRM}`
+      );
+      confirm.items.forEach((item: any, index: number) => {
+        
+        onSearchItems.forEach((it: any) => {
+          const isCustomization = tagFinder(it, "customization");
+          const isNotCustomization = !isCustomization;
+
+          if (
+            it.id === item.id &&
+            it.location_id !== item.location_id &&
+            isNotCustomization
+          ) {
+            console.info(
+              `Location_id mismatch for item with ID: ${item.id} at index ${index}`
+            );
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `items[${index}]: location_id for item ${item.id} must match the location_id in /${constants.ON_SEARCH}`,
+            });
+          }
+        });
+      });
+    } catch (error: any) {
+      console.error(
+        `!!Error while checking for valid and present location ID inside item list for /${constants.CONFIRM}, ${error.stack}`
       );
     }
 
@@ -383,6 +509,76 @@ const confirm = async (data: any) => {
     } catch (error: any) {
       console.error(
         `!!Error while checking vehicle registration for fulfillments in /${constants.CONFIRM}, ${error.stack}`
+      );
+    }
+
+    try {
+      console.info(`Checking address components length in /${constants.CONFIRM}`);
+      const noOfFulfillments = confirm.fulfillments?.length || 0;
+      let i = 0;
+      while (i < noOfFulfillments) {
+        const address = confirm.fulfillments[i].end?.location?.address;
+        if (!address) {
+          result.push({
+            valid: false,
+            code: 20000,
+            description: `fulfillments[${i}].end.location.address is missing in /${constants.CONFIRM}`,
+          });
+        } else {
+          const lenName = address.name?.length || 0;
+          const lenBuilding = address.building?.length || 0;
+          const lenLocality = address.locality?.length || 0;
+
+          if (lenName + lenBuilding + lenLocality >= 190) {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `address.name + address.building + address.locality should be less than 190 chars in fulfillments[${i}]`,
+            });
+          }
+
+          if (lenBuilding <= 3) {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `address.building should be more than 3 chars in fulfillments[${i}]`,
+            });
+          }
+
+          if (lenName <= 3) {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `address.name should be more than 3 chars in fulfillments[${i}]`,
+            });
+          }
+
+          if (lenLocality <= 3) {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `address.locality should be more than 3 chars in fulfillments[${i}]`,
+            });
+          }
+
+          if (
+            address.building === address.locality ||
+            address.name === address.building ||
+            address.name === address.locality
+          ) {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `value of address.name, address.building, and address.locality should be unique in fulfillments[${i}]`,
+            });
+          }
+        }
+
+        i++;
+      }
+    } catch (error: any) {
+      console.error(
+        `!!Error while checking address components in /${constants.CONFIRM}, ${error.stack}`
       );
     }
 
@@ -441,11 +637,12 @@ const confirm = async (data: any) => {
         ? JSON.parse(itemFlfllmntsRaw)
         : null;
       let i = 0;
-      const len = confirm.fulfillments.length;
+      const len = confirm.fulfillments?.length || 0;
+      const gpsRegex = /^-?\d{1,3}\.\d+,-?\d{1,3}\.\d+$/;
       while (i < len) {
         if (confirm.fulfillments[i].id) {
           const id = confirm.fulfillments[i].id;
-          if (!Object.values(itemFlfllmnts).includes(id)) {
+          if (!itemFlfllmnts || !Object.values(itemFlfllmnts).includes(id)) {
             result.push({
               valid: false,
               code: 20000,
@@ -465,7 +662,7 @@ const confirm = async (data: any) => {
           `${transaction_id}_${ffId}_tracking`
         );
         const tracking = trackingRaw ? JSON.parse(trackingRaw) : null;
-        if (tracking) {
+        if (tracking != null) {
           if (
             confirm.fulfillments[i].tracking === false ||
             confirm.fulfillments[i].tracking === true
@@ -485,6 +682,7 @@ const confirm = async (data: any) => {
             });
           }
         }
+
         if (
           !confirm.fulfillments[i].end ||
           !confirm.fulfillments[i].end.person
@@ -496,33 +694,89 @@ const confirm = async (data: any) => {
           });
         }
 
-        const buyerGpsRaw = await RedisService.getKey(
-          `${transaction_id}_buyerGps`
-        );
-        const buyerGps = buyerGpsRaw ? JSON.parse(buyerGpsRaw) : null;
-        if (!_.isEqual(confirm.fulfillments[i].end.location.gps, buyerGps)) {
+        const gps = confirm.fulfillments[i].end?.location?.gps;
+        if (gps == null || gps === "") {
+          console.info(
+            `Missing gps coordinates for fulfillment at index ${i} in /${constants.CONFIRM}`
+          );
           result.push({
             valid: false,
             code: 20000,
-            description: `fulfillments[${i}].end.location gps is not matching with gps in /select`,
+            description: `fulfillments[${i}].end.location.gps is missing or empty in /${constants.CONFIRM}`,
           });
+        } else {
+          if (!gpsRegex.test(gps)) {
+            console.info(
+              `Invalid gps format for fulfillment at index ${i}: ${gps}`
+            );
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `fulfillments[${i}].end.location.gps has invalid format in /${constants.CONFIRM}`,
+            });
+          } else {
+            const buyerGpsRaw = await RedisService.getKey(
+              `${transaction_id}_buyerGps`
+            );
+            const buyerGps = buyerGpsRaw ? JSON.parse(buyerGpsRaw) : null;
+            console.info(`GPS from confirm: ${gps}, buyerGps from Redis: ${buyerGps}`);
+            if (buyerGps == null) {
+              console.info(
+                `buyerGps is missing or null for transaction_id ${transaction_id} in /${constants.CONFIRM}`
+              );
+              result.push({
+                valid: false,
+                code: 20000,
+                description: `buyerGps is missing in Redis for /${constants.CONFIRM}`,
+              });
+            } else if (!gpsRegex.test(buyerGps)) {
+              console.info(
+                `Invalid buyerGps format for transaction_id ${transaction_id}: ${buyerGps}`
+              );
+              result.push({
+                valid: false,
+                code: 20000,
+                description: `buyerGps has invalid format in Redis for /${constants.CONFIRM}`,
+              });
+            } else if (!_.isEqual(gps, buyerGps)) {
+              console.info(
+                `GPS coordinates mismatch for fulfillment at index ${i} in /${constants.CONFIRM}`
+              );
+              result.push({
+                valid: false,
+                code: 20000,
+                description: `gps coordinates in fulfillments[${i}].end.location mismatch in /${constants.SELECT} & /${constants.CONFIRM}`,
+              });
+            }
+          }
         }
 
-        const buyerAddrRaw = await RedisService.getKey(
-          `${transaction_id}_buyerAddr`
-        );
-        const buyerAddr = buyerAddrRaw ? JSON.parse(buyerAddrRaw) : null;
-        if (
-          !_.isEqual(
-            confirm.fulfillments[i].end.location.address.area_code,
-            buyerAddr
-          )
-        ) {
+        const areaCode =
+          confirm.fulfillments[i].end?.location?.address?.area_code;
+        if (areaCode == null || areaCode === "") {
+          console.info(
+            `Missing area_code for fulfillment at index ${i} in /${constants.CONFIRM}`
+          );
           result.push({
             valid: false,
             code: 20000,
-            description: `fulfillments[${i}].end.location.address.area_code is not matching with area_code in /select`,
+            description: `fulfillments[${i}].end.location.address.area_code is missing or empty in /${constants.CONFIRM}`,
           });
+        } else {
+          const buyerAddrRaw = await RedisService.getKey(
+            `${transaction_id}_buyerAddr`
+          );
+          const buyerAddr = buyerAddrRaw ? JSON.parse(buyerAddrRaw) : null;
+          if (buyerAddr != null && !_.isEqual(areaCode, buyerAddr)) {
+            console.info(
+              `Area code mismatch for fulfillment at index ${i} in /${constants.CONFIRM}`
+            );
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `address.area_code in fulfillments[${i}].end.location mismatch in /${constants.SELECT} & /${constants.CONFIRM}`,
+            });
+          }
         }
 
         i++;
