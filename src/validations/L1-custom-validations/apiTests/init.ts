@@ -10,8 +10,8 @@ import {
   isObjectEmpty,
   tagFinder,
   compareObjects,
-} from "../../../../utils/helper";
-import constants, { ApiSequence } from "../../../../utils/constants";
+} from "../../../utils/helper";
+import constants, { ApiSequence } from "../../../utils/constants";
 
 const init = async (data: any) => {
   const result: any[] = [];
@@ -323,7 +323,9 @@ const init = async (data: any) => {
     }
 
     try {
-      console.info(`Validating and storing billing object in /${constants.INIT}`);
+      console.info(
+        `Validating and storing billing object in /${constants.INIT}`
+      );
       if (!init.billing) {
         console.info(`Missing billing object in /${constants.INIT}`);
         result.push({
@@ -472,8 +474,8 @@ const init = async (data: any) => {
         } else {
           result.push({
             valid: false,
-            code: 20000,
-            description: `Item Id ${itemId} does not exist in /${constants.ON_SELECT}`,
+            code: 30004,
+            description: `Item not found - Item Id ${itemId} does not exist in /${constants.ON_SELECT}`,
           });
         }
 
@@ -581,7 +583,8 @@ const init = async (data: any) => {
           }
 
           // Compare area_code with buyerAddr
-          const areaCode = init.fulfillments[i].end?.location?.address?.area_code;
+          const areaCode =
+            init.fulfillments[i].end?.location?.address?.area_code;
           if (areaCode == null || areaCode === "") {
             console.info(
               `Missing area_code for fulfillment at index ${i} in /${constants.INIT}`
@@ -618,7 +621,9 @@ const init = async (data: any) => {
     }
 
     try {
-      console.info(`Checking parent_item_id and type tags in /${constants.INIT}`);
+      console.info(
+        `Checking parent_item_id and type tags in /${constants.INIT}`
+      );
       const items = init.items || [];
       items.forEach((item: any, index: number) => {
         // Manually check type tags
@@ -638,7 +643,9 @@ const init = async (data: any) => {
         // Check 1: If item has type: item or type: customization, parent_item_id must be present
         if ((isItemType || isCustomizationType) && !item.parent_item_id) {
           console.info(
-            `Missing parent_item_id for item with ID: ${item.id || "undefined"} at index ${index}`
+            `Missing parent_item_id for item with ID: ${
+              item.id || "undefined"
+            } at index ${index}`
           );
           result.push({
             valid: false,
@@ -664,7 +671,9 @@ const init = async (data: any) => {
           const parentTag = item.tags.find((tag: any) => tag.code === "parent");
           if (!parentTag) {
             console.info(
-              `Missing parent tag for customization item with ID: ${item.id || "undefined"} at index ${index}`
+              `Missing parent tag for customization item with ID: ${
+                item.id || "undefined"
+              } at index ${index}`
             );
             result.push({
               valid: false,
@@ -677,7 +686,9 @@ const init = async (data: any) => {
             )?.value;
             if (parentId && checkItemTag(item, select_customIdArray)) {
               console.info(
-                `Invalid parent tag id: ${parentId} for customization item with ID: ${item.id || "undefined"} at index ${index}`
+                `Invalid parent tag id: ${parentId} for customization item with ID: ${
+                  item.id || "undefined"
+                } at index ${index}`
               );
               result.push({
                 valid: false,
@@ -710,7 +721,9 @@ const init = async (data: any) => {
         // Check if location_id is present
         if (!item.location_id || item.location_id.trim() === "") {
           console.info(
-            `Missing location_id for item with ID: ${item.id || "undefined"} at index ${index}`
+            `Missing location_id for item with ID: ${
+              item.id || "undefined"
+            } at index ${index}`
           );
           result.push({
             valid: false,

@@ -15,8 +15,8 @@ import {
   payment_status,
   sumQuoteBreakUp,
   tagFinder,
-} from "../../../../utils/helper";
-import constants, { ApiSequence } from "../../../../utils/constants";
+} from "../../../utils/helper";
+import constants, { ApiSequence } from "../../../utils/constants";
 
 const confirm = async (data: any) => {
   const TTL_IN_SECONDS: number = Number(process.env.TTL_IN_SECONDS) || 3600;
@@ -133,7 +133,6 @@ const confirm = async (data: any) => {
         data.context.message_id,
         TTL_IN_SECONDS
       );
-      console.log("first", msgId);
 
       const isMsgIdNotPresent = await addMsgIdToRedisSet(
         context.transaction_id,
@@ -366,7 +365,9 @@ const confirm = async (data: any) => {
     }
 
     try {
-      console.info(`Checking parent_item_id and type tags in /${constants.CONFIRM}`);
+      console.info(
+        `Checking parent_item_id and type tags in /${constants.CONFIRM}`
+      );
       const items = confirm.items || [];
       items.forEach((item: any, index: number) => {
         let isItemType = false;
@@ -384,7 +385,9 @@ const confirm = async (data: any) => {
 
         if ((isItemType || isCustomizationType) && !item.parent_item_id) {
           console.info(
-            `Missing parent_item_id for item with ID: ${item.id || "undefined"} at index ${index}`
+            `Missing parent_item_id for item with ID: ${
+              item.id || "undefined"
+            } at index ${index}`
           );
           result.push({
             valid: false,
@@ -408,7 +411,9 @@ const confirm = async (data: any) => {
           const parentTag = item.tags.find((tag: any) => tag.code === "parent");
           if (!parentTag) {
             console.info(
-              `Missing parent tag for customization item with ID: ${item.id || "undefined"} at index ${index}`
+              `Missing parent tag for customization item with ID: ${
+                item.id || "undefined"
+              } at index ${index}`
             );
             result.push({
               valid: false,
@@ -421,7 +426,9 @@ const confirm = async (data: any) => {
             )?.value;
             if (parentId && checkItemTag(item, select_customIdArray)) {
               console.info(
-                `Invalid parent tag id: ${parentId} for customization item with ID: ${item.id || "undefined"} at index ${index}`
+                `Invalid parent tag id: ${parentId} for customization item with ID: ${
+                  item.id || "undefined"
+                } at index ${index}`
               );
               result.push({
                 valid: false,
@@ -443,7 +450,6 @@ const confirm = async (data: any) => {
         `Checking for valid and present location ID inside item list for /${constants.CONFIRM}`
       );
       confirm.items.forEach((item: any, index: number) => {
-        
         onSearchItems.forEach((it: any) => {
           const isCustomization = tagFinder(it, "customization");
           const isNotCustomization = !isCustomization;
@@ -513,7 +519,9 @@ const confirm = async (data: any) => {
     }
 
     try {
-      console.info(`Checking address components length in /${constants.CONFIRM}`);
+      console.info(
+        `Checking address components length in /${constants.CONFIRM}`
+      );
       const noOfFulfillments = confirm.fulfillments?.length || 0;
       let i = 0;
       while (i < noOfFulfillments) {
@@ -719,7 +727,9 @@ const confirm = async (data: any) => {
               `${transaction_id}_buyerGps`
             );
             const buyerGps = buyerGpsRaw ? JSON.parse(buyerGpsRaw) : null;
-            console.info(`GPS from confirm: ${gps}, buyerGps from Redis: ${buyerGps}`);
+            console.info(
+              `GPS from confirm: ${gps}, buyerGps from Redis: ${buyerGps}`
+            );
             if (buyerGps == null) {
               console.info(
                 `buyerGps is missing or null for transaction_id ${transaction_id} in /${constants.CONFIRM}`

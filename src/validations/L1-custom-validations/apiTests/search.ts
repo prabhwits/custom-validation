@@ -1,4 +1,4 @@
-import constants, { ApiSequence } from "../../../../utils/constants";
+import constants, { ApiSequence } from "../../../utils/constants";
 import {
   checkGpsPrecision,
   isObjectEmpty,
@@ -7,8 +7,8 @@ import {
   checkTagConditions,
   addMsgIdToRedisSet,
   addActionToRedisSet,
-} from "../../../../utils/helper";
-import { bap_features } from "../../../../utils/bap_features";
+} from "../../../utils/helper";
+import { bap_features } from "../../../utils/bap_features";
 import { RedisService } from "ondc-automation-cache-lib";
 
 const TTL_IN_SECONDS: number = Number(process.env.TTL_IN_SECONDS) || 3600;
@@ -65,7 +65,7 @@ export default async function search(payload: any): Promise<ValidationOutput> {
       if (!previousCallPresent) {
         result.push({
           valid: false,
-          code: 20000,
+          code: 20009,
           description: `Previous call doesn't exist`,
         });
       }
@@ -74,7 +74,6 @@ export default async function search(payload: any): Promise<ValidationOutput> {
         `!!Error while previous action call /${constants.SEARCH}, ${error.stack}`
       );
     }
-
     // Validate message.intent
     const { intent } = message;
 
@@ -197,7 +196,6 @@ export default async function search(payload: any): Promise<ValidationOutput> {
         addError(40000, "tags must be a non-empty array");
       } else {
         const validTagCodes = [
-          "bnp_features",
           "catalog_full",
           "catalog_inc",
           "bap_terms",
@@ -228,12 +226,6 @@ export default async function search(payload: any): Promise<ValidationOutput> {
 
           try {
             switch (tag.code) {
-              case "bnp_features":
-                if (!tag.list.some((item: any) => item.code === "000")) {
-                  addError(40000, 'bnp_features tag must contain code "000"');
-                }
-                break;
-
               case "catalog_full":
                 const payloadType = tag.list.find(
                   (item: any) => item.code === "payload_type"
@@ -344,7 +336,10 @@ export default async function search(payload: any): Promise<ValidationOutput> {
             }
           } catch (err) {
             console.error("Error during tag validation:", err);
-            addError(50000, "Internal server error during tag validation");
+            addError(
+              23001,
+              "Internal server error during tag validation,The response could not be processed due to an internal error"
+            );
           }
 
           for (const item of tag.list) {
@@ -426,7 +421,10 @@ export default async function search(payload: any): Promise<ValidationOutput> {
     return result;
   } catch (error: any) {
     console.error(`Error in /${ApiSequence.SEARCH}: ${error.stack}`);
-    addError(40000, `Unexpected error: ${error.message}`);
+    addError(
+      40000,
+      `Business Error - A generic business error: ${error.message}`
+    );
     return result;
   }
 }

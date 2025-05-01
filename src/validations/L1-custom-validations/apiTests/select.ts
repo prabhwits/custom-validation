@@ -8,16 +8,15 @@ import {
   isObjectEmpty,
   isoDurToSec,
   tagFinder,
- 
-} from "../../../../utils/helper";
+} from "../../../utils/helper";
 import _ from "lodash";
-import constants, { ApiSequence } from "../../../../utils/constants";
+import constants, { ApiSequence } from "../../../utils/constants";
 
-
-
-const select = async (data: any, flow: string = "default", apiSeq: string = ApiSequence.SELECT) => {
+const select = async (data: any) => {
   const result: any[] = [];
   const TTL_IN_SECONDS: number = Number(process.env.TTL_IN_SECONDS) || 3600;
+  const flow: string = "2";
+  const apiSeq: string = ApiSequence.SELECT;
 
   // Check if data is empty
   if (!data || isObjectEmpty(data)) {
@@ -41,7 +40,8 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
     result.push({
       valid: false,
       code: 20000,
-      description: "/context, /message, /order or /message/order is missing or empty",
+      description:
+        "/context, /message, /order or /message/order is missing or empty",
     });
     return result;
   }
@@ -120,7 +120,11 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
   // Message ID checks
   try {
     console.info(
-      `Adding Message Id /${flow === "3" && apiSeq === ApiSequence.SELECT_OUT_OF_STOCK ? constants.SELECT_OUT_OF_STOCK : constants.SELECT}`
+      `Adding Message Id /${
+        flow === "3" && apiSeq === ApiSequence.SELECT_OUT_OF_STOCK
+          ? constants.SELECT_OUT_OF_STOCK
+          : constants.SELECT
+      }`
     );
     const isMsgIdNotPresent = await addMsgIdToRedisSet(
       context.transaction_id,
@@ -144,20 +148,30 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
     const searchContextRaw = await RedisService.getKey(
       `${transaction_id}_${ApiSequence.SEARCH}_context`
     );
-    const searchContext = searchContextRaw ? JSON.parse(searchContextRaw) : null;
+    const searchContext = searchContextRaw
+      ? JSON.parse(searchContextRaw)
+      : null;
     const onSearchContextRaw = await RedisService.getKey(
       `${transaction_id}_${ApiSequence.ON_SEARCH}_context`
     );
-    const onSearchContext = onSearchContextRaw ? JSON.parse(onSearchContextRaw) : null;
+    const onSearchContext = onSearchContextRaw
+      ? JSON.parse(onSearchContextRaw)
+      : null;
 
-    if (onSearchContext && _.isEqual(onSearchContext.message_id, context.message_id)) {
+    if (
+      onSearchContext &&
+      _.isEqual(onSearchContext.message_id, context.message_id)
+    ) {
       result.push({
         valid: false,
         code: 20000,
         description: `Message Id for /${ApiSequence.ON_SEARCH} and /${ApiSequence.SELECT} api cannot be same`,
       });
     }
-    if (searchContext && _.isEqual(searchContext.message_id, context.message_id)) {
+    if (
+      searchContext &&
+      _.isEqual(searchContext.message_id, context.message_id)
+    ) {
       result.push({
         valid: false,
         code: 20000,
@@ -166,7 +180,11 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
     }
   } catch (error: any) {
     console.error(
-      `!!Error while checking message id for /${flow === "3" && apiSeq === ApiSequence.SELECT_OUT_OF_STOCK ? constants.SELECT_OUT_OF_STOCK : constants.SELECT}, ${error.stack}`
+      `!!Error while checking message id for /${
+        flow === "3" && apiSeq === ApiSequence.SELECT_OUT_OF_STOCK
+          ? constants.SELECT_OUT_OF_STOCK
+          : constants.SELECT
+      }, ${error.stack}`
     );
   }
 
@@ -200,7 +218,9 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
   const onSearchContextRaw = await RedisService.getKey(
     `${transaction_id}_${ApiSequence.ON_SEARCH}_context`
   );
-  const onSearchContext = onSearchContextRaw ? JSON.parse(onSearchContextRaw) : null;
+  const onSearchContext = onSearchContextRaw
+    ? JSON.parse(onSearchContextRaw)
+    : null;
 
   let providerOnSelect = null;
   const itemIdArray: any[] = [];
@@ -211,7 +231,9 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
 
   // City comparison
   try {
-    console.log(`Comparing city of /${constants.ON_SEARCH} and /${constants.SELECT}`);
+    console.log(
+      `Comparing city of /${constants.ON_SEARCH} and /${constants.SELECT}`
+    );
     if (!_.isEqual(onSearchContext?.city, context.city)) {
       result.push({
         valid: false,
@@ -227,8 +249,13 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
 
   // Timestamp comparison
   try {
-    console.log(`Comparing timestamp of /${constants.ON_SEARCH} and /${constants.SELECT}`);
-    if (onSearchContext && _.gte(onSearchContext.timestamp, context.timestamp)) {
+    console.log(
+      `Comparing timestamp of /${constants.ON_SEARCH} and /${constants.SELECT}`
+    );
+    if (
+      onSearchContext &&
+      _.gte(onSearchContext.timestamp, context.timestamp)
+    ) {
       result.push({
         valid: false,
         code: 20000,
@@ -266,18 +293,20 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
       });
     }
 
-    select.items.forEach((item: { id: string | number; quantity: { count: number } }) => {
-      if (!itemsOnSearch?.includes(item.id)) {
-        result.push({
-          valid: false,
-          code: 20000,
-          description: `Invalid item found in /${constants.SELECT} id: ${item.id}`,
-        });
+    select.items.forEach(
+      (item: { id: string | number; quantity: { count: number } }) => {
+        if (!itemsOnSearch?.includes(item.id)) {
+          result.push({
+            valid: false,
+            code: 20000,
+            description: `Invalid item found in /${constants.SELECT} id: ${item.id}`,
+          });
+        }
+        itemIdArray.push(item.id);
+        itemsOnSelect.push(item.id);
+        itemsIdList[item.id] = item.quantity.count;
       }
-      itemIdArray.push(item.id);
-      itemsOnSelect.push(item.id);
-      itemsIdList[item.id] = item.quantity.count;
-    });
+    );
 
     await RedisService.setKey(
       `${transaction_id}_itemsIdList`,
@@ -290,7 +319,9 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
       TTL_IN_SECONDS
     );
   } catch (error: any) {
-    console.error(`Error while storing item IDs in /${constants.SELECT}, ${error.stack}`);
+    console.error(
+      `Error while storing item IDs in /${constants.SELECT}, ${error.stack}`
+    );
   }
 
   try {
@@ -306,7 +337,7 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
           });
           return; // Skip further checks for this fulfillment
         }
-  
+
         // Store gps and address in Redis
         RedisService.setKey(
           `${transaction_id}_buyerGps`,
@@ -318,33 +349,35 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
           JSON.stringify(ff.end?.location?.address?.area_code),
           TTL_IN_SECONDS
         );
-  
+
         const gps = ff.end?.location?.gps?.split(",");
         const gpsLat: string = gps?.[0];
         const gpsLong: string = gps?.[1];
-  
+
         // Validate latitude
         Array.from(gpsLat).forEach((char: any) => {
           if (char !== "." && isNaN(parseInt(char))) {
             result.push({
               valid: false,
               code: 20000,
-              description: "fulfillments location.gps latitude is not as per the API contract",
+              description:
+                "fulfillments location.gps latitude is not as per the API contract",
             });
           }
         });
-  
+
         // Validate longitude
         Array.from(gpsLong).forEach((char: any) => {
           if (char !== "." && isNaN(parseInt(char))) {
             result.push({
               valid: false,
               code: 20000,
-              description: "fulfillments location.gps longitude is not as per the API contract",
+              description:
+                "fulfillments location.gps longitude is not as per the API contract",
             });
           }
         });
-  
+
         // Check if latitude or longitude is missing
         if (!gpsLat || !gpsLong) {
           result.push({
@@ -353,7 +386,7 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
             description: "fulfillments location.gps is incomplete in /select",
           });
         }
-  
+
         // Check for area_code
         if (!ff.end.location.address.hasOwnProperty("area_code")) {
           result.push({
@@ -365,13 +398,19 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
       }
     });
   } catch (error: any) {
-    console.error(`!!Error while checking GPS Precision in /${constants.SELECT}, ${error.stack}`);
+    console.error(
+      `!!Error while checking GPS Precision in /${constants.SELECT}, ${error.stack}`
+    );
   }
 
   // Provider validation
   try {
-    console.log(`Checking for valid provider in /${constants.ON_SEARCH} and /${constants.SELECT}`);
-    const onSearchRaw = await RedisService.getKey(`${transaction_id}_${ApiSequence.ON_SEARCH}`);
+    console.log(
+      `Checking for valid provider in /${constants.ON_SEARCH} and /${constants.SELECT}`
+    );
+    const onSearchRaw = await RedisService.getKey(
+      `${transaction_id}_${ApiSequence.ON_SEARCH}`
+    );
     const onSearch = onSearchRaw ? JSON.parse(onSearchRaw) : null;
     let provider = onSearch?.message?.catalog["bpp/providers"].filter(
       (provider: { id: any }) => provider.id === select.provider.id
@@ -380,8 +419,8 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
     if (provider?.length === 0) {
       result.push({
         valid: false,
-        code: 20000,
-        description: `provider with provider.id: ${select.provider.id} does not exist in on_search`,
+        code: 30001,
+        description: `Provider not found - The provider ID provided in the request was not found`,
       });
     } else {
       providerOnSelect = provider[0];
@@ -403,11 +442,17 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
   }
 
   try {
-    console.log(`Checking for valid and present location ID inside item list for /${constants.SELECT}`);
-    const allOnSearchItemsRaw = await RedisService.getKey(`${transaction_id}_onSearchItems`);
-    const allOnSearchItems = allOnSearchItemsRaw ? JSON.parse(allOnSearchItemsRaw) : [];
+    console.log(
+      `Checking for valid and present location ID inside item list for /${constants.SELECT}`
+    );
+    const allOnSearchItemsRaw = await RedisService.getKey(
+      `${transaction_id}_onSearchItems`
+    );
+    const allOnSearchItems = allOnSearchItemsRaw
+      ? JSON.parse(allOnSearchItemsRaw)
+      : [];
     let onSearchItems = allOnSearchItems.flat();
-    
+
     select.items.forEach((item: any, index: number) => {
       // Check if location_id is present
       if (!item.location_id || item.location_id.trim() === "") {
@@ -418,13 +463,17 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
         });
         return; // Skip further checks for this item
       }
-  
+
       // Compare location_id with on_search items for non-customization items
       onSearchItems.forEach((it: any) => {
         const isCustomization = tagFinder(it, "customization");
         const isNotCustomization = !isCustomization;
-        
-        if (it.id === item.id && it.location_id !== item.location_id && isNotCustomization) {
+
+        if (
+          it.id === item.id &&
+          it.location_id !== item.location_id &&
+          isNotCustomization
+        ) {
           result.push({
             valid: false,
             code: 20000,
@@ -437,159 +486,162 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
     console.error(
       `Error while checking for valid and present location ID inside item list for /${constants.SELECT}, ${error.stack}`
     );
-  }// Placeholder for constants (assumed to be defined elsewhere)
+  } // Placeholder for constants (assumed to be defined elsewhere)
 
-// Validation function
-// try {
-//   console.info(`Checking offers in /${constants.SELECT}`);
-//   console.log("offers in select call", JSON.stringify(select.offers));
+  // Validation function
+  // try {
+  //   console.info(`Checking offers in /${constants.SELECT}`);
+  //   console.log("offers in select call", JSON.stringify(select.offers));
 
+  //   if (select?.offers && select.offers.length > 0) {
+  //     const providerOffers: any = RedisService.getKey(`${constants.ON_SEARCH}_offers`) || [];
+  //     const applicableOffers: any[] = [];
+  //     const orderItemIds = select?.items?.map((item: any) => item.id).filter((id: any) => !!id) || [];
+  //     const orderLocationIds = select?.provider?.locations?.map((location: any) => location.id).filter((id: any) => !!id) || [];
 
-//   if (select?.offers && select.offers.length > 0) {
-//     const providerOffers: any = RedisService.getKey(`${constants.ON_SEARCH}_offers`) || [];
-//     const applicableOffers: any[] = [];
-//     const orderItemIds = select?.items?.map((item: any) => item.id).filter((id: any) => !!id) || [];
-//     const orderLocationIds = select?.provider?.locations?.map((location: any) => location.id).filter((id: any) => !!id) || [];
+  //     select.offers.forEach((offer: any, index: number) => {
+  //       const providerOffer = providerOffers.find((providedOffer: any) => providedOffer?.id === offer?.id);
+  //       console.log("providerOffer in select call", JSON.stringify(providerOffer));
 
-//     select.offers.forEach((offer: any, index: number) => {
-//       const providerOffer = providerOffers.find((providedOffer: any) => providedOffer?.id === offer?.id);
-//       console.log("providerOffer in select call", JSON.stringify(providerOffer));
+  //       if (!providerOffer) {
+  //         result.push({
+  //           valid: false,
+  //           code: 20006,
+  //           description: `Offer with id ${offer.id || 'unknown'} is not available for the provider.`,
+  //         });
+  //         return;
+  //       }
 
-//       if (!providerOffer) {
-//         result.push({
-//           valid: false,
-//           code: 20006,
-//           description: `Offer with id ${offer.id || 'unknown'} is not available for the provider.`,
-//         });
-//         return;
-//       }
+  //       const offerLocationIds = providerOffer?.location_ids || [];
+  //       const locationMatch = offerLocationIds.some((id: any) => orderLocationIds.includes(id));
+  //       if (!locationMatch) {
+  //         result.push({
+  //           valid: false,
+  //           code: 20006,
+  //           description: `Offer with id '${offer.id || 'unknown'}' is not applicable for any of the order's locations [${orderLocationIds.join(', ')}].`,
+  //         });
+  //         return;
+  //       }
 
-//       const offerLocationIds = providerOffer?.location_ids || [];
-//       const locationMatch = offerLocationIds.some((id: any) => orderLocationIds.includes(id));
-//       if (!locationMatch) {
-//         result.push({
-//           valid: false,
-//           code: 20006,
-//           description: `Offer with id '${offer.id || 'unknown'}' is not applicable for any of the order's locations [${orderLocationIds.join(', ')}].`,
-//         });
-//         return;
-//       }
+  //       const offerItemIds = providerOffer?.item_ids || [];
+  //       const itemMatch = offerItemIds.some((id: any) => orderItemIds.includes(id));
+  //       if (!itemMatch) {
+  //         result.push({
+  //           valid: false,
+  //           code: 20006,
+  //           description: `Offer with id '${offer.id || 'unknown'}' is not applicable for any of the ordered item(s) [${orderItemIds.join(', ')}].`,
+  //         });
+  //         return;
+  //       }
 
-//       const offerItemIds = providerOffer?.item_ids || [];
-//       const itemMatch = offerItemIds.some((id: any) => orderItemIds.includes(id));
-//       if (!itemMatch) {
-//         result.push({
-//           valid: false,
-//           code: 20006,
-//           description: `Offer with id '${offer.id || 'unknown'}' is not applicable for any of the ordered item(s) [${orderItemIds.join(', ')}].`,
-//         });
-//         return;
-//       }
+  //       const { label, range } = providerOffer?.time || {};
+  //       const start = range?.start;
+  //       const end = range?.end;
+  //       if (label !== 'valid' || !start || !end) {
+  //         result.push({
+  //           valid: false,
+  //           code: 20006,
+  //           description: `Offer with id ${offer.id || 'unknown'} has an invalid or missing time configuration.`,
+  //         });
+  //         return;
+  //       }
 
-//       const { label, range } = providerOffer?.time || {};
-//       const start = range?.start;
-//       const end = range?.end;
-//       if (label !== 'valid' || !start || !end) {
-//         result.push({
-//           valid: false,
-//           code: 20006,
-//           description: `Offer with id ${offer.id || 'unknown'} has an invalid or missing time configuration.`,
-//         });
-//         return;
-//       }
+  //       const currentTimeStamp = new Date(context?.timestamp || '');
+  //       const startTime = new Date(start);
+  //       const endTime = new Date(end);
+  //       if (!(currentTimeStamp >= startTime && currentTimeStamp <= endTime)) {
+  //         result.push({
+  //           valid: false,
+  //           code: 20006,
+  //           description: `Offer with id ${offer.id || 'unknown'} is not currently valid based on time range.`,
+  //         });
+  //         return;
+  //       }
 
-//       const currentTimeStamp = new Date(context?.timestamp || '');
-//       const startTime = new Date(start);
-//       const endTime = new Date(end);
-//       if (!(currentTimeStamp >= startTime && currentTimeStamp <= endTime)) {
-//         result.push({
-//           valid: false,
-//           code: 20006,
-//           description: `Offer with id ${offer.id || 'unknown'} is not currently valid based on time range.`,
-//         });
-//         return;
-//       }
+  //       const isSelected = offer?.tags?.some(
+  //         (tag: any) =>
+  //           tag.code === 'selection' &&
+  //           tag.list?.some((entry: any) => entry.code === 'apply' && entry.value === 'yes')
+  //       );
+  //       if (!isSelected) {
+  //         result.push({
+  //           valid: false,
+  //           code: 20006,
+  //           description: `Offer with id ${offer.id || 'unknown'} is not selected (apply: "yes" missing).`,
+  //         });
+  //         return;
+  //       }
 
-//       const isSelected = offer?.tags?.some(
-//         (tag: any) =>
-//           tag.code === 'selection' &&
-//           tag.list?.some((entry: any) => entry.code === 'apply' && entry.value === 'yes')
-//       );
-//       if (!isSelected) {
-//         result.push({
-//           valid: false,
-//           code: 20006,
-//           description: `Offer with id ${offer.id || 'unknown'} is not selected (apply: "yes" missing).`,
-//         });
-//         return;
-//       }
+  //       applicableOffers.push({ ...providerOffer, index });
+  //       console.log("applicableOffers", JSON.stringify(applicableOffers));
+  //     });
 
-//       applicableOffers.push({ ...providerOffer, index });
-//       console.log("applicableOffers", JSON.stringify(applicableOffers));
-//     });
+  //     // Additive validation
+  //     const additiveOffers = applicableOffers.filter((offer: any) => {
+  //       const metaTag = offer.tags?.find((tag: any) => tag.code === 'meta');
+  //       return metaTag?.list?.some((entry: any) => entry.code === 'additive' && entry.value?.toLowerCase() === 'yes');
+  //     });
 
-//     // Additive validation
-//     const additiveOffers = applicableOffers.filter((offer: any) => {
-//       const metaTag = offer.tags?.find((tag: any) => tag.code === 'meta');
-//       return metaTag?.list?.some((entry: any) => entry.code === 'additive' && entry.value?.toLowerCase() === 'yes');
-//     });
+  //     const nonAdditiveOffers = applicableOffers.filter((offer: any) => {
+  //       const metaTag = offer.tags?.find((tag: any) => tag.code === 'meta');
+  //       return metaTag?.list?.some((entry: any) => entry.code === 'additive' && entry.value?.toLowerCase() === 'no');
+  //     });
 
-//     const nonAdditiveOffers = applicableOffers.filter((offer: any) => {
-//       const metaTag = offer.tags?.find((tag: any) => tag.code === 'meta');
-//       return metaTag?.list?.some((entry: any) => entry.code === 'additive' && entry.value?.toLowerCase() === 'no');
-//     });
+  //     if (additiveOffers.length > 0) {
+  //       // Apply all additive offers
+  //       applicableOffers.length = 0;
+  //       additiveOffers.forEach((offer: any) => {
+  //         const providerOffer = providerOffers.find((o: any) => o.id === offer.id);
+  //         if (providerOffer) {
+  //           applicableOffers.push(providerOffer);
+  //         }
+  //       });
+  //     } else if (nonAdditiveOffers.length === 1) {
+  //       // Apply the single non-additive offer
+  //       applicableOffers.length = 0;
+  //       const offer = nonAdditiveOffers[0];
+  //       const providerOffer = providerOffers.find((o: any) => o.id === offer.id);
+  //       if (providerOffer) {
+  //         applicableOffers.push(providerOffer);
+  //       }
+  //     } else if (nonAdditiveOffers.length > 1){
+  //       // Multiple non-additive offers selected; add errors
+  //       applicableOffers.length = 0
+  //       nonAdditiveOffers.forEach((offer: any) => {
+  //       result.push({
+  //         valid: false,
+  //         code: 20006,
+  //         description: `Offer ${offer.id || 'unknown'} is non-additive and cannot be combined with other non-additive offers.`,
+  //       });
+  //       return;
+  //     }
 
-//     if (additiveOffers.length > 0) {
-//       // Apply all additive offers
-//       applicableOffers.length = 0;
-//       additiveOffers.forEach((offer: any) => {
-//         const providerOffer = providerOffers.find((o: any) => o.id === offer.id);
-//         if (providerOffer) {
-//           applicableOffers.push(providerOffer);
-//         }
-//       });
-//     } else if (nonAdditiveOffers.length === 1) {
-//       // Apply the single non-additive offer
-//       applicableOffers.length = 0;
-//       const offer = nonAdditiveOffers[0];
-//       const providerOffer = providerOffers.find((o: any) => o.id === offer.id);
-//       if (providerOffer) {
-//         applicableOffers.push(providerOffer);
-//       }
-//     } else if (nonAdditiveOffers.length > 1){
-//       // Multiple non-additive offers selected; add errors
-//       applicableOffers.length = 0
-//       nonAdditiveOffers.forEach((offer: any) => {
-//       result.push({
-//         valid: false,
-//         code: 20006,
-//         description: `Offer ${offer.id || 'unknown'} is non-additive and cannot be combined with other non-additive offers.`,
-//       });
-//       return;
-//     }
-
-//     RedisService.setKey('selected_offer', JSON.stringify(applicableOffers));
-//     }
-// } catch (error: any) {
-//   console.error(`Error while checking for offers in /${constants.SELECT}, ${error.stack}`);
-//   result.push({
-//     valid: false,
-//     code: 20006,
-//     description: `Unexpected error while validating offers in /${constants.SELECT}: ${error.message}`,
-//   });
-// }
+  //     RedisService.setKey('selected_offer', JSON.stringify(applicableOffers));
+  //     }
+  // } catch (error: any) {
+  //   console.error(`Error while checking for offers in /${constants.SELECT}, ${error.stack}`);
+  //   result.push({
+  //     valid: false,
+  //     code: 20006,
+  //     description: `Unexpected error while validating offers in /${constants.SELECT}: ${error.message}`,
+  //   });
+  // }
 
   // Duplicate parent_item_id check
   try {
-    console.log(`Checking for duplicate parent_item_id, required parent_item_id, and type tags in /${constants.SELECT}`);
+    console.log(
+      `Checking for duplicate parent_item_id, required parent_item_id, and type tags in /${constants.SELECT}`
+    );
     select.items.forEach((item: any, index: number) => {
       const isItemType = tagFinder(item, "item");
       const isCustomizationType = tagFinder(item, "customization");
-      
+
       // Check 1: If item has type: item or type: customization, parent_item_id must be present
       if ((isItemType || isCustomizationType) && !item.parent_item_id) {
         console.info(
-          `Missing parent_item_id for item with ID: ${item.id || 'undefined'} at index ${index}`
+          `Missing parent_item_id for item with ID: ${
+            item.id || "undefined"
+          } at index ${index}`
         );
         result.push({
           valid: false,
@@ -597,7 +649,7 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
           description: `/message/order/items[${index}]: parent_item_id is required for items with type 'item' or 'customization'`,
         });
       }
-      
+
       // Check 2: If item has parent_item_id, it must have type: item or type: customization
       if (item.parent_item_id && !(isItemType || isCustomizationType)) {
         console.info(
@@ -609,7 +661,7 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
           description: `/message/order/items[${index}]: items with parent_item_id must have a type tag of 'item' or 'customization'`,
         });
       }
-      
+
       // Check 3: Check for duplicate parent_item_id for the same item.id
       if (!itemMapper[item.id]) {
         itemMapper[item.id] = item.parent_item_id;
@@ -637,20 +689,82 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
     console.log(
       `Mapping the items with their prices on /${constants.ON_SEARCH} and /${constants.SELECT}`
     );
-    const allOnSearchItemsRaw = await RedisService.getKey(`${transaction_id}_onSearchItems`);
-    const allOnSearchItems = allOnSearchItemsRaw ? JSON.parse(allOnSearchItemsRaw) : [];
+    const allOnSearchItemsRaw = await RedisService.getKey(
+      `${transaction_id}_onSearchItems`
+    );
+    const allOnSearchItems = allOnSearchItemsRaw
+      ? JSON.parse(allOnSearchItemsRaw)
+      : [];
     let onSearchItems = allOnSearchItems.flat();
-    select.items.forEach((item: any) => {
-      const itemOnSearch = onSearchItems.find((it: any) => it.id === item.id);
-      if (itemOnSearch) {
+    select.items.forEach(async (item: any) => {
+      const onSearchItem = onSearchItems.find((it: any) => it.id === item.id);
+      if (onSearchItem) {
         console.log(
-          `ITEM ID: ${item.id}, Price: ${itemOnSearch.price.value}, Count: ${item.quantity.count}`
+          `ITEM ID: ${item.id}, Price: ${onSearchItem.price.value}, Count: ${item.quantity.count}`
         );
-        itemsCtgrs[item.id] = itemOnSearch.category_id;
-        itemsTat.push(itemOnSearch["@ondc/org/time_to_ship"]);
-        selectedPrice += itemOnSearch.price.value * item.quantity?.count;
+        itemsCtgrs[item.id] = onSearchItem.category_id;
+        itemsTat.push(onSearchItem["@ondc/org/time_to_ship"]);
+
+        if (
+          onSearchItem.quantity?.available?.count &&
+          onSearchItem.quantity?.maximum?.count
+        ) {
+          const availableCount =
+            onSearchItem.quantity.available.count === "99"
+              ? Infinity
+              : parseInt(onSearchItem.quantity.available.count);
+          const maximumCount =
+            onSearchItem.quantity.maximum.count === "99"
+              ? Infinity
+              : parseInt(onSearchItem.quantity.maximum.count);
+          const selectedQuantity = parseInt(item.quantity.count);
+
+          if (selectedQuantity > 0) {
+            if (
+              !(
+                selectedQuantity <= availableCount &&
+                selectedQuantity <= maximumCount
+              )
+            ) {
+              result.push({
+                valid: false,
+                code: 40009,
+                description: `Maximum order qty exceeded - The maximum order quantity has been exceeded for the item.id: ${item.id}`,
+              });
+            }
+          } else {
+            result.push({
+              valid: false,
+              code: 40012,
+              description: `Minimum order qty required - The minimum order quantity has not been met for the item.id: ${item.id}`,
+            });
+          }
+
+          selectedPrice += onSearchItem.price.value * item.quantity?.count;
+        }
       }
     });
+    const provider_id = select.provider.id;
+    console.log("provider_id", provider_id);
+
+    let orderValueData = await RedisService.getKey(
+      `${transaction_id}_${ApiSequence.ON_SEARCH}_orderValueSet`
+    );
+
+    if (!_.isNull(orderValueData)) {
+      const parsedData: any[] = JSON.parse(orderValueData) || [];
+      const min_value =
+        parsedData?.find((itm: any) => itm.provider_id === provider_id)
+          ?.value || 0;
+
+      if (selectedPrice < min_value) {
+        result.push({
+          valid: false,
+          code: 30023,
+          description: `Minimum order value error - The cart value is less than the minimum order value (${selectedPrice} < ${min_value})`,
+        });
+      }
+    }
     await RedisService.setKey(
       `${transaction_id}_selectedPrice`,
       JSON.stringify(selectedPrice),
@@ -673,7 +787,6 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
     let timeToShip = 0;
     itemsTat?.forEach((tts: any) => {
       const ttship = isoDurToSec(tts);
-      console.log(ttship);
       timeToShip = Math.max(timeToShip, ttship);
     });
     await RedisService.setKey(
@@ -682,12 +795,17 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
       TTL_IN_SECONDS
     );
   } catch (error: any) {
-    console.error(`!!Error while saving time_to_ship in ${constants.SELECT}`, error);
+    console.error(
+      `!!Error while saving time_to_ship in ${constants.SELECT}`,
+      error
+    );
   }
 
   // Consistent location IDs for parent_item_id
   try {
-    console.log(`Checking for Consistent location IDs for parent_item_id in /${constants.SELECT}`);
+    console.log(
+      `Checking for Consistent location IDs for parent_item_id in /${constants.SELECT}`
+    );
     select.items.forEach((item: any, index: number) => {
       const itemTag = tagFinder(item, "item");
       if (itemTag) {
@@ -695,7 +813,10 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
           itemMap[item.parent_item_id] = { location_id: item.location_id };
         }
       }
-      if (itemTag && itemMap[item.parent_item_id].location_id !== item.location_id) {
+      if (
+        itemTag &&
+        itemMap[item.parent_item_id].location_id !== item.location_id
+      ) {
         result.push({
           valid: false,
           code: 20000,
@@ -711,12 +832,14 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
 
   const checksOnValidProvider = async (provider: any) => {
     try {
-      console.log(`Comparing provider location in /${constants.ON_SEARCH} and /${constants.SELECT}`);
+      console.log(
+        `Comparing provider location in /${constants.ON_SEARCH} and /${constants.SELECT}`
+      );
       if (provider?.locations[0]?.id != select.provider?.locations[0]?.id) {
         result.push({
           valid: false,
-          code: 20000,
-          description: `provider.locations[0].id ${provider.locations[0].id} mismatches in /${constants.ON_SEARCH} and /${constants.SELECT}`,
+          code: 30002,
+          description: `provider.locations[0].id ${provider.locations[0].id}, Provider location not found - The provider location ID provided in the request was not found in /${constants.ON_SEARCH} and /${constants.SELECT}`,
         });
       }
     } catch (error: any) {
@@ -726,17 +849,23 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
     }
 
     try {
-      console.log(`Checking for valid items for provider in /${constants.SELECT}`);
-      const itemProviderMapRaw = await RedisService.getKey(`${transaction_id}_itemProviderMap`);
-      const itemProviderMap = itemProviderMapRaw ? JSON.parse(itemProviderMapRaw) : {};
+      console.log(
+        `Checking for valid items for provider in /${constants.SELECT}`
+      );
+      const itemProviderMapRaw = await RedisService.getKey(
+        `${transaction_id}_itemProviderMap`
+      );
+      const itemProviderMap = itemProviderMapRaw
+        ? JSON.parse(itemProviderMapRaw)
+        : {};
       const providerID = select.provider.id;
       const items = select.items;
       items.forEach((item: any, index: number) => {
         if (!itemProviderMap[providerID]?.includes(item.id)) {
           result.push({
             valid: false,
-            code: 20000,
-            description: `Item with id ${item.id} is not available for provider with id ${provider.id}`,
+            code: 30004,
+            description: `Item with id ${item.id} not found - The item ID provided in the request was not found with  provider_id ${provider.id}`,
           });
         }
       });
@@ -757,7 +886,9 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
         TTL_IN_SECONDS
       );
     } catch (error: any) {
-      console.error(`Error while storing item IDs on custom ID array, ${error.stack}`);
+      console.error(
+        `Error while storing item IDs on custom ID array, ${error.stack}`
+      );
     }
 
     try {
@@ -780,7 +911,9 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
       select.items.forEach((item: any) => {
         const baseItem = findItemByItemType(item);
         if (baseItem) {
-          const searchBaseItem = provider.items.find((it: { id: any }) => it.id === baseItem.id);
+          const searchBaseItem = provider.items.find(
+            (it: { id: any }) => it.id === baseItem.id
+          );
           if (searchBaseItem && searchBaseItem.time.label === "disable") {
             result.push({
               valid: false,
@@ -806,7 +939,10 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
               tag.code === "parent" &&
               tag.list &&
               tag.list.find((listItem: { code: string; value: any }) => {
-                return listItem.code === "id" && customIdArray.includes(listItem.value);
+                return (
+                  listItem.code === "id" &&
+                  customIdArray.includes(listItem.value)
+                );
               })
             );
           });
@@ -840,4 +976,4 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
   return result;
 };
 
-export default select;  
+export default select;
