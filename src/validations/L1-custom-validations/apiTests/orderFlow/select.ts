@@ -257,6 +257,7 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
     const itemsOnSearchRaw = await RedisService.getKey(
       `${transaction_id}_${ApiSequence.ON_SEARCH}itemsId`
     );
+    console.log('Got this one 🎁', itemsOnSearchRaw)
     const itemsOnSearch = itemsOnSearchRaw ? JSON.parse(itemsOnSearchRaw) : [];
     if (!itemsOnSearch?.length) {
       result.push({
@@ -384,7 +385,7 @@ const select = async (data: any, flow: string = "default", apiSeq: string = ApiS
         description: `provider with provider.id: ${select.provider.id} does not exist in on_search`,
       });
     } else {
-      providerOnSelect = provider[0];
+      providerOnSelect = provider?.[0];
       await RedisService.setKey(
         `${transaction_id}_providerGps`,
         JSON.stringify(providerOnSelect?.locations[0]?.gps),
