@@ -813,6 +813,7 @@ const onSelect = async (data: any) => {
         onSelectPrice += parseFloat(element.price.value);
         if (titleType === "item") {
           if (!(element["@ondc/org/item_id"] in itemFlfllmnts)) {
+            console.log("fasly error is coming here",element["@ondc/org/item_id"], JSON.stringify(itemFlfllmnts) )
             result.push({
               valid: false,
               code: 20000,
@@ -856,8 +857,10 @@ const onSelect = async (data: any) => {
             onSelectItemsPrice += parseFloat(element.price.value);
           }
         }
-        if (titleType === "tax" || titleType === "discount") {
+        if (titleType === "item" ) {
           if (!(element["@ondc/org/item_id"] in itemFlfllmnts)) {
+            console.log('🫀', itemFlfllmnts)
+            console.log('👔', element["@ondc/org/item_id"])
             result.push({
               valid: false,
               code: 20000,
@@ -871,7 +874,7 @@ const onSelect = async (data: any) => {
           titleType === "misc"
         ) {
           if (
-            !Object.values(itemFlfllmnts).includes(element["@ondc/org/item_id"])
+            !fulfillmentIdArray.includes(element["@ondc/org/item_id"])
           ) {
             result.push({
               valid: false,
@@ -1021,9 +1024,11 @@ const onSelect = async (data: any) => {
     );
   }
 
+  let fulfillmentIdArray : any = []
   try {
     console.info("Checking Fulfillment TAT...");
     on_select.fulfillments.forEach((ff: { [x: string]: any; id: any }) => {
+      if(ff.id) fulfillmentIdArray.push(ff.id)
       if (!ff["@ondc/org/TAT"]) {
         console.info(
           `Fulfillment TAT must be present for Fulfillment ID: ${ff.id}`
@@ -1035,12 +1040,18 @@ const onSelect = async (data: any) => {
         });
       }
     });
+   
   } catch (error: any) {
     console.info(
       `Error while checking fulfillments TAT in /${constants.ON_SELECT}`
     );
   }
-
+  
+  await RedisService.setKey(
+    `${transaction_id}_fulfillmentIdArray`,
+    JSON.stringify(fulfillmentIdArray),
+    TTL_IN_SECONDS
+  );
   try {
     console.info("Checking fulfillment.id, fulfillment.type and tracking");
     on_select.fulfillments.forEach(async (ff: any) => {

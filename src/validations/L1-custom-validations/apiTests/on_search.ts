@@ -104,7 +104,7 @@ export default async function onSearch(
     );
 
     const storedDomain = await RedisService.getKey(`${transaction_id}_domain`);
-    if (!_.isEqual(payload.context.domain.split(":")[1], storedDomain)) {
+    if (!_.isEqual(payload.context.domain?.split(":")[1], storedDomain)) {
       addError(20006, `Domain should be same in each action`);
     }
 
@@ -2601,7 +2601,7 @@ export default async function onSearch(
 
         i++;
       }
-
+      console.log('Is this getting printedd 😱')
       await RedisService.setKey(
         `${transaction_id}_onSearchItems`,
         JSON.stringify(itemsArray),

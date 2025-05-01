@@ -439,6 +439,12 @@ const init = async (data: any) => {
       const itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
       let i = 0;
       const len = init.items.length;
+      const fulfillmentIdArrayRaw = await RedisService.getKey(
+        `${transaction_id}_fulfillmentIdArray`
+      );
+      const fulfillmentIdArray = fulfillmentIdArrayRaw
+        ? JSON.parse(fulfillmentIdArrayRaw)
+        : null;
       while (i < len) {
         const itemId = init.items[i].id;
         const item = init.items[i];
@@ -464,7 +470,9 @@ const init = async (data: any) => {
         }
 
         if (itemId in itemFlfllmnts) {
-          if (init.items[i].fulfillment_id != itemFlfllmnts[itemId]) {
+          if (!fulfillmentIdArray.includes(init.items[i].fulfillment_id) ) {
+            console.log('🥶', init.items[i].fulfillment_id)
+            console.log('🤬', fulfillmentIdArray)
             result.push({
               valid: false,
               code: 20000,
@@ -505,6 +513,12 @@ const init = async (data: any) => {
       const itemFlfllmnts = itemFlfllmntsRaw
         ? JSON.parse(itemFlfllmntsRaw)
         : null;
+        const fulfillmentIdArrayRaw = await RedisService.getKey(
+          `${transaction_id}_fulfillmentIdArray`
+        );
+        const fulfillmentIdArray = fulfillmentIdArrayRaw
+          ? JSON.parse(fulfillmentIdArrayRaw)
+          : null;
       let i = 0;
       const len = init.fulfillments.length;
       while (i < len) {
@@ -520,7 +534,7 @@ const init = async (data: any) => {
           });
         } else {
           // Check if fulfillment id exists in itemFlfllmnts
-          if (!itemFlfllmnts || !Object.values(itemFlfllmnts).includes(id)) {
+          if (!fulfillmentIdArray || !fulfillmentIdArray.includes(id)) {
             console.info(
               `Fulfillment id ${id} not found in /${constants.ON_SELECT} at index ${i}`
             );

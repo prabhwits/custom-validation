@@ -844,8 +844,8 @@ export function compareQuoteObjects(
   const errors: string[] = [];
 
   // Compare root level properties
-  const rootKeys1 = Object.keys(obj1);
-  const rootKeys2 = Object.keys(obj2);
+  const rootKeys1 = obj1 && Object.keys(obj1);
+  const rootKeys2 = obj2 && Object.keys(obj2);
 
   if (rootKeys1.length !== rootKeys2.length) {
     errors.push(

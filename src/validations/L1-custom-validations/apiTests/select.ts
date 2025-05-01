@@ -423,7 +423,7 @@ const select = async (data: any) => {
         description: `Provider not found - The provider ID provided in the request was not found`,
       });
     } else {
-      providerOnSelect = provider[0];
+      providerOnSelect = provider?.[0];
       await RedisService.setKey(
         `${transaction_id}_providerGps`,
         JSON.stringify(providerOnSelect?.locations[0]?.gps),

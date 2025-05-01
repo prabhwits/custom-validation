@@ -290,6 +290,12 @@ const confirm = async (data: any) => {
       let i = 0;
       const len = confirm.items?.length || 0;
       let itemsCountChange = false;
+      const fulfillmentIdArrayRaw = await RedisService.getKey(
+        `${transaction_id}_fulfillmentIdArray`
+      );
+      const fulfillmentIdArray = fulfillmentIdArrayRaw
+        ? JSON.parse(fulfillmentIdArrayRaw)
+        : null;
       while (i < len) {
         const itemId = confirm.items[i].id;
         const item = confirm.items[i];
@@ -314,8 +320,8 @@ const confirm = async (data: any) => {
           });
         }
 
-        if (itemId in itemFlfllmnts) {
-          if (confirm.items[i].fulfillment_id != itemFlfllmnts[itemId]) {
+        if (itemFlfllmnts && fulfillmentIdArray && (itemId in fulfillmentIdArray) || (itemId in itemFlfllmnts)) {
+          if (!fulfillmentIdArray.includes(confirm.items[i].fulfillment_id)  && !itemFlfllmnts[itemId]) {
             result.push({
               valid: false,
               code: 20000,
@@ -644,13 +650,19 @@ const confirm = async (data: any) => {
       const itemFlfllmnts = itemFlfllmntsRaw
         ? JSON.parse(itemFlfllmntsRaw)
         : null;
+        const fulfillmentIdArrayRaw = await RedisService.getKey(
+          `${transaction_id}_fulfillmentIdArray`
+        );
+        const fulfillmentIdArray = fulfillmentIdArrayRaw
+          ? JSON.parse(fulfillmentIdArrayRaw)
+          : null;
       let i = 0;
       const len = confirm.fulfillments?.length || 0;
       const gpsRegex = /^-?\d{1,3}\.\d+,-?\d{1,3}\.\d+$/;
       while (i < len) {
         if (confirm.fulfillments[i].id) {
           const id = confirm.fulfillments[i].id;
-          if (!itemFlfllmnts || !Object.values(itemFlfllmnts).includes(id)) {
+          if (fulfillmentIdArray && !fulfillmentIdArray.includes(id)) {
             result.push({
               valid: false,
               code: 20000,
@@ -821,6 +833,8 @@ const confirm = async (data: any) => {
           sttlmntdtls
         )
       ) {
+        console.log(`👺 ${confirm.payment["@ondc/org/settlement_details"]}`)
+        console.log('👀', sttlmntdtls)
         result.push({
           valid: false,
           code: 20000,

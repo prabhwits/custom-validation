@@ -295,6 +295,12 @@ async function validateOrder(
   const providerLoc = providerLocRaw ? JSON.parse(providerLocRaw) : null;
   const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
   const itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
+  const fulfillmentIdArrayRaw = await RedisService.getKey(
+    `${transaction_id}_fulfillmentIdArray`
+  );
+  const fulfillmentIdArray = fulfillmentIdArrayRaw
+    ? JSON.parse(fulfillmentIdArrayRaw)
+    : null;
 
   if (providerId && order.provider?.id !== providerId) {
     result.push(
@@ -334,8 +340,8 @@ async function validateOrder(
         )
       );
     }
-    if (itemFlfllmnts && item.id in itemFlfllmnts) {
-      if (item.fulfillment_id !== itemFlfllmnts[item.id]) {
+    if (itemFlfllmnts   && (item.id in itemFlfllmnts)) {
+      if (fulfillmentIdArray.includes(item.fulfillment_id) && !itemFlfllmnts[item.id]) {
         result.push(
           addError(
             `items[${index}].fulfillment_id mismatches for Item ${item.id} in /${constants.ON_SELECT} and /${constants.ON_CONFIRM}`,
@@ -344,6 +350,7 @@ async function validateOrder(
         );
       }
     } else {
+    
       result.push(
         addError(
           `Item Id ${item.id} does not exist in /${constants.ON_SELECT}`,
@@ -406,6 +413,12 @@ async function validateFulfillments(
     const on_select_fulfillment_tat_obj = on_select_fulfillment_tat_objRaw
       ? JSON.parse(on_select_fulfillment_tat_objRaw)
       : null;
+      const fulfillmentIdArrayRaw = await RedisService.getKey(
+        `${transaction_id}_fulfillmentIdArray`
+      );
+      const fulfillmentIdArray = fulfillmentIdArrayRaw
+        ? JSON.parse(fulfillmentIdArrayRaw)
+        : null;
     if (
       on_select_fulfillment_tat_obj &&
       on_select_fulfillment_tat_obj[fulfillment.id] !==
@@ -426,7 +439,7 @@ async function validateFulfillments(
     if (
       !fulfillment.id ||
       !itemFlfllmnts ||
-      !Object.values(itemFlfllmnts).includes(fulfillment.id)
+      !fulfillmentIdArray.includes(fulfillment.id) 
     ) {
       result.push(
         addError(
@@ -1210,12 +1223,15 @@ async function validateItems(
         });
         continue;
       }
-
+      const fulfillmentIdArrayRaw = await RedisService.getKey(
+        `${transactionId}_fulfillmentIdArray`
+      );
+      const fulfillmentIdArray = fulfillmentIdArrayRaw
+        ? JSON.parse(fulfillmentIdArrayRaw)
+        : null;
       // Validate fulfillment ID
-      if (
-        item.fulfillment_id &&
-        item.fulfillment_id !== itemFlfllmnts[itemId]
-      ) {
+      if (item.fulfillment_id && !fulfillmentIdArray.includes(item.fulfillment_id)) {
+       
         result.push({
           valid: false,
           code: 20000,
