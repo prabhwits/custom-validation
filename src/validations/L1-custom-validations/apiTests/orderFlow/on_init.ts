@@ -426,6 +426,12 @@ try {
   const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
   const itemsIdListRaw = await RedisService.getKey(`${transaction_id}_itemsIdList`);
   const itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
+  const fulfillmentIdArrayRaw = await RedisService.getKey(
+    `${transaction_id}_fulfillmentIdArray`
+  );
+  const fulfillmentIdArray = fulfillmentIdArrayRaw
+    ? JSON.parse(fulfillmentIdArrayRaw)
+    : null;
 
   for (let i = 0; i < (on_init.items?.length || 0); i++) {
     const itemId: any = on_init.items[i].id;
@@ -451,21 +457,22 @@ try {
       });
     }
 
-    if (itemFlfllmnts && itemId in itemFlfllmnts) {
-      if (on_init.items[i].fulfillment_id !== itemFlfllmnts[itemId]) {
+    if (itemFlfllmnts && fulfillmentIdArray && (itemId in fulfillmentIdArray) || (itemId in itemFlfllmnts)) {
+      if (!fulfillmentIdArray.includes(on_init.items[i].fulfillment_id) && !itemFlfllmnts[itemId]) {
         result.push({
           valid: false,
           code: 20000,
           description: `items[${i}].fulfillment_id mismatches for Item ${itemId} in /${constants.ON_SELECT} and /${constants.ON_INIT}`,
         });
       }
-    } else {
-      result.push({
-        valid: false,
-        code: 20000,
-        description: `Item Id ${itemId} does not exist in /on_select`,
-      });
-    }
+    } 
+    else {
+              result.push({
+                valid: false,
+                code: 20000,
+                description: `Item Id ${itemId} does not exist in /${constants.ON_SELECT}`,
+              });
+            }
 
     if (itemsIdList && itemId in itemsIdList) {
       if (!item.quantity || item.quantity.count == null) {
@@ -809,14 +816,21 @@ try {
 
     // Check fulfillment objects
     try {
+
       console.info(`Checking fulfillments objects in /${constants.ON_INIT}`);
+      const fulfillmentIdArrayRaw = await RedisService.getKey(
+        `${transaction_id}_fulfillmentIdArray`
+      );
+      const fulfillmentIdArray = fulfillmentIdArrayRaw
+        ? JSON.parse(fulfillmentIdArrayRaw)
+        : null;
       const itemFlfllmntsRaw = await RedisService.getKey(`${transaction_id}_itemFlfllmnts`);
       const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
 
       for (let i = 0; i < (on_init.fulfillments?.length || 0); i++) {
         if (on_init.fulfillments[i].id) {
           const id = on_init.fulfillments[i].id;
-          if (itemFlfllmnts && !Object.values(itemFlfllmnts).includes(id)) {
+          if (fulfillmentIdArray && !fulfillmentIdArray.includes(id)) {
             result.push({
               valid: false,
               code: 20000,
