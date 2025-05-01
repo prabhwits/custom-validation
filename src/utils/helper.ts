@@ -54,6 +54,12 @@ export const hasProperty = (object: any, propetyName: string) => {
   return Object.prototype.hasOwnProperty.call(object, propetyName);
 };
 
+export const isValidISO8601Duration = (value: string): boolean => {
+  const iso8601DurationRegex = /^P(?:\d+Y)?(?:\d+M)?(?:\d+D)?(?:T(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d+)?S)?)?$/;
+  return iso8601DurationRegex.test(value) && value !== "P" && value !== "PT";
+};
+
+
 export const checkTagConditions = async (
   message: any,
   context: any,
@@ -841,8 +847,10 @@ export function compareQuoteObjects(
   const rootKeys1 = obj1 && Object.keys(obj1);
   const rootKeys2 = obj2 && Object.keys(obj2);
 
-  if (rootKeys1?.length !== rootKeys2?.length) {
-    errors.push("Root level properties mismatch");
+  if (rootKeys1.length !== rootKeys2.length) {
+    errors.push(
+      `The quote object length of ${api1} mismatches with the ${api2}`
+    );
     return errors;
   }
 

@@ -1,4 +1,4 @@
-import constants, { ApiSequence } from "../../../../utils/constants";
+import constants, { ApiSequence } from "../../../utils/constants";
 import {
   isObjectEmpty,
   checkContext,
@@ -14,7 +14,7 @@ import {
   validateBapUri,
   validateBppUri,
   addActionToRedisSet,
-} from "../../../../utils/helper";
+} from "../../../utils/helper";
 import _, { isEmpty } from "lodash";
 import {
   calculateDefaultSelectionPrice,
@@ -22,7 +22,7 @@ import {
   mapCustomItemToTreeNode,
   mapCustomizationsToBaseItems,
   mapItemToTreeNode,
-} from "../../../../utils/fb_calculation/default_selection/utils";
+} from "../../../utils/fb_calculation/default_selection/utils";
 import { RedisService } from "ondc-automation-cache-lib";
 
 interface ValidationError {
@@ -245,6 +245,7 @@ export default async function onSearch(
     const prvdrLocId = new Set();
     const onSearchFFTypeSet = new Set();
     const itemsId = new Set();
+    const orderValueSet = new Set();
     let customMenuIds: any = [];
     let customMenu = false;
 
@@ -2063,6 +2064,7 @@ export default async function onSearch(
           }
           const serviceabilitySet = new Set();
           const timingSet = new Set();
+
           tags.forEach((sc: any, t: any) => {
             if (sc.code === "serviceability") {
               if (serviceabilitySet.has(JSON.stringify(sc))) {
@@ -2266,8 +2268,7 @@ export default async function onSearch(
                   }
                 }
               }
-            }
-            if (sc.code === "timing") {
+            } else if (sc.code === "timing") {
               if (timingSet.has(JSON.stringify(sc))) {
                 addError(
                   20006,
@@ -2330,6 +2331,68 @@ export default async function onSearch(
 
               if (!isOrderPresent) {
                 addError(20006, `'Order' type must be present in timing tags`);
+              }
+            } else if (sc.code === "order_value") {
+              // Check if construct is a valid object
+              if (!sc || typeof sc !== "object") {
+                addError(
+                  20000,
+                  `order_value construct /bpp/providers[${i}]/tags[${t}] is invalid or not an object`
+                );
+              }
+
+              // Check if 'list' exists and is an array
+              if (!("list" in sc) || !Array.isArray(sc.list)) {
+                addError(
+                  20000,
+                  `order_value construct /bpp/providers[${i}]/tags[${t}] must have a valid 'list' array`
+                );
+              } else {
+                // Check if list has exactly 1 item
+                if (sc.list.length !== 1) {
+                  addError(
+                    20000,
+                    `order_value construct /bpp/providers[${i}]/tags[${t}] must contain exactly one item in the list, found ${sc.list.length}`
+                  );
+                }
+
+                // Check for min_value in list
+                const minValue = sc.list.find(
+                  (elem: any) => elem.code === "min_value"
+                );
+                if (!minValue) {
+                  addError(
+                    20000,
+                    `order_value construct /bpp/providers[${i}]/tags[${t}] must include an item with code "min_value"`
+                  );
+                } else {
+                  // const serializedSc = JSON.stringify(sc);
+                  orderValueSet.add({
+                    ...minValue,
+                    provider_id: onSearchCatalog["bpp/providers"][i].id,
+                  });
+                  // Check if min_value has a valid value
+                  if (!("value" in minValue)) {
+                    addError(
+                      20000,
+                      `order_value construct /bpp/providers[${i}]/tags[${t}] is missing value for code "min_value"`
+                    );
+                  } else {
+                    // Validate value is a non-negative number
+                    const value = parseFloat(minValue.value);
+                    if (isNaN(value)) {
+                      addError(
+                        20000,
+                        `value for code "min_value" in order_value construct /bpp/providers[${i}]/tags[${t}] must be a valid number, received "${minValue.value}"`
+                      );
+                    } else if (value < 0) {
+                      addError(
+                        20000,
+                        `value for code "min_value" in order_value construct /bpp/providers[${i}]/tags[${t}] must be non-negative, received ${value}`
+                      );
+                    }
+                  }
+                }
               }
             }
           });
@@ -2711,6 +2774,17 @@ export default async function onSearch(
         `Error while checking default flow in /${constants.ON_SEARCH}, ${error.stack}`
       );
       addError(20006, `Error while checking default flow: ${error.message}`);
+    }
+    if (!_.isEmpty(orderValueSet)) {
+      console.log(
+        "JSON.stringify([...orderValueSet])",
+        JSON.stringify([...orderValueSet])
+      );
+      await RedisService.setKey(
+        `${transaction_id}_${ApiSequence.ON_SEARCH}_orderValueSet`,
+        JSON.stringify([...orderValueSet]),
+        TTL_IN_SECONDS
+      );
     }
   } catch (error: any) {
     console.error(

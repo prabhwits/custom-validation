@@ -19,11 +19,11 @@ import {
   addFulfillmentIdToRedisSet,
   addActionToRedisSet,
   tagFinder,
-} from "../../../../utils/helper";
+} from "../../../utils/helper";
 import constants, {
   ApiSequence,
   PAYMENT_STATUS,
-} from "../../../../utils/constants";
+} from "../../../utils/constants";
 
 // Minimal interface for validation error
 interface ValidationError {
@@ -740,7 +740,11 @@ async function validateFulfillments(
       }
     }
   }
-  await RedisService.setKey('fulfillmentsItemsSet', JSON.stringify(order?.fulfillments), TTL_IN_SECONDS);
+  await RedisService.setKey(
+    "fulfillmentsItemsSet",
+    JSON.stringify(order?.fulfillments),
+    TTL_IN_SECONDS
+  );
 }
 
 async function validatePayment(
@@ -1137,7 +1141,9 @@ async function validateItems(
       redisKeys.push(RedisService.getKey(`${transactionId}_parentItemIdSet`));
     }
     if (checkTags) {
-      redisKeys.push(RedisService.getKey(`${transactionId}_select_customIdArray`));
+      redisKeys.push(
+        RedisService.getKey(`${transactionId}_select_customIdArray`)
+      );
     }
     if (checkLocationId) {
       redisKeys.push(RedisService.getKey(`${transactionId}_onSearchItems`));
@@ -1148,20 +1154,38 @@ async function validateItems(
         try {
           return await key;
         } catch (error: any) {
-          console.error(`!!Error fetching Redis key ${index}: ${error.message}`);
+          console.error(
+            `!!Error fetching Redis key ${index}: ${error.message}`
+          );
           return null;
         }
       })
     );
 
-    const [itemFlfllmntsRaw, itemsIdListRaw, parentItemIdSetRaw, customIdArrayRaw, onSearchItemsRaw] = redisResults;
+    const [
+      itemFlfllmntsRaw,
+      itemsIdListRaw,
+      parentItemIdSetRaw,
+      customIdArrayRaw,
+      onSearchItemsRaw,
+    ] = redisResults;
 
-    const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
+    const itemFlfllmnts = itemFlfllmntsRaw
+      ? JSON.parse(itemFlfllmntsRaw)
+      : null;
     let itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
-    const parentItemIdSet = parentItemIdSetRaw ? JSON.parse(parentItemIdSetRaw) : null;
-    const select_customIdArray = customIdArrayRaw ? JSON.parse(customIdArrayRaw) : null;
-    const allOnSearchItems = onSearchItemsRaw ? JSON.parse(onSearchItemsRaw) : [];
-    const onSearchItems = Array.isArray(allOnSearchItems) ? allOnSearchItems.flat() : [];
+    const parentItemIdSet = parentItemIdSetRaw
+      ? JSON.parse(parentItemIdSetRaw)
+      : null;
+    const select_customIdArray = customIdArrayRaw
+      ? JSON.parse(customIdArrayRaw)
+      : null;
+    const allOnSearchItems = onSearchItemsRaw
+      ? JSON.parse(onSearchItemsRaw)
+      : [];
+    const onSearchItems = Array.isArray(allOnSearchItems)
+      ? allOnSearchItems.flat()
+      : [];
 
     let itemsCountChange = false;
 
@@ -1223,7 +1247,10 @@ async function validateItems(
             code: 20000,
             description: `items[${i}].quantity.count is missing or undefined for Item ${itemId} in /${currentApi}`,
           });
-        } else if (!Number.isInteger(item.quantity.count) || item.quantity.count <= 0) {
+        } else if (
+          !Number.isInteger(item.quantity.count) ||
+          item.quantity.count <= 0
+        ) {
           result.push({
             valid: false,
             code: 20000,
@@ -1246,12 +1273,19 @@ async function validateItems(
       if (checkParentItemId) {
         const tags = Array.isArray(item.tags) ? item.tags : [];
         const typeTag = tags.find((tag: any) => tag.code === "type");
-        const typeValue = typeTag?.list?.find((listItem: any) => listItem.code === "type")?.value;
+        const typeValue = typeTag?.list?.find(
+          (listItem: any) => listItem.code === "type"
+        )?.value;
         const isItemType = typeValue === "item";
         const isCustomizationType = typeValue === "customization";
 
-        if ((isItemType || isCustomizationType) && (!item.parent_item_id || item.parent_item_id.trim() === "")) {
-          console.info(`Missing parent_item_id for item ID: ${itemId} at index ${i}`);
+        if (
+          (isItemType || isCustomizationType) &&
+          (!item.parent_item_id || item.parent_item_id.trim() === "")
+        ) {
+          console.info(
+            `Missing parent_item_id for item ID: ${itemId} at index ${i}`
+          );
           result.push({
             valid: false,
             code: 20000,
@@ -1260,7 +1294,9 @@ async function validateItems(
         }
 
         if (item.parent_item_id && !(isItemType || isCustomizationType)) {
-          console.info(`Missing type tag for item with parent_item_id: ${item.parent_item_id}, ID: ${itemId} at index ${i}`);
+          console.info(
+            `Missing type tag for item with parent_item_id: ${item.parent_item_id}, ID: ${itemId} at index ${i}`
+          );
           result.push({
             valid: false,
             code: 20000,
@@ -1268,7 +1304,11 @@ async function validateItems(
           });
         }
 
-        if (item.parent_item_id && parentItemIdSet && !parentItemIdSet.includes(item.parent_item_id)) {
+        if (
+          item.parent_item_id &&
+          parentItemIdSet &&
+          !parentItemIdSet.includes(item.parent_item_id)
+        ) {
           result.push({
             valid: false,
             code: 20000,
@@ -1279,16 +1319,22 @@ async function validateItems(
         if (checkTags && isCustomizationType && select_customIdArray) {
           const parentTag = tags.find((tag: any) => tag.code === "parent");
           if (!parentTag) {
-            console.info(`Missing parent tag for customization item ID: ${itemId} at index ${i}`);
+            console.info(
+              `Missing parent tag for customization item ID: ${itemId} at index ${i}`
+            );
             result.push({
               valid: false,
               code: 20000,
               description: `items[${i}]: customization items must have a parent tag in /${currentApi}`,
             });
           } else {
-            const parentId = parentTag.list?.find((listItem: any) => listItem.code === "id")?.value;
+            const parentId = parentTag.list?.find(
+              (listItem: any) => listItem.code === "id"
+            )?.value;
             if (!parentId || checkItemTag(item, select_customIdArray)) {
-              console.info(`Invalid or missing parent tag id for customization item ID: ${itemId} at index ${i}`);
+              console.info(
+                `Invalid or missing parent tag id for customization item ID: ${itemId} at index ${i}`
+              );
               result.push({
                 valid: false,
                 code: 20000,
@@ -1332,7 +1378,11 @@ async function validateItems(
       // }
 
       // Validate custom ID tags (existing logic)
-      if (checkTags && select_customIdArray && checkItemTag(item, select_customIdArray)) {
+      if (
+        checkTags &&
+        select_customIdArray &&
+        checkItemTag(item, select_customIdArray)
+      ) {
         result.push({
           valid: false,
           code: 20000,
@@ -1352,7 +1402,9 @@ async function validateItems(
 
     return result;
   } catch (error: any) {
-    console.error(`!!Error while validating items in /${currentApi} for transaction ${transactionId}: ${error.stack}`);
+    console.error(
+      `!!Error while validating items in /${currentApi} for transaction ${transactionId}: ${error.stack}`
+    );
     result.push({
       valid: false,
       code: 20000,
