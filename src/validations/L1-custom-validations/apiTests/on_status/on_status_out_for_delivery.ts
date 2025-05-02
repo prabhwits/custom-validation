@@ -46,7 +46,7 @@ const ERROR_CODES = {
 const TTL_IN_SECONDS: number = Number(process.env.TTL_IN_SECONDS) || 3600;
 
 // Utility function to create error objects
-const createError = (description: string, code: number): ValidationError => ({
+const addError = (description: string, code: number): ValidationError => ({
   valid: false,
   code,
   description,
@@ -60,13 +60,13 @@ async function validateContext(
   const contextRes = checkContext(context, constants.ON_STATUS);
   if (!contextRes?.valid) {
     contextRes?.ERRORS.forEach((error: string) =>
-      result.push(createError(error, ERROR_CODES.INVALID_RESPONSE))
+      result.push(addError(error, ERROR_CODES.INVALID_RESPONSE))
     );
   }
 
   if (checkBppIdOrBapId(context.bap_id)) {
     result.push(
-      createError(
+      addError(
         "context/bap_id should not be a url",
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -74,7 +74,7 @@ async function validateContext(
   }
   if (checkBppIdOrBapId(context.bpp_id)) {
     result.push(
-      createError(
+      addError(
         "context/bpp_id should not be a url",
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -84,7 +84,7 @@ async function validateContext(
   const domain = await RedisService.getKey(`${transaction_id}_domain`);
   if (!_.isEqual(context.domain?.split(":")[1], domain)) {
     result.push(
-      createError(
+      addError(
         "Domain should be same in each action",
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -97,7 +97,7 @@ async function validateContext(
   const searchContext = searchContextRaw ? JSON.parse(searchContextRaw) : null;
   if (searchContext && !_.isEqual(searchContext.city, context.city)) {
     result.push(
-      createError(
+      addError(
         `City code mismatch in /${constants.SEARCH} and /${constants.ON_STATUS}`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -119,7 +119,7 @@ async function validateMessageId(
     );
     if (!isMsgIdNotPresent) {
       result.push(
-        createError(
+        addError(
           `Message id should not be same with previous calls`,
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -134,7 +134,7 @@ async function validateMessageId(
       : null;
     if (pickedMessageId && pickedMessageId === context.message_id) {
       result.push(
-        createError(
+        addError(
           `Message_id cannot be the same for ${constants.ON_STATUS}.picked and ${constants.ON_STATUS}.out_for_delivery`,
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -151,7 +151,7 @@ async function validateMessageId(
       `!!Error while checking message id for /${constants.ON_STATUS_OUT_FOR_DELIVERY}, ${error.stack}`
     );
     result.push(
-      createError(
+      addError(
         "Internal error while checking message ID",
         ERROR_CODES.INTERNAL_ERROR
       )
@@ -171,7 +171,7 @@ async function validateOrder(
   const cnfrmOrdrId = cnfrmOrdrIdRaw ? JSON.parse(cnfrmOrdrIdRaw) : null;
   if (cnfrmOrdrId && order.id !== cnfrmOrdrId) {
     result.push(
-      createError(
+      addError(
         `Order id in /${constants.CONFIRM} and /${constants.ON_STATUS}_${state} do not match`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -180,7 +180,7 @@ async function validateOrder(
 
   if (order.state !== "In-progress") {
     result.push(
-      createError(
+      addError(
         `order/state should be "In-progress" for /${constants.ON_STATUS}_${state}`,
         ERROR_CODES.INVALID_ORDER_STATE
       )
@@ -193,7 +193,7 @@ async function validateOrder(
   const providerId = providerIdRaw ? JSON.parse(providerIdRaw) : null;
   if (providerId && order.provider?.id !== providerId) {
     result.push(
-      createError(
+      addError(
         `Provider Id mismatches in /${constants.ON_SEARCH} and /${constants.ON_STATUS}_${state}`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -206,7 +206,7 @@ async function validateOrder(
   const providerLoc = providerLocRaw ? JSON.parse(providerLocRaw) : null;
   if (providerLoc && order.provider?.locations?.[0]?.id !== providerLoc) {
     result.push(
-      createError(
+      addError(
         `provider.locations[0].id mismatches in /${constants.ON_SEARCH} and /${constants.ON_STATUS}_${state}`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -251,7 +251,7 @@ async function validateFulfillments(
   );
   if (!deliveryObjArr.length) {
     result.push(
-      createError(
+      addError(
         `Delivery object is mandatory for ${ApiSequence.ON_STATUS_OUT_FOR_DELIVERY}`,
         ERROR_CODES.ORDER_VALIDATION_FAILURE
       )
@@ -260,7 +260,7 @@ async function validateFulfillments(
     const deliveryObj = deliveryObjArr[0];
     if (!deliveryObj.tags) {
       result.push(
-        createError(
+        addError(
           `Tags are mandatory in Delivery Fulfillment for ${ApiSequence.ON_STATUS_OUT_FOR_DELIVERY}`,
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -271,7 +271,7 @@ async function validateFulfillments(
       );
       if (!routingTagArr.length) {
         result.push(
-          createError(
+          addError(
             `RoutingTag object is mandatory in Tags of Delivery Object for ${ApiSequence.ON_STATUS_OUT_FOR_DELIVERY}`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -281,7 +281,7 @@ async function validateFulfillments(
         const routingTagList = routingTag.list;
         if (!routingTagList) {
           result.push(
-            createError(
+            addError(
               `RoutingTagList is mandatory in RoutingTag of Delivery Object for ${ApiSequence.ON_STATUS_OUT_FOR_DELIVERY}`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -292,7 +292,7 @@ async function validateFulfillments(
           );
           if (!routingTagTypeArr.length) {
             result.push(
-              createError(
+              addError(
                 `RoutingTagListType object is mandatory in RoutingTag/List of Delivery Object for ${ApiSequence.ON_STATUS_OUT_FOR_DELIVERY}`,
                 ERROR_CODES.INVALID_RESPONSE
               )
@@ -301,7 +301,7 @@ async function validateFulfillments(
             const routingTagType = routingTagTypeArr[0];
             if (!ROUTING_ENUMS.includes(routingTagType.value)) {
               result.push(
-                createError(
+                addError(
                   `RoutingTagListType Value is mandatory in RoutingTag of Delivery Object for ${ApiSequence.ON_STATUS_OUT_FOR_DELIVERY} and should be equal to 'P2P' or 'P2H2P'`,
                   ERROR_CODES.INVALID_RESPONSE
                 )
@@ -317,16 +317,13 @@ async function validateFulfillments(
     const ff = fulfillment;
     if (!ff.id) {
       result.push(
-        createError(
-          `Fulfillment Id must be present`,
-          ERROR_CODES.INVALID_RESPONSE
-        )
+        addError(`Fulfillment Id must be present`, ERROR_CODES.INVALID_RESPONSE)
       );
     }
 
     if (!ff.type) {
       result.push(
-        createError(
+        addError(
           `Fulfillment type does not exist in /${constants.ON_STATUS}_${state}`,
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -341,14 +338,14 @@ async function validateFulfillments(
       if (ffTracking !== null) {
         if (typeof ff.tracking !== "boolean") {
           result.push(
-            createError(
+            addError(
               `Tracking must be present for fulfillment ID: ${ff.id} in boolean form`,
               ERROR_CODES.INVALID_RESPONSE
             )
           );
         } else if (ffTracking !== ff.tracking) {
           result.push(
-            createError(
+            addError(
               `Fulfillment Tracking mismatch with the ${constants.ON_SELECT} call`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -359,7 +356,7 @@ async function validateFulfillments(
 
     if (!itemFlfllmnts || !Object.values(itemFlfllmnts).includes(ff.id)) {
       result.push(
-        createError(
+        addError(
           `Fulfillment id ${ff.id || "missing"} does not exist in /${
             constants.ON_SELECT
           }`,
@@ -373,7 +370,7 @@ async function validateFulfillments(
       ffDesc?.hasOwnProperty("code") && ffDesc.code === "Out-for-delivery";
     if (!ffStateCheck) {
       result.push(
-        createError(
+        addError(
           `Fulfillment state should be 'Out-for-delivery' in /${constants.ON_STATUS}_${state}`,
           ERROR_CODES.INVALID_ORDER_STATE
         )
@@ -382,7 +379,7 @@ async function validateFulfillments(
 
     if (!ff.start || !ff.end) {
       result.push(
-        createError(
+        addError(
           `fulfillments[${ff.id}] start and end locations are mandatory`,
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -394,7 +391,7 @@ async function validateFulfillments(
       !compareCoordinates(ff.start.location.gps, providerGps)
     ) {
       result.push(
-        createError(
+        addError(
           `store gps location /fulfillments[${ff.id}]/start/location/gps can't change`,
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -406,7 +403,7 @@ async function validateFulfillments(
       !_.isEqual(ff.start?.location?.descriptor?.name, providerName)
     ) {
       result.push(
-        createError(
+        addError(
           `store name /fulfillments[${ff.id}]/start/location/descriptor/name can't change`,
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -415,7 +412,7 @@ async function validateFulfillments(
 
     if (ff.end?.location?.gps && !_.isEqual(ff.end.location.gps, buyerGps)) {
       result.push(
-        createError(
+        addError(
           `fulfillments[${ff.id}].end.location gps is not matching with gps in /${constants.SELECT}`,
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -427,7 +424,7 @@ async function validateFulfillments(
       !_.isEqual(ff.end.location.address.area_code, buyerAddr)
     ) {
       result.push(
-        createError(
+        addError(
           `fulfillments[${ff.id}].end.location.address.area_code is not matching with area_code in /${constants.SELECT}`,
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -451,7 +448,7 @@ async function validateFulfillments(
     const endRange = end?.time?.range;
     if (!startRange || !endRange) {
       result.push(
-        createError(
+        addError(
           `Delivery fulfillment (${deliveryFulfillment[0].id}) has incomplete time range.`,
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -486,7 +483,7 @@ async function validateFulfillments(
       );
       if (fulfillmentRangeErrors) {
         fulfillmentRangeErrors.forEach((error: string) => {
-          result.push(createError(`${error}`, ERROR_CODES.INVALID_RESPONSE));
+          result.push(addError(`${error}`, ERROR_CODES.INVALID_RESPONSE));
         });
       }
     }
@@ -496,7 +493,7 @@ async function validateFulfillments(
   if (["6", "2", "3", "5"].includes(flow)) {
     if (!order.fulfillments?.length) {
       result.push(
-        createError(
+        addError(
           `missingFulfillments is mandatory for ${ApiSequence.ON_STATUS_OUT_FOR_DELIVERY}`,
           ERROR_CODES.ORDER_VALIDATION_FAILURE
         )
@@ -533,6 +530,7 @@ async function validateFulfillments(
             delete obj2?.end?.instructions;
             delete obj2?.start?.time?.timestamp;
             delete obj2?.state;
+            delete obj1?.state;
           }
           apiSeq =
             obj2.type === "Cancel"
@@ -544,11 +542,11 @@ async function validateFulfillments(
               : ApiSequence.ON_STATUS_PENDING;
           const errors = compareFulfillmentObject(obj1, obj2, keys, i, apiSeq);
           errors.forEach((item: any) => {
-            result.push(createError(item.errMsg, ERROR_CODES.INVALID_RESPONSE));
+            result.push(addError(item.errMsg, ERROR_CODES.INVALID_RESPONSE));
           });
         } else {
           result.push(
-            createError(
+            addError(
               `Missing fulfillment type '${obj1.type}' in ${ApiSequence.ON_STATUS_OUT_FOR_DELIVERY} as compared to ${apiSeq}`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -562,7 +560,7 @@ async function validateFulfillments(
       );
       if (!deliveryObjArr.length) {
         result.push(
-          createError(
+          addError(
             `Delivery fulfillment must be present in ${ApiSequence.ON_STATUS_OUT_FOR_DELIVERY}`,
             ERROR_CODES.ORDER_VALIDATION_FAILURE
           )
@@ -597,7 +595,7 @@ async function validateTimestamps(
   const cnfrmTmpstmp = cnfrmTmpstmpRaw ? JSON.parse(cnfrmTmpstmpRaw) : null;
   if (cnfrmTmpstmp && !_.isEqual(cnfrmTmpstmp, order.created_at)) {
     result.push(
-      createError(
+      addError(
         `Created At timestamp for /${constants.ON_STATUS}_${state} should be equal to context timestamp at ${constants.CONFIRM}`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -612,7 +610,7 @@ async function validateTimestamps(
     : null;
   if (onCnfrmTmpstmp && _.gte(onCnfrmTmpstmp, context.timestamp)) {
     result.push(
-      createError(
+      addError(
         `Timestamp for /${constants.ON_CONFIRM} api cannot be greater than or equal to /${constants.ON_STATUS}_${state} api`,
         ERROR_CODES.OUT_OF_SEQUENCE
       )
@@ -625,7 +623,7 @@ async function validateTimestamps(
   const pickedTmpstmp = pickedTmpstmpRaw ? JSON.parse(pickedTmpstmpRaw) : null;
   if (pickedTmpstmp && _.gte(pickedTmpstmp, context.timestamp)) {
     result.push(
-      createError(
+      addError(
         `Timestamp for /${constants.ON_STATUS}_picked api cannot be greater than or equal to /${constants.ON_STATUS}_${state} api`,
         ERROR_CODES.OUT_OF_SEQUENCE
       )
@@ -634,7 +632,7 @@ async function validateTimestamps(
 
   if (!areTimestampsLessThanOrEqualTo(order.updated_at, context.timestamp)) {
     result.push(
-      createError(
+      addError(
         `order.updated_at timestamp should be less than or equal to context timestamp for /${constants.ON_STATUS}_${state} api`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -669,7 +667,7 @@ async function validateOutForDeliveryTimestamps(
 
       if (!outForDeliveryTime) {
         result.push(
-          createError(
+          addError(
             `Out_for_delivery timestamp is missing`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -677,7 +675,7 @@ async function validateOutForDeliveryTimestamps(
       } else {
         if (!_.lte(outForDeliveryTime, context.timestamp)) {
           result.push(
-            createError(
+            addError(
               `Fulfillments start timestamp should match context/timestamp and can't be future dated`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -686,7 +684,7 @@ async function validateOutForDeliveryTimestamps(
 
         if (!_.gte(order.updated_at, outForDeliveryTime)) {
           result.push(
-            createError(
+            addError(
               `order/updated_at timestamp can't be less than the Out_for_delivery time`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -695,7 +693,7 @@ async function validateOutForDeliveryTimestamps(
 
         if (!_.gte(context.timestamp, order.updated_at)) {
           result.push(
-            createError(
+            addError(
               `order/updated_at timestamp can't be future dated (should match context/timestamp)`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -713,7 +711,7 @@ async function validateOutForDeliveryTimestamps(
 
   if (!orderOutForDelivery) {
     result.push(
-      createError(
+      addError(
         `fulfillments/state should be ${constants.ORDER_OUT_FOR_DELIVERY} for /${constants.ON_STATUS}_${constants.ORDER_OUT_FOR_DELIVERY}`,
         ERROR_CODES.INVALID_ORDER_STATE
       )
@@ -734,7 +732,7 @@ async function validatePayment(
   const cnfrmpymnt = cnfrmpymntRaw ? JSON.parse(cnfrmpymntRaw) : null;
   if (cnfrmpymnt && !_.isEqual(cnfrmpymnt, order.payment)) {
     result.push(
-      createError(
+      addError(
         `payment object mismatches in /${constants.CONFIRM} & /${constants.ON_STATUS}_${state}`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -746,7 +744,7 @@ async function validatePayment(
     parseFloat(order.quote?.price?.value)
   ) {
     result.push(
-      createError(
+      addError(
         `Quoted price (/${constants.ON_STATUS}_${state}) doesn't match with the amount in payment.params`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -756,7 +754,7 @@ async function validatePayment(
   const status = payment_status(order.payment, flow);
   if (!status) {
     result.push(
-      createError(
+      addError(
         `Transaction_id missing in message/order/payment`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -768,7 +766,7 @@ async function validatePayment(
     order.payment?.status !== PAYMENT_STATUS.NOT_PAID
   ) {
     result.push(
-      createError(
+      addError(
         `Payment status should be ${PAYMENT_STATUS.NOT_PAID} for ${FLOW.FLOW2A} flow (Cash on Delivery)`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -784,7 +782,7 @@ async function validateQuote(
 ): Promise<void> {
   if (!sumQuoteBreakUp(order.quote)) {
     result.push(
-      createError(
+      addError(
         `item quote breakup prices for ${constants.ON_STATUS}_${state} should be equal to the total price`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -801,7 +799,7 @@ async function validateQuote(
   );
   if (quoteErrors) {
     quoteErrors.forEach((error: string) =>
-      result.push(createError(error, ERROR_CODES.INVALID_RESPONSE))
+      result.push(addError(error, ERROR_CODES.INVALID_RESPONSE))
     );
   }
 
@@ -812,7 +810,7 @@ async function validateQuote(
   const onStatusQuotePrice = parseFloat(order.quote?.price?.value);
   if (onConfirmQuotePrice && onConfirmQuotePrice !== onStatusQuotePrice) {
     result.push(
-      createError(
+      addError(
         `Quoted Price in /${constants.ON_STATUS}_${state} INR ${onStatusQuotePrice} does not match with the quoted price in /${constants.ON_CONFIRM} INR ${onConfirmQuotePrice}`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -832,7 +830,7 @@ async function validateBilling(
   if (billingErrors) {
     billingErrors.forEach((error: string) =>
       result.push(
-        createError(
+        addError(
           `${error} when compared with confirm billing object`,
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -856,24 +854,24 @@ async function validateTags(
     `${transaction_id}_${ApiSequence.ON_SEARCH}np_type`
   );
 
-  if (np_type_arr.length === 0) {
-    result.push(
-      createError(
-        `np_type not found in ${constants.ON_STATUS}_${state}`,
-        ERROR_CODES.INVALID_RESPONSE
-      )
-    );
-  } else {
-    const np_type = np_type_arr[0].value;
-    if (np_type !== np_type_on_search) {
-      result.push(
-        createError(
-          `np_type of ${constants.ON_SEARCH} is not same to np_type of ${constants.ON_STATUS}_${state}`,
-          ERROR_CODES.INVALID_RESPONSE
-        )
-      );
-    }
-  }
+  // if (np_type_arr.length === 0) {
+  //   result.push(
+  //     addError(
+  //       `np_type not found in ${constants.ON_STATUS}_${state}`,
+  //       ERROR_CODES.INVALID_RESPONSE
+  //     )
+  //   );
+  // } else {
+  //   const np_type = np_type_arr[0].value;
+  //   if (np_type !== np_type_on_search) {
+  //     result.push(
+  //       addError(
+  //         `np_type of ${constants.ON_SEARCH} is not same to np_type of ${constants.ON_STATUS}_${state}`,
+  //         ERROR_CODES.INVALID_RESPONSE
+  //       )
+  //     );
+  //   }
+  // }
 
   let tax_number = "";
   let provider_tax_number = "";
@@ -881,7 +879,7 @@ async function validateTags(
     if (item.code === "tax_number") {
       if (item.value.length !== 15) {
         result.push(
-          createError(
+          addError(
             `Number of digits in tax number in message.order.tags[0].list should be 15`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -892,7 +890,7 @@ async function validateTags(
           /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
         if (!taxNumberPattern.test(tax_number)) {
           result.push(
-            createError(
+            addError(
               `Invalid format for tax_number in ${constants.ON_STATUS}_${state}`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -903,7 +901,7 @@ async function validateTags(
     if (item.code === "provider_tax_number") {
       if (item.value.length !== 10) {
         result.push(
-          createError(
+          addError(
             `Number of digits in provider tax number in message.order.tags[0].list should be 10`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -913,7 +911,7 @@ async function validateTags(
         const taxNumberPattern = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
         if (!taxNumberPattern.test(provider_tax_number)) {
           result.push(
-            createError(
+            addError(
               `Invalid format for provider_tax_number in ${constants.ON_STATUS}_${state}`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -923,35 +921,35 @@ async function validateTags(
     }
   });
 
-  if (!tax_number) {
-    result.push(
-      createError(
-        `tax_number must be present for ${constants.ON_STATUS}_${state}`,
-        ERROR_CODES.INVALID_RESPONSE
-      )
-    );
-  }
-  if (!provider_tax_number) {
-    result.push(
-      createError(
-        `provider_tax_number must be present for ${constants.ON_STATUS}_${state}`,
-        ERROR_CODES.INVALID_RESPONSE
-      )
-    );
-  }
+  // if (!tax_number) {
+  //   result.push(
+  //     addError(
+  //       `tax_number must be present for ${constants.ON_STATUS}_${state}`,
+  //       ERROR_CODES.INVALID_RESPONSE
+  //     )
+  //   );
+  // }
+  // if (!provider_tax_number) {
+  //   result.push(
+  //     addError(
+  //       `provider_tax_number must be present for ${constants.ON_STATUS}_${state}`,
+  //       ERROR_CODES.INVALID_RESPONSE
+  //     )
+  //   );
+  // }
 
   if (tax_number.length === 15 && provider_tax_number.length === 10) {
     const pan_id = tax_number.slice(2, 12);
     if (pan_id !== provider_tax_number && np_type_on_search === "ISN") {
       result.push(
-        createError(
+        addError(
           `Pan_id is different in tax_number and provider_tax_number in message.order.tags[0].list`,
           ERROR_CODES.INVALID_RESPONSE
         )
       );
     } else if (pan_id === provider_tax_number && np_type_on_search === "MSN") {
       result.push(
-        createError(
+        addError(
           `Pan_id shouldn't be same in tax_number and provider_tax_number in message.order.tags[0].list`,
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -966,7 +964,7 @@ async function validateTags(
   if (order.tags && confirm_tags) {
     if (!areGSTNumbersMatching(confirm_tags, order.tags, "bpp_terms")) {
       result.push(
-        createError(
+        addError(
           `Tags should have same and valid gst_number as passed in /${constants.CONFIRM}`,
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -1124,7 +1122,7 @@ const checkOnStatusOutForDelivery = async (
   try {
     if (!data || isObjectEmpty(data)) {
       result.push(
-        createError("JSON cannot be empty", ERROR_CODES.INVALID_RESPONSE)
+        addError("JSON cannot be empty", ERROR_CODES.INVALID_RESPONSE)
       );
       return result;
     }
@@ -1132,7 +1130,7 @@ const checkOnStatusOutForDelivery = async (
     const { context, message } = data;
     if (!message || !context || !message.order || isObjectEmpty(message)) {
       result.push(
-        createError(
+        addError(
           "/context, /message, /order or /message/order is missing or empty",
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -1200,7 +1198,7 @@ const checkOnStatusOutForDelivery = async (
       `!!Some error occurred while checking /${constants.ON_STATUS} API, ${err.stack}`
     );
     result.push(
-      createError(
+      addError(
         "Internal error processing /on_status_out_for_delivery request",
         ERROR_CODES.INTERNAL_ERROR
       )

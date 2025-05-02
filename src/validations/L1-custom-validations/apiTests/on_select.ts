@@ -183,8 +183,6 @@ const onSelect = async (data: any) => {
     );
     const tmpstmp = tmpstmpRaw ? JSON.parse(tmpstmpRaw) : null;
 
-    console.log("timstamp", tmpstmp, context.timestamp);
-
     if (_.gte(tmpstmp, context.timestamp)) {
       result.push({
         valid: false,
@@ -222,7 +220,6 @@ const onSelect = async (data: any) => {
       ? JSON.parse(itemsOnSelectRaw)
       : null;
 
-    console.log("itemsOnSelect", itemsOnSelectRaw, itemsOnSelect);
     const itemsList = message.order.items;
     const selectItems: any = [];
     itemsList.forEach((item: any, index: number) => {
@@ -794,148 +791,6 @@ const onSelect = async (data: any) => {
 
   try {
     console.info(
-      `-x-x-x-x-Quote Breakup ${constants.ON_SELECT} all checks-x-x-x-x`
-    );
-    const itemsIdListRaw = await RedisService.getKey(
-      `${transaction_id}_itemsIdList`
-    );
-    const itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
-    const itemsCtgrsRaw = await RedisService.getKey(
-      `${transaction_id}_itemsCtgrs`
-    );
-    const itemsCtgrs = itemsCtgrsRaw ? JSON.parse(itemsCtgrsRaw) : null;
-    if (on_select.quote) {
-      on_select.quote.breakup.forEach((element: any, i: any) => {
-        const titleType = element["@ondc/org/title_type"];
-        console.info(
-          `Calculating quoted Price Breakup for element ${element.title}`
-        );
-        onSelectPrice += parseFloat(element.price.value);
-        if (titleType === "item") {
-          if (!(element["@ondc/org/item_id"] in itemFlfllmnts)) {
-            console.log("fasly error is coming here",element["@ondc/org/item_id"], JSON.stringify(itemFlfllmnts) )
-            result.push({
-              valid: false,
-              code: 20000,
-              description: `item with id: ${element["@ondc/org/item_id"]} in quote.breakup[${i}] does not exist in items[]`,
-            });
-          }
-          console.info(
-            `Comparing individual item's total price and unit price `
-          );
-          if (!element.hasOwnProperty("item")) {
-            result.push({
-              valid: false,
-              code: 20000,
-              description: `Item's unit price missing in quote.breakup for item id ${element["@ondc/org/item_id"]}`,
-            });
-          } else if (
-            parseFloat(element.item.price.value) *
-              element["@ondc/org/item_quantity"].count !=
-            element.price.value
-          ) {
-            result.push({
-              valid: false,
-              code: 20000,
-              description: `Item's unit and total price mismatch for id: ${element["@ondc/org/item_id"]}`,
-            });
-          }
-        }
-        console.info(`Calculating Items' prices in /${constants.ON_SELECT}`);
-        if (
-          typeof itemsIdList === "object" &&
-          itemsIdList &&
-          element["@ondc/org/item_id"] in itemsIdList
-        ) {
-          if (
-            titleType === "item" ||
-            (titleType === "tax" &&
-              !taxNotInlcusive.includes(
-                itemsCtgrs[element["@ondc/org/item_id"]]
-              ))
-          ) {
-            onSelectItemsPrice += parseFloat(element.price.value);
-          }
-        }
-        if (titleType === "item" ) {
-          if (!(element["@ondc/org/item_id"] in itemFlfllmnts)) {
-            console.log('🫀', itemFlfllmnts)
-            console.log('👔', element["@ondc/org/item_id"])
-            result.push({
-              valid: false,
-              code: 20000,
-              description: `item with id: ${element["@ondc/org/item_id"]} in quote.breakup[${i}] does not exist in items[] (should be a valid item id)`,
-            });
-          }
-        }
-        if (
-          titleType === "packing" ||
-          titleType === "delivery" ||
-          titleType === "misc"
-        ) {
-          if (
-            !fulfillmentIdArray.includes(element["@ondc/org/item_id"])
-          ) {
-            result.push({
-              valid: false,
-              code: 20000,
-              description: `invalid  id: ${element["@ondc/org/item_id"]} in ${titleType} line item (should be a valid fulfillment_id as provided in message.items for the items)`,
-            });
-          }
-        }
-      });
-      await RedisService.setKey(
-        `${transaction_id}_onSelectPrice`,
-        JSON.stringify(on_select.quote.price.value),
-        TTL_IN_SECONDS
-      );
-      onSelectPrice = onSelectPrice.toFixed(2);
-      console.info(
-        `Matching quoted Price ${parseFloat(
-          on_select.quote.price.value
-        )} with Breakup Price ${onSelectPrice}`
-      );
-      if (
-        Math.round(onSelectPrice) !=
-        Math.round(parseFloat(on_select.quote.price.value))
-      ) {
-        result.push({
-          valid: false,
-          code: 20000,
-          description: `quote.price.value ${on_select.quote.price.value} does not match with the price breakup ${onSelectPrice}`,
-        });
-      }
-      const selectedPriceRaw = await RedisService.getKey(
-        `${transaction_id}_selectedPrice`
-      );
-      const selectedPrice = selectedPriceRaw
-        ? JSON.parse(selectedPriceRaw)
-        : null;
-      console.info(
-        `Matching price breakup of items ${onSelectItemsPrice} (/${constants.ON_SELECT}) with selected items price ${selectedPrice} (${constants.SELECT})`
-      );
-      if (
-        typeof selectedPrice === "number" &&
-        onSelectItemsPrice !== selectedPrice
-      ) {
-        result.push({
-          valid: false,
-          code: 20000,
-          description: `Warning: Quoted Price in /${constants.ON_SELECT} INR ${onSelectItemsPrice} does not match with the total price of items in /${constants.SELECT} INR ${selectedPrice} i.e price for the item mismatch in on_search and on_select`,
-        });
-        console.info("Quoted Price and Selected Items price mismatch");
-      }
-    } else {
-      console.error(`Missing quote object in ${constants.ON_SELECT}`);
-    }
-  } catch (error: any) {
-    console.error(
-      `!!Error while checking and comparing the quoted price in /${constants.ON_SELECT}, ${error.stack}`
-    );
-  }
-
-  try {
-    console.info(
       `Checking if delivery line item present in case of Serviceable for ${constants.ON_SELECT}`
     );
     if (on_select.quote) {
@@ -1024,11 +879,11 @@ const onSelect = async (data: any) => {
     );
   }
 
-  let fulfillmentIdArray : any = []
+  let fulfillmentIdArray: any = [];
   try {
     console.info("Checking Fulfillment TAT...");
     on_select.fulfillments.forEach((ff: { [x: string]: any; id: any }) => {
-      if(ff.id) fulfillmentIdArray.push(ff.id)
+      if (ff.id) fulfillmentIdArray.push(ff.id);
       if (!ff["@ondc/org/TAT"]) {
         console.info(
           `Fulfillment TAT must be present for Fulfillment ID: ${ff.id}`
@@ -1040,18 +895,160 @@ const onSelect = async (data: any) => {
         });
       }
     });
-   
+
+    await RedisService.setKey(
+      `${transaction_id}_fulfillmentIdArray`,
+      JSON.stringify(fulfillmentIdArray),
+      TTL_IN_SECONDS
+    );
   } catch (error: any) {
     console.info(
       `Error while checking fulfillments TAT in /${constants.ON_SELECT}`
     );
   }
-  
-  await RedisService.setKey(
-    `${transaction_id}_fulfillmentIdArray`,
-    JSON.stringify(fulfillmentIdArray),
-    TTL_IN_SECONDS
-  );
+
+  try {
+    console.info(
+      `-x-x-x-x-Quote Breakup ${constants.ON_SELECT} all checks-x-x-x-x`
+    );
+    const itemsIdListRaw = await RedisService.getKey(
+      `${transaction_id}_itemsIdList`
+    );
+    const itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
+    const itemsCtgrsRaw = await RedisService.getKey(
+      `${transaction_id}_itemsCtgrs`
+    );
+    const itemsCtgrs = itemsCtgrsRaw ? JSON.parse(itemsCtgrsRaw) : null;
+    if (on_select.quote) {
+      on_select.quote.breakup.forEach((element: any, i: any) => {
+        const titleType = element["@ondc/org/title_type"];
+        console.info(
+          `Calculating quoted Price Breakup for element ${element.title}`
+        );
+        onSelectPrice += parseFloat(element.price.value);
+        if (titleType === "item") {
+          if (!(element["@ondc/org/item_id"] in itemFlfllmnts)) {
+            console.log(
+              "fasly error is coming here",
+              element["@ondc/org/item_id"],
+              JSON.stringify(itemFlfllmnts)
+            );
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `item with id: ${element["@ondc/org/item_id"]} in quote.breakup[${i}] does not exist in items[]`,
+            });
+          }
+          console.info(
+            `Comparing individual item's total price and unit price `
+          );
+          if (!element.hasOwnProperty("item")) {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `Item's unit price missing in quote.breakup for item id ${element["@ondc/org/item_id"]}`,
+            });
+          } else if (
+            parseFloat(element.item.price.value) *
+              element["@ondc/org/item_quantity"].count !=
+            element.price.value
+          ) {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `Item's unit and total price mismatch for id: ${element["@ondc/org/item_id"]}`,
+            });
+          }
+        }
+        console.info(`Calculating Items' prices in /${constants.ON_SELECT}`);
+        if (
+          typeof itemsIdList === "object" &&
+          itemsIdList &&
+          element["@ondc/org/item_id"] in itemsIdList
+        ) {
+          if (
+            titleType === "item" ||
+            (titleType === "tax" &&
+              !taxNotInlcusive.includes(
+                itemsCtgrs[element["@ondc/org/item_id"]]
+              ))
+          ) {
+            onSelectItemsPrice += parseFloat(element.price.value);
+          }
+        }
+        if (titleType === "item") {
+          if (!(element["@ondc/org/item_id"] in itemFlfllmnts)) {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `item with id: ${element["@ondc/org/item_id"]} in quote.breakup[${i}] does not exist in items[] (should be a valid item id)`,
+            });
+          }
+        }
+        if (
+          titleType === "packing" ||
+          titleType === "delivery" ||
+          titleType === "misc"
+        ) {
+          if (!fulfillmentIdArray.includes(element["@ondc/org/item_id"])) {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `invalid  id: ${element["@ondc/org/item_id"]} in ${titleType} line item (should be a valid fulfillment_id as provided in message.items for the items)`,
+            });
+          }
+        }
+      });
+      await RedisService.setKey(
+        `${transaction_id}_onSelectPrice`,
+        JSON.stringify(on_select.quote.price.value),
+        TTL_IN_SECONDS
+      );
+      onSelectPrice = onSelectPrice.toFixed(2);
+      console.info(
+        `Matching quoted Price ${parseFloat(
+          on_select.quote.price.value
+        )} with Breakup Price ${onSelectPrice}`
+      );
+      if (
+        Math.round(onSelectPrice) !=
+        Math.round(parseFloat(on_select.quote.price.value))
+      ) {
+        result.push({
+          valid: false,
+          code: 20000,
+          description: `quote.price.value ${on_select.quote.price.value} does not match with the price breakup ${onSelectPrice}`,
+        });
+      }
+      const selectedPriceRaw = await RedisService.getKey(
+        `${transaction_id}_selectedPrice`
+      );
+      const selectedPrice = selectedPriceRaw
+        ? JSON.parse(selectedPriceRaw)
+        : null;
+      console.info(
+        `Matching price breakup of items ${onSelectItemsPrice} (/${constants.ON_SELECT}) with selected items price ${selectedPrice} (${constants.SELECT})`
+      );
+      if (
+        typeof selectedPrice === "number" &&
+        onSelectItemsPrice !== selectedPrice
+      ) {
+        result.push({
+          valid: false,
+          code: 20000,
+          description: `Warning: Quoted Price in /${constants.ON_SELECT} INR ${onSelectItemsPrice} does not match with the total price of items in /${constants.SELECT} INR ${selectedPrice} i.e price for the item mismatch in on_search and on_select`,
+        });
+        console.info("Quoted Price and Selected Items price mismatch");
+      }
+    } else {
+      console.error(`Missing quote object in ${constants.ON_SELECT}`);
+    }
+  } catch (error: any) {
+    console.error(
+      `!!Error while checking and comparing the quoted price in /${constants.ON_SELECT}, ${error.stack}`
+    );
+  }
+
   try {
     console.info("Checking fulfillment.id, fulfillment.type and tracking");
     on_select.fulfillments.forEach(async (ff: any) => {

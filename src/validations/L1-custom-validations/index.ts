@@ -62,7 +62,6 @@ export async function performL1CustomValidations(
 
       break;
   }
-  console.log("resulttttt", result);
   return [...result];
   return [
     {

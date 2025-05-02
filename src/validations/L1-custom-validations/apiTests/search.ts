@@ -118,7 +118,6 @@ export default async function search(payload: any): Promise<ValidationOutput> {
         payment["@ondc/org/buyer_app_finder_fee_amount"]
       );
 
-      console.log("buyerFF", buyerFF);
       if (!isNaN(buyerFF)) {
         await RedisService.setKey(
           `${context.transaction_id}_${ApiSequence.SEARCH}_buyerFF`,

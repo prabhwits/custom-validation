@@ -1267,16 +1267,12 @@ try {
       const on_select_quoteRaw = await RedisService.getKey(
         `${transaction_id}_quoteObj`
       );
+      
       const on_select_quote = on_select_quoteRaw
         ? JSON.parse(on_select_quoteRaw)
         : null;
 
       if (on_select_quote) {
-        console.log(
-          "quoteDiff",
-          JSON.stringify(on_select_quote),
-          JSON.stringify(on_init.quote)
-        );
         const quoteErrors = compareQuoteObjects(
           on_select_quote,
           on_init.quote,
