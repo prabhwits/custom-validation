@@ -34,6 +34,7 @@ const onSelect = async (data: any) => {
   const { message, context } = data;
   const TTL_IN_SECONDS: number = Number(process.env.TTL_IN_SECONDS) || 3600;
   const { transaction_id } = context;
+  const error = data?.error;
 
   if (!data || isObjectEmpty(data)) {
     return [
@@ -725,6 +726,121 @@ const onSelect = async (data: any) => {
     );
   }
 
+  if (error) {
+   
+    try {
+      const breakup_msg = message.order.quote.breakup;
+      const msg_err: string = error.message;
+      const msg_err_code: string = error.code;
+      const itemsIdListRaw: any = await RedisService.getKey(
+        `${transaction_id}_itemsIdList`
+      );
+      const itemsIdList: any = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
+
+      console.info(
+        `Checking for Valid error.message and Item Id and error.message.item_id Mapping in /ON_SELECT_OUT_OF_STOCK`
+      );
+
+      if (msg_err_code === '40002') {
+        let errorArray: any = '';
+        try {
+          errorArray = JSON.parse(msg_err);
+        } catch (error: any) {
+          console.error(`!!Error while Checking for Valid error.message and paring it ${error.message} ${error.stack}`);
+        }
+        if (!Array.isArray(errorArray)) {
+          result.push({
+            valid: false,
+            code: 20006,
+            description: `The error.message provided in the ${ApiSequence.ON_SELECT_OUT_OF_STOCK} should be in the form of an array with proper error_code and item_id. For Example: [{"item_id":"I1","error":"40002"},{"item_id":"I2","error":"40002"},{"item_id":"I3","error":"40002"}]`
+          });
+        } else {
+          function isValidErrorItem(item: any): boolean {
+            return   typeof item.dynamic_item_id === 'string' &&
+            typeof item.customization_id === 'string' &&
+            typeof item.customization_group_id === 'string' &&
+            typeof item.error === 'string'
+            // && typeof item.item_id === 'string'
+          }
+
+          function validateErrorArray(items: any[]): boolean {
+            return items.every(isValidErrorItem);
+          }
+          if (validateErrorArray(errorArray)) {
+            const parent_item_ids = _.map(breakup_msg, 'item.parent_item_id');
+            const dynamic_item_ids = _.map(errorArray, 'dynamic_item_id');
+       
+
+            _.difference(dynamic_item_ids, parent_item_ids).forEach((diff) => {
+              result.push({
+                valid: false,
+                code: 20006,
+                description: `Dynamic_item_id: ${diff} doesn't exists in any quote.breakup.item.parent_item_ids`
+              });
+            });
+
+            const itemsReduced = breakup_msg.filter((item: any) => {
+              return (
+                item['@ondc/org/item_quantity'] &&
+                item['@ondc/org/item_quantity'].count < itemsIdList[item['@ondc/org/item_id']]
+              );
+            });
+
+            _.difference(_.map(itemsReduced, 'item.parent_item_id'), dynamic_item_ids).forEach((diff) => {
+              result.push({
+                valid: false,
+                code: 20006,
+                description: `Dynamic_item_id: ${diff} is missing from error payload and should be provided in the correct form with proper error_code and item_id,dynamic_item_id,etc. For Example: if base item "I1" for dynamic item "DI1" and customization "C15" for dynamic item "DI2" are both out of stock, error.message would be encoded as: "[{\"dynamic_item_id\":\"DI1\",\"item_id\":\"I1\",\"error\":\"40002\"}, {\"dynamic_item_id\":\"DI2\",\"customization_id\":\"C15\",\"customization_group_id\":\"CG3\",\"error\":\"40002\"}]"`
+              });
+            });
+            errorArray.forEach((errorItem: any) => {
+              const isPresent = itemsReduced.some((item: any) => item['@ondc/org/item_id'] === errorItem.item_id);
+
+              if (!isPresent) {
+                result.push({
+                  valid: false,
+                  code: 20006,
+                  description: `Item isn't reduced ${errorItem.item_id} in ${msg_err} is not present in fullfillments/items`
+                });
+              }
+            });
+
+            itemsReduced.forEach((item: any) => {
+              const isPresentForward = errorArray.some(
+                (errorItem: any) => errorItem.item_id === item['@ondc/org/item_id']
+              );
+              if (!isPresentForward) {
+                result.push({
+                  valid: false,
+                  code: 20006,
+                  description: `message/order/items for item ${item['@ondc/org/item_id']} does not match in ${msg_err}`
+                });
+              }
+            });
+          } else {
+            let isCustomizationThere = false;
+            errorArray.forEach((obj: any) => {
+              if (Object.keys(obj).includes('dynamic_item_id')) {
+                isCustomizationThere = true;
+              }
+            });
+            if (!isCustomizationThere) {
+              result.push({
+                valid: false,
+                code: 20006,
+                description: `The error.message provided in the ${ApiSequence.ON_SELECT_OUT_OF_STOCK} should be provided in the correct form with proper error_code and item_id. For Example: [{"item_id":"I1","error":"40002"},{"item_id":"I2","error":"40002"},{"item_id":"I3","error":"40002"}]`
+              });
+            }
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error(
+        `!!Error while Checking for Valid error.message and Item Id and error.message.item_id Mapping in ${error.message} ${error.stack}`
+      );
+    }
+  }
+
   try {
     const itemPrices = new Map();
     on_select.quote.breakup.forEach(
@@ -751,38 +867,61 @@ const onSelect = async (data: any) => {
   }
 
   try {
-    console.info(
-      `Checking available and maximum count in ${constants.ON_SELECT}`
-    );
-    on_select.quote.breakup.forEach((element: any, i: any) => {
-      const itemId = element["@ondc/org/item_id"];
-      if (
-        element.item?.quantity &&
-        element.item.quantity?.available &&
-        element.item.quantity?.maximum &&
-        typeof element.item.quantity.available.count === "string" &&
-        typeof element.item.quantity.maximum.count === "string"
-      ) {
-        const availCount = parseInt(element.item.quantity.available.count, 10);
-        const maxCount = parseInt(element.item.quantity.maximum.count, 10);
-        if (isNaN(availCount) || isNaN(maxCount) || availCount <= 0) {
-          result.push({
-            valid: false,
-            code: 20000,
-            description: `Available and Maximum count should be greater than 0 for item id: ${itemId} in quote.breakup[${i}]`,
-          });
-        } else if (
-          element.item.quantity.available.count.trim() === "" ||
-          element.item.quantity.maximum.count.trim() === ""
+    if(!error){
+
+      console.info(
+        `Checking available and maximum count in ${constants.ON_SELECT}`
+      );
+      on_select.quote.breakup.forEach((element: any, i: any) => {
+        const itemId = element["@ondc/org/item_id"];
+        if (
+          element.item?.quantity &&
+          element.item.quantity?.available &&
+          element.item.quantity?.maximum &&
+          typeof element.item.quantity.available.count === "string" &&
+          typeof element.item.quantity.maximum.count === "string"
         ) {
-          result.push({
-            valid: false,
-            code: 20000,
-            description: `Available or Maximum count should not be empty string for item id: ${itemId} in quote.breakup[${i}]`,
-          });
+          const availCount = parseInt(element.item.quantity.available.count, 10);
+          const maxCount = parseInt(element.item.quantity.maximum.count, 10);
+          const selectedCount = element["@ondc/org/item_quantity"]?.count 
+            ? parseInt(element["@ondc/org/item_quantity"].count, 10) 
+            : 0;
+  
+          if (isNaN(availCount) || isNaN(maxCount) || availCount <= 0) {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `Available and Maximum count should be greater than 0 for item id: ${itemId} in quote.breakup[${i}]`,
+            });
+          } else if (
+            element.item.quantity.available.count.trim() === "" ||
+            element.item.quantity.maximum.count.trim() === ""
+          ) {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `Available or Maximum count should not be empty string for item id: ${itemId} in quote.breakup[${i}]`,
+            });
+          } else if (
+            selectedCount > availCount || 
+            selectedCount > maxCount
+          ) {
+            result.push({
+              valid: false,
+              code: 20001,
+              description: `Selected count (${selectedCount}) exceeds available (${availCount}) or maximum (${maxCount}) count for item id: ${itemId} in quote.breakup[${i}]`,
+            });
+          }
+          else if(availCount > maxCount){
+            result.push({
+              valid: false,
+              code: 20001,
+              description: `available (${availCount})  exceeds  maximum (${maxCount}) count for item id: ${itemId} in quote.breakup[${i}]`
+            })
+          }
         }
-      }
-    });
+      });
+    }
   } catch (error: any) {
     console.error(
       `Error while checking available and maximum count in ${constants.ON_SELECT}, ${error.stack}`
