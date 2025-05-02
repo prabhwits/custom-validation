@@ -55,10 +55,10 @@ export const hasProperty = (object: any, propetyName: string) => {
 };
 
 export const isValidISO8601Duration = (value: string): boolean => {
-  const iso8601DurationRegex = /^P(?:\d+Y)?(?:\d+M)?(?:\d+D)?(?:T(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d+)?S)?)?$/;
+  const iso8601DurationRegex =
+    /^P(?:\d+Y)?(?:\d+M)?(?:\d+D)?(?:T(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d+)?S)?)?$/;
   return iso8601DurationRegex.test(value) && value !== "P" && value !== "PT";
 };
-
 
 export const checkTagConditions = async (
   message: any,
@@ -856,11 +856,15 @@ export function compareQuoteObjects(
 
   // Compare breakup array
   obj1.breakup.forEach((item1: any) => {
-    const matchingItem = obj2.breakup.find(
-      (item2: any) =>
-        item1["@ondc/org/item_id"] === item2["@ondc/org/item_id"] &&
-        item1["@ondc/org/title_type"] === item2["@ondc/org/title_type"]
-    );
+    const matchingItem = obj2.breakup.find((item2: any) => {
+      const sameItemId =
+        item1["@ondc/org/item_id"] === item2["@ondc/org/item_id"];
+      const sameTitleType =
+        item1["@ondc/org/title_type"] === item2["@ondc/org/title_type"];
+      const sameParentItemId =
+        !item1?.item?.parent_item_id || item1?.item?.parent_item_id === item2?.item?.parent_item_id;
+      return sameItemId && sameTitleType && sameParentItemId;
+    });
 
     if (!matchingItem || !deepCompare(item1, matchingItem)) {
       errors.push(

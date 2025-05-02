@@ -168,7 +168,7 @@ export class ValidationController {
     const invalidResult = l1Result.filter(
       (result) => !result.valid && result.code !== 200
     );
-    console.log("invalidResult", invalidResult);
+
     if (invalidResult.length > 0) {
       const error = invalidResult[0].description;
       const code = invalidResult[0].code as number;

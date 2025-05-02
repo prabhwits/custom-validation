@@ -274,7 +274,6 @@ export const cancel = async (data: any) => {
         });
       } else {
         const paramsTag = tags.find((tag: any) => tag.code === "params");
-        console.log("paramTag", paramsTag);
         if (!paramsTag || !paramsTag.list || !Array.isArray(paramsTag.list)) {
           result.push({
             valid: false,
@@ -289,7 +288,6 @@ export const cancel = async (data: any) => {
             (item: any) => item.code === "ttl_response"
           );
 
-          console.log("forceParam", forceParam);
 
           // Validate force parameter
           if (!forceParam || !forceParam.code) {

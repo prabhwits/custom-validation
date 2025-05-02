@@ -347,8 +347,21 @@ const init = async (data: any) => {
             code: 20000,
             description: `billing.created_at is missing or empty in /${constants.INIT}`,
           });
-        }
+        } else {
+          const billingTime = new Date(init.billing.created_at).getTime();
+          const contextTime = new Date(context.timestamp).getTime();
 
+          if (isNaN(billingTime) || billingTime > contextTime) {
+            console.info(
+              `Invalid billing.created_at timestamp in /${constants.INIT}`
+            );
+            result.push({
+              valid: false,
+              code: 20001,
+              description: `billing.created_at should not be greater than context.timestamp in /${constants.INIT}`,
+            });
+          }
+        }
         // Check updated_at presence
         if (
           init.billing.updated_at == null ||
@@ -362,6 +375,20 @@ const init = async (data: any) => {
             code: 20000,
             description: `billing.updated_at is missing or empty in /${constants.INIT}`,
           });
+        } else {
+          const billingTime = new Date(init.billing.updated_at).getTime();
+          const contextTime = new Date(context.timestamp).getTime();
+
+          if (isNaN(billingTime) || billingTime > contextTime) {
+            console.info(
+              `Invalid billing.updated_at timestamp in /${constants.INIT}`
+            );
+            result.push({
+              valid: false,
+              code: 20001,
+              description: `billing.updated_at should not be greater than context.timestamp in /${constants.INIT}`,
+            });
+          }
         }
 
         // Compare updated_at with created_at
@@ -470,9 +497,7 @@ const init = async (data: any) => {
         }
 
         if (itemId in itemFlfllmnts) {
-          if (!fulfillmentIdArray.includes(init.items[i].fulfillment_id) ) {
-            console.log('🥶', init.items[i].fulfillment_id)
-            console.log('🤬', fulfillmentIdArray)
+          if (!fulfillmentIdArray.includes(init.items[i].fulfillment_id)) {
             result.push({
               valid: false,
               code: 20000,
@@ -513,12 +538,12 @@ const init = async (data: any) => {
       const itemFlfllmnts = itemFlfllmntsRaw
         ? JSON.parse(itemFlfllmntsRaw)
         : null;
-        const fulfillmentIdArrayRaw = await RedisService.getKey(
-          `${transaction_id}_fulfillmentIdArray`
-        );
-        const fulfillmentIdArray = fulfillmentIdArrayRaw
-          ? JSON.parse(fulfillmentIdArrayRaw)
-          : null;
+      const fulfillmentIdArrayRaw = await RedisService.getKey(
+        `${transaction_id}_fulfillmentIdArray`
+      );
+      const fulfillmentIdArray = fulfillmentIdArrayRaw
+        ? JSON.parse(fulfillmentIdArrayRaw)
+        : null;
       let i = 0;
       const len = init.fulfillments.length;
       while (i < len) {

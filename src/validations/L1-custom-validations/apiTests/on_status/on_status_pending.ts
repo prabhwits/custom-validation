@@ -39,7 +39,7 @@ const ERROR_CODES = {
 
 const TTL_IN_SECONDS = Number(process.env.TTL_IN_SECONDS) || 3600;
 
-const createError = (description: any, code: any) => ({
+const addError = (description: any, code: any) => ({
   valid: false,
   code,
   description,
@@ -49,13 +49,13 @@ async function validateContext(context: any, transaction_id: any, result: any) {
   const contextRes = checkContext(context, constants.ON_STATUS);
   if (!contextRes?.valid) {
     contextRes?.ERRORS.forEach((error: any) =>
-      result.push(createError(error, ERROR_CODES.INVALID_RESPONSE))
+      result.push(addError(error, ERROR_CODES.INVALID_RESPONSE))
     );
   }
 
   if (checkBppIdOrBapId(context.bap_id)) {
     result.push(
-      createError(
+      addError(
         "context/bap_id should not be a url",
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -63,7 +63,7 @@ async function validateContext(context: any, transaction_id: any, result: any) {
   }
   if (checkBppIdOrBapId(context.bpp_id)) {
     result.push(
-      createError(
+      addError(
         "context/bpp_id should not be a url",
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -73,7 +73,7 @@ async function validateContext(context: any, transaction_id: any, result: any) {
   const domain = await RedisService.getKey(`${transaction_id}_domain`);
   if (!_.isEqual(context.domain?.split(":")[1], domain)) {
     result.push(
-      createError(
+      addError(
         "Domain should be same in each action",
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -86,7 +86,7 @@ async function validateContext(context: any, transaction_id: any, result: any) {
   const searchContext = searchContextRaw ? JSON.parse(searchContextRaw) : null;
   if (searchContext && !_.isEqual(searchContext.city, context.city)) {
     result.push(
-      createError(
+      addError(
         `City code mismatch in /${constants.SEARCH} and /${constants.ON_STATUS}`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -108,7 +108,7 @@ async function validateMessageId(
     );
     if (!isMsgIdNotPresent) {
       result.push(
-        createError(
+        addError(
           `Message id should not be same with previous calls`,
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -125,7 +125,7 @@ async function validateMessageId(
       `!!Error while checking message id for /${constants.ON_STATUS_PENDING}, ${error.stack}`
     );
     result.push(
-      createError(
+      addError(
         "Internal error while checking message ID",
         ERROR_CODES.INTERNAL_ERROR
       )
@@ -145,7 +145,7 @@ async function validateOrder(
   const cnfrmOrdrId = cnfrmOrdrIdRaw ? JSON.parse(cnfrmOrdrIdRaw) : null;
   if (cnfrmOrdrId && order.id !== cnfrmOrdrId) {
     result.push(
-      createError(
+      addError(
         `Order id in /${constants.CONFIRM} and /${constants.ON_STATUS}_${state} do not match`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -154,7 +154,7 @@ async function validateOrder(
 
   if (order.cancellation_terms && order.cancellation_terms.length > 0) {
     result.push(
-      createError(
+      addError(
         `'cancellation_terms' in /message/order should not be provided as those are not enabled yet`,
         ERROR_CODES.INVALID_CANCELLATION_TERMS
       )
@@ -163,7 +163,7 @@ async function validateOrder(
 
   if (order.state !== "Created" && order.state !== "Accepted") {
     result.push(
-      createError(
+      addError(
         `Order state should be 'Created' or 'Accepted' in /${constants.ON_STATUS}_${state}. Current state: ${order.state}`,
         ERROR_CODES.INVALID_ORDER_STATE
       )
@@ -176,7 +176,7 @@ async function validateOrder(
   const providerId = providerIdRaw ? JSON.parse(providerIdRaw) : null;
   if (providerId && order.provider?.id !== providerId) {
     result.push(
-      createError(
+      addError(
         `Provider Id mismatches in /${constants.ON_SEARCH} and /${constants.ON_STATUS}_${state}`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -189,7 +189,7 @@ async function validateOrder(
   const providerLoc = providerLocRaw ? JSON.parse(providerLocRaw) : null;
   if (providerLoc && order.provider?.locations?.[0]?.id !== providerLoc) {
     result.push(
-      createError(
+      addError(
         `provider.locations[0].id mismatches in /${constants.ON_SEARCH} and /${constants.ON_STATUS}_${state}`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -271,7 +271,7 @@ async function validateFulfillments(
           `Missing fulfillment ID in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `Fulfillment Id must be present`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -283,7 +283,7 @@ async function validateFulfillments(
           `Duplicate fulfillment ID ${ff.id} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `Duplicate fulfillment ID ${ff.id} in /${constants.ON_STATUS}_${state}`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -307,7 +307,7 @@ async function validateFulfillments(
           `Missing fulfillment type for ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `Fulfillment type does not exist in /${constants.ON_STATUS}_${state} for fulfillment ID ${ffId}`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -319,7 +319,7 @@ async function validateFulfillments(
             `Invalid fulfillment type ${ff.type} for ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `Invalid fulfillment type ${
                 ff.type
               } for ID ${ffId}; must be one of ${validTypes.join(", ")}`,
@@ -334,7 +334,7 @@ async function validateFulfillments(
           `Missing TAT for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `'TAT' must be provided in message/order/fulfillments[${ffId}]`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -347,7 +347,7 @@ async function validateFulfillments(
           `TAT mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `TAT Mismatch between /${
               constants.ON_STATUS
             }_${state} i.e ${isoDurToSec(ff["@ondc/org/TAT"])} seconds & /${
@@ -365,7 +365,7 @@ async function validateFulfillments(
             `Missing tracking key for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `Tracking key must be explicitly true or false for fulfillment ID ${ffId}`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -375,7 +375,7 @@ async function validateFulfillments(
             `Invalid tracking type for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `Tracking must be a boolean (true or false) for fulfillment ID ${ffId}`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -391,7 +391,7 @@ async function validateFulfillments(
                 `Tracking mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
               );
               result.push(
-                createError(
+                addError(
                   `Fulfillment Tracking mismatch with /${constants.ON_CONFIRM} for ID ${ffId} (expected ${ffTracking}, got ${ff.tracking})`,
                   ERROR_CODES.INVALID_RESPONSE
                 )
@@ -402,7 +402,7 @@ async function validateFulfillments(
               `Error fetching tracking for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}: ${error.message}`
             );
             result.push(
-              createError(
+              addError(
                 `Error validating tracking for fulfillment ID ${ffId}`,
                 ERROR_CODES.INTERNAL_ERROR
               )
@@ -414,7 +414,7 @@ async function validateFulfillments(
           `Tracking key present for Cancel fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `Tracking key must not be present for Cancel fulfillment ID ${ffId}`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -426,7 +426,7 @@ async function validateFulfillments(
           `Fulfillment ID ${ffId} not found in /${constants.ON_CONFIRM} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `Fulfillment ID ${ffId} does not exist in /${constants.ON_CONFIRM}`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -440,7 +440,7 @@ async function validateFulfillments(
           `Invalid state for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `Fulfillment state should be 'Pending' for ID ${ffId} in /${constants.ON_STATUS}_${state}`,
             ERROR_CODES.INVALID_ORDER_STATE
           )
@@ -453,7 +453,7 @@ async function validateFulfillments(
           `Fulfillment state Pending incompatible with order state ${parsedOrderState} for ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `Fulfillment state 'Pending' is incompatible with order state ${parsedOrderState} for ID ${ffId}`,
             ERROR_CODES.INVALID_ORDER_STATE
           )
@@ -465,50 +465,11 @@ async function validateFulfillments(
           `Invalid state.descriptor.short_desc for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `fulfillments[${ffId}].state.descriptor.short_desc must be a string`,
             ERROR_CODES.INVALID_RESPONSE
           )
         );
-      }
-
-      // Status timestamp validation
-      if (!ff.state?.updated_at) {
-        console.info(
-          `Missing state.updated_at for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-        );
-        result.push(
-          createError(
-            `fulfillments[${ffId}].state.updated_at is required`,
-            ERROR_CODES.INVALID_RESPONSE
-          )
-        );
-      } else {
-        const timestampPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z$/;
-        if (!timestampPattern.test(ff.state.updated_at)) {
-          console.info(
-            `Invalid state.updated_at format for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-          );
-          result.push(
-            createError(
-              `fulfillments[${ffId}].state.updated_at must be a valid ISO timestamp`,
-              ERROR_CODES.INVALID_RESPONSE
-            )
-          );
-        } else if (
-          onConfirmTimestamp &&
-          new Date(ff.state.updated_at) < new Date(onConfirmTimestamp)
-        ) {
-          console.info(
-            `state.updated_at earlier than /on_confirm for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-          );
-          result.push(
-            createError(
-              `fulfillments[${ffId}].state.updated_at must not be earlier than /${constants.ON_CONFIRM} timestamp`,
-              ERROR_CODES.INVALID_RESPONSE
-            )
-          );
-        }
       }
 
       // Location validations
@@ -517,7 +478,7 @@ async function validateFulfillments(
           `Missing start or end location for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `fulfillments[${ffId}] start and end locations are mandatory`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -530,7 +491,7 @@ async function validateFulfillments(
             `Missing start.location.gps for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `fulfillments[${ffId}].start.location.gps is required`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -540,7 +501,7 @@ async function validateFulfillments(
             `Invalid GPS format for start.location.gps in fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `fulfillments[${ffId}].start.location.gps must be in 'latitude,longitude' format`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -553,7 +514,7 @@ async function validateFulfillments(
             `Start GPS mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `store gps location /fulfillments[${ffId}]/start/location/gps can't change`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -565,7 +526,7 @@ async function validateFulfillments(
             `Missing end.location.gps for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `fulfillments[${ffId}].end.location.gps is required`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -575,7 +536,7 @@ async function validateFulfillments(
             `Invalid GPS format for end.location.gps in fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `fulfillments[${ffId}].end.location.gps must be in 'latitude,longitude' format`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -585,7 +546,7 @@ async function validateFulfillments(
             `End GPS mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `fulfillments[${ffId}].end.location.gps does not match gps in /${constants.SELECT}`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -598,20 +559,20 @@ async function validateFulfillments(
             `Missing start.location.address for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `fulfillments[${ffId}].start.location.address is required`,
               ERROR_CODES.INVALID_RESPONSE
             )
           );
         } else {
-          const requiredFields = ["area_code", "city", "state", "country"];
+          const requiredFields = ["locality", "area_code", "city", "state"];
           for (const field of requiredFields) {
             if (!ff.start.location.address[field]) {
               console.info(
                 `Missing start.location.address.${field} for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
               );
               result.push(
-                createError(
+                addError(
                   `fulfillments[${ffId}].start.location.address.${field} is required`,
                   ERROR_CODES.INVALID_RESPONSE
                 )
@@ -626,7 +587,7 @@ async function validateFulfillments(
               `Start address mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
-              createError(
+              addError(
                 `fulfillments[${ffId}].start.location.address does not match address in /${constants.ON_SEARCH}`,
                 ERROR_CODES.INVALID_RESPONSE
               )
@@ -639,7 +600,7 @@ async function validateFulfillments(
             `Missing end.location.address for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `fulfillments[${ffId}].end.location.address is required`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -650,7 +611,7 @@ async function validateFulfillments(
               `Missing end.location.address.area_code for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
-              createError(
+              addError(
                 `fulfillments[${ffId}].end.location.address.area_code is required`,
                 ERROR_CODES.INVALID_RESPONSE
               )
@@ -663,7 +624,7 @@ async function validateFulfillments(
               `End area_code mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
-              createError(
+              addError(
                 `fulfillments[${ffId}].end.location.address.area_code does not match area_code in /${constants.SELECT}`,
                 ERROR_CODES.INVALID_RESPONSE
               )
@@ -677,7 +638,7 @@ async function validateFulfillments(
                   `Missing end.location.address.${field} for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
                 );
                 result.push(
-                  createError(
+                  addError(
                     `fulfillments[${ffId}].end.location.address.${field} is required for Delivery`,
                     ERROR_CODES.INVALID_RESPONSE
                   )
@@ -694,19 +655,20 @@ async function validateFulfillments(
           `Missing start.contact.phone for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `fulfillments[${ffId}].start.contact.phone is required`,
             ERROR_CODES.INVALID_RESPONSE
           )
         );
       } else {
-        const phonePattern = /^\+\d{10,15}$/;
+        const phonePattern = /^\+?\d{10,15}$/;
+
         if (!phonePattern.test(ff.start.contact.phone)) {
           console.info(
             `Invalid phone format for start.contact.phone in fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `fulfillments[${ffId}].start.contact.phone must be a valid phone number`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -719,19 +681,19 @@ async function validateFulfillments(
           `Missing end.contact.phone for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `fulfillments[${ffId}].end.contact.phone is required`,
             ERROR_CODES.INVALID_RESPONSE
           )
         );
       } else {
-        const phonePattern = /^\+\d{10,15}$/;
+        const phonePattern = /^\+?\d{10,15}$/;
         if (!phonePattern.test(ff.end.contact.phone)) {
           console.info(
             `Invalid phone format for end.contact.phone in fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `fulfillments[${ffId}].end.contact.phone must be a valid phone number`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -742,23 +704,14 @@ async function validateFulfillments(
       // Agent validations
       if (ff.type === "Delivery" && flow === "2") {
         if (!ff.agent || !ff.agent.name || !ff.agent.phone) {
-          console.info(
-            `Missing agent details for Delivery fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-          );
-          result.push(
-            createError(
-              `fulfillments[${ffId}].agent.name and agent.phone are required for Delivery in flow 2`,
-              ERROR_CODES.INVALID_RESPONSE
-            )
-          );
         } else {
-          const phonePattern = /^\+\d{10,15}$/;
+          const phonePattern = /^\+?\d{10,15}$/;
           if (!phonePattern.test(ff.agent.phone)) {
             console.info(
               `Invalid agent.phone format for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
-              createError(
+              addError(
                 `fulfillments[${ffId}].agent.phone must be a valid phone number`,
                 ERROR_CODES.INVALID_RESPONSE
               )
@@ -772,7 +725,7 @@ async function validateFulfillments(
               `Invalid agent.name for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
-              createError(
+              addError(
                 `fulfillments[${ffId}].agent.name must be a non-empty string`,
                 ERROR_CODES.INVALID_RESPONSE
               )
@@ -791,7 +744,7 @@ async function validateFulfillments(
                 `Agent details mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
               );
               result.push(
-                createError(
+                addError(
                   `fulfillments[${ffId}].agent details do not match /${constants.ON_SELECT}`,
                   ERROR_CODES.INVALID_RESPONSE
                 )
@@ -809,20 +762,20 @@ async function validateFulfillments(
             `Invalid agent.name for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `fulfillments[${ffId}].agent.name must be a non-empty string if agent is provided`,
               ERROR_CODES.INVALID_RESPONSE
             )
           );
         }
         if (ff.agent.phone) {
-          const phonePattern = /^\+\d{10,15}$/;
+          const phonePattern = /^\+?\d{10,15}$/;
           if (!phonePattern.test(ff.agent.phone)) {
             console.info(
               `Invalid agent.phone format for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
-              createError(
+              addError(
                 `fulfillments[${ffId}].agent.phone must be a valid phone number if provided`,
                 ERROR_CODES.INVALID_RESPONSE
               )
@@ -838,7 +791,7 @@ async function validateFulfillments(
             `Invalid start.time format for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `fulfillments[${ffId}].start.time must have timestamp or range`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -849,7 +802,7 @@ async function validateFulfillments(
               `Missing start.time.range fields for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
-              createError(
+              addError(
                 `fulfillments[${ffId}].start.time.range must have start and end timestamps`,
                 ERROR_CODES.INVALID_RESPONSE
               )
@@ -862,7 +815,7 @@ async function validateFulfillments(
               `Invalid start.time.range for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
-              createError(
+              addError(
                 `fulfillments[${ffId}].start.time.range.end must be after range.start`,
                 ERROR_CODES.INVALID_RESPONSE
               )
@@ -881,7 +834,7 @@ async function validateFulfillments(
                 `start.time.range mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
               );
               result.push(
-                createError(
+                addError(
                   `fulfillments[${ffId}].start.time.range does not match /${constants.ON_SELECT}`,
                   ERROR_CODES.INVALID_RESPONSE
                 )
@@ -897,7 +850,7 @@ async function validateFulfillments(
             `Invalid end.time format for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `fulfillments[${ffId}].end.time must have timestamp or range`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -908,7 +861,7 @@ async function validateFulfillments(
               `Missing end.time.range fields for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
-              createError(
+              addError(
                 `fulfillments[${ffId}].end.time.range must have start and end timestamps`,
                 ERROR_CODES.INVALID_RESPONSE
               )
@@ -920,7 +873,7 @@ async function validateFulfillments(
               `Invalid end.time.range for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
-              createError(
+              addError(
                 `fulfillments[${ffId}].end.time.range.end must be after range.start`,
                 ERROR_CODES.INVALID_RESPONSE
               )
@@ -939,7 +892,7 @@ async function validateFulfillments(
                 `end.time.range mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
               );
               result.push(
-                createError(
+                addError(
                   `fulfillments[${ffId}].end.time.range does not match /${constants.ON_SELECT}`,
                   ERROR_CODES.INVALID_RESPONSE
                 )
@@ -960,7 +913,7 @@ async function validateFulfillments(
               `end.time.timestamp not after start.time.timestamp for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
-              createError(
+              addError(
                 `fulfillments[${ffId}].end.time.timestamp must be after start.time.timestamp`,
                 ERROR_CODES.INVALID_RESPONSE
               )
@@ -976,7 +929,7 @@ async function validateFulfillments(
             `Missing vehicle details for Self-Pickup fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `fulfillments[${ffId}].vehicle is required for Self-Pickup`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -987,7 +940,7 @@ async function validateFulfillments(
               `Invalid vehicle.category for Self-Pickup fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
-              createError(
+              addError(
                 `fulfillments[${ffId}].vehicle.category must be 'Kerbside' for Self-Pickup`,
                 ERROR_CODES.INVALID_RESPONSE
               )
@@ -998,7 +951,7 @@ async function validateFulfillments(
               `Missing vehicle.number for Self-Pickup fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
-              createError(
+              addError(
                 `fulfillments[${ffId}].vehicle.number is required for Self-Pickup`,
                 ERROR_CODES.INVALID_RESPONSE
               )
@@ -1013,7 +966,7 @@ async function validateFulfillments(
                 `Vehicle details mismatch for Self-Pickup fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
               );
               result.push(
-                createError(
+                addError(
                   `fulfillments[${ffId}].vehicle details do not match /${constants.ON_SELECT}`,
                   ERROR_CODES.INVALID_RESPONSE
                 )
@@ -1026,7 +979,7 @@ async function validateFulfillments(
           `Vehicle present for Cancel fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `fulfillments[${ffId}].vehicle must not be present for Cancel`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -1047,7 +1000,7 @@ async function validateFulfillments(
               `Missing ${tagCode} tag for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
-              createError(
+              addError(
                 `fulfillments[${ffId}].tags must include ${tagCode}`,
                 ERROR_CODES.INVALID_RESPONSE
               )
@@ -1060,7 +1013,7 @@ async function validateFulfillments(
               `Invalid ${tagCode} tag format for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
-              createError(
+              addError(
                 `fulfillments[${ffId}].tags[${tagCode}] must have a valid value`,
                 ERROR_CODES.INVALID_RESPONSE
               )
@@ -1074,23 +1027,13 @@ async function validateFulfillments(
               `Tags mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
-              createError(
+              addError(
                 `fulfillments[${ffId}].tags do not match /${constants.ON_SELECT}`,
                 ERROR_CODES.INVALID_RESPONSE
               )
             );
           }
         }
-      } else {
-        console.info(
-          `Missing tags for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-        );
-        result.push(
-          createError(
-            `fulfillments[${ffId}].tags is required`,
-            ERROR_CODES.INVALID_RESPONSE
-          )
-        );
       }
 
       // Cancel/Return reason validation
@@ -1102,7 +1045,7 @@ async function validateFulfillments(
           `Missing state.descriptor.reason for ${ff.type} fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `fulfillments[${ffId}].state.descriptor.reason is required for ${ff.type}`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -1115,7 +1058,7 @@ async function validateFulfillments(
           `Invalid rateable type for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `fulfillments[${ffId}].rateable must be a boolean`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -1128,7 +1071,7 @@ async function validateFulfillments(
           `Invalid start.instructions format for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `fulfillments[${ffId}].start.instructions must be a string`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -1139,7 +1082,7 @@ async function validateFulfillments(
           `Invalid end.instructions format for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `fulfillments[${ffId}].end.instructions must be a string`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -1154,7 +1097,7 @@ async function validateFulfillments(
           `Start location name mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `store name /fulfillments[${ffId}]/start/location/descriptor/name can't change`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -1208,7 +1151,7 @@ async function validateFulfillments(
             console.info(
               `Time range error for delivery fulfillment in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}: ${error}`
             );
-            result.push(createError(`${error}`, ERROR_CODES.INVALID_RESPONSE));
+            result.push(addError(`${error}`, ERROR_CODES.INVALID_RESPONSE));
           });
         }
       }
@@ -1217,7 +1160,7 @@ async function validateFulfillments(
         `Error handling delivery fulfillment for transaction ${transaction_id}: ${error.message}`
       );
       result.push(
-        createError(
+        addError(
           `Error processing delivery fulfillment`,
           ERROR_CODES.INTERNAL_ERROR
         )
@@ -1231,7 +1174,7 @@ async function validateFulfillments(
           `Missing fulfillments for flow ${flow} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
         result.push(
-          createError(
+          addError(
             `missingFulfillments is mandatory for ${ApiSequence.ON_STATUS_PENDING}`,
             ERROR_CODES.ORDER_VALIDATION_FAILURE
           )
@@ -1248,7 +1191,7 @@ async function validateFulfillments(
             `Missing Delivery fulfillment for flow ${flow} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `Delivery fulfillment must be present in ${ApiSequence.ON_STATUS_PENDING}`,
               ERROR_CODES.ORDER_VALIDATION_FAILURE
             )
@@ -1259,7 +1202,7 @@ async function validateFulfillments(
             `Invalid number of Self-Pickup fulfillments for flow ${flow} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
-            createError(
+            addError(
               `Exactly one Self-Pickup fulfillment must be present for flow 3 in ${ApiSequence.ON_STATUS_PENDING}`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -1281,7 +1224,7 @@ async function validateFulfillments(
               `Error storing delivery fulfillment ID for transaction ${transaction_id}: ${error.message}`
             );
             result.push(
-              createError(
+              addError(
                 `Error storing delivery fulfillment ID`,
                 ERROR_CODES.INTERNAL_ERROR
               )
@@ -1302,7 +1245,7 @@ async function validateFulfillments(
         `Error storing fulfillmentsItemsSet for transaction ${transaction_id}: ${error.message}`
       );
       result.push(
-        createError(
+        addError(
           `Error storing fulfillmentsItemsSet`,
           ERROR_CODES.INTERNAL_ERROR
         )
@@ -1313,7 +1256,7 @@ async function validateFulfillments(
       `Error in validateFulfillments for transaction ${transaction_id}: ${error.message}`
     );
     result.push(
-      createError(
+      addError(
         `Internal error validating fulfillments`,
         ERROR_CODES.INTERNAL_ERROR
       )
@@ -1334,7 +1277,7 @@ async function validateTimestamps(
   const cnfrmTmpstmp = cnfrmTmpstmpRaw ? JSON.parse(cnfrmTmpstmpRaw) : null;
   if (cnfrmTmpstmp && !_.isEqual(cnfrmTmpstmp, order.created_at)) {
     result.push(
-      createError(
+      addError(
         `Created At timestamp for /${constants.ON_STATUS}_${state} should be equal to context timestamp at ${constants.CONFIRM}`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -1349,7 +1292,7 @@ async function validateTimestamps(
     : null;
   if (onCnfrmTmpstmp && _.gte(onCnfrmTmpstmp, context.timestamp)) {
     result.push(
-      createError(
+      addError(
         `Timestamp for /${constants.ON_CONFIRM} api cannot be greater than or equal to /${constants.ON_STATUS}_${state} api`,
         ERROR_CODES.OUT_OF_SEQUENCE
       )
@@ -1358,7 +1301,7 @@ async function validateTimestamps(
 
   if (!areTimestampsLessThanOrEqualTo(order.updated_at, context.timestamp)) {
     result.push(
-      createError(
+      addError(
         `order.updated_at timestamp should be less than or equal to context timestamp for /${constants.ON_STATUS}_${state} api`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -1385,7 +1328,7 @@ async function validatePayment(
   const cnfrmpymnt = cnfrmpymntRaw ? JSON.parse(cnfrmpymntRaw) : null;
   if (cnfrmpymnt && !_.isEqual(cnfrmpymnt, order.payment)) {
     result.push(
-      createError(
+      addError(
         `payment object mismatches in /${constants.CONFIRM} & /${constants.ON_STATUS}_${state}`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -1397,7 +1340,7 @@ async function validatePayment(
     parseFloat(order.quote?.price?.value)
   ) {
     result.push(
-      createError(
+      addError(
         `Quoted price (/${constants.ON_STATUS}_${state}) doesn't match with the amount in payment.params`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -1414,7 +1357,7 @@ async function validatePayment(
       buyerFF
   ) {
     result.push(
-      createError(
+      addError(
         `Buyer app finder fee can't change in /${constants.ON_STATUS}_${state}`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -1425,7 +1368,7 @@ async function validatePayment(
     const status = payment_status(order.payment, flow);
     if (!status) {
       result.push(
-        createError(
+        addError(
           `Transaction_id missing in message/order/payment`,
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -1438,7 +1381,7 @@ async function validatePayment(
     order.payment?.status !== PAYMENT_STATUS.NOT_PAID
   ) {
     result.push(
-      createError(
+      addError(
         `Payment status should be ${PAYMENT_STATUS.NOT_PAID} for ${FLOW.FLOW2A} flow (Cash on Delivery)`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -1454,7 +1397,7 @@ async function validateQuote(
 ) {
   if (!sumQuoteBreakUp(order.quote)) {
     result.push(
-      createError(
+      addError(
         `item quote breakup prices for ${constants.ON_STATUS}_${state} should be equal to the total price`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -1471,7 +1414,7 @@ async function validateQuote(
   );
   if (quoteErrors) {
     quoteErrors.forEach((error: any) =>
-      result.push(createError(error, ERROR_CODES.INVALID_RESPONSE))
+      result.push(addError(error, ERROR_CODES.INVALID_RESPONSE))
     );
   }
 
@@ -1482,7 +1425,7 @@ async function validateQuote(
   const onStatusQuotePrice = parseFloat(order.quote?.price?.value);
   if (onConfirmQuotePrice && onConfirmQuotePrice !== onStatusQuotePrice) {
     result.push(
-      createError(
+      addError(
         `Quoted Price in /${constants.ON_STATUS}_${state} INR ${onStatusQuotePrice} does not match with the quoted price in /${constants.ON_CONFIRM} INR ${onConfirmQuotePrice}`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -1494,7 +1437,7 @@ async function validateQuote(
   );
   if (hasItemWithQuantity) {
     result.push(
-      createError(
+      addError(
         `Extra attribute Quantity provided in quote object i.e not supposed to be provided after on_confirm so invalid quote object`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -1514,7 +1457,7 @@ async function validateBilling(
   if (billingErrors) {
     billingErrors.forEach((error: any) =>
       result.push(
-        createError(
+        addError(
           `${error} when compared with confirm billing object`,
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -1541,28 +1484,28 @@ async function validateTags(
     `${transaction_id}_${ApiSequence.ON_SEARCH}np_type`
   );
 
-  if (np_type_arr.length === 0) {
-    result.push(
-      createError(
-        `np_type not found in ${constants.ON_STATUS}_${state}`,
-        ERROR_CODES.INVALID_RESPONSE
-      )
-    );
-  } else {
-    const np_type = np_type_arr[0].value;
-    if (np_type !== np_type_on_search) {
-      result.push(
-        createError(
-          `np_type of ${constants.ON_SEARCH} is not same to np_type of ${constants.ON_STATUS}_${state}`,
-          ERROR_CODES.INVALID_RESPONSE
-        )
-      );
-    }
-  }
+  // if (np_type_arr.length === 0) {
+  //   result.push(
+  //     addError(
+  //       `np_type not found in ${constants.ON_STATUS}_${state}`,
+  //       ERROR_CODES.INVALID_RESPONSE
+  //     )
+  //   );
+  // } else {
+  //   const np_type = np_type_arr[0].value;
+  //   if (np_type !== np_type_on_search) {
+  //     result.push(
+  //       addError(
+  //         `np_type of ${constants.ON_SEARCH} is not same to np_type of ${constants.ON_STATUS}_${state}`,
+  //         ERROR_CODES.INVALID_RESPONSE
+  //       )
+  //     );
+  //   }
+  // }
 
   if (accept_bap_terms.length > 0) {
     result.push(
-      createError(
+      addError(
         `accept_bap_terms is not required for now`,
         ERROR_CODES.INVALID_RESPONSE
       )
@@ -1575,7 +1518,7 @@ async function validateTags(
     if (item.code === "tax_number") {
       if (item.value.length !== 15) {
         result.push(
-          createError(
+          addError(
             `Number of digits in tax number in message.order.tags[0].list should be 15`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -1586,7 +1529,7 @@ async function validateTags(
           /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
         if (!taxNumberPattern.test(tax_number)) {
           result.push(
-            createError(
+            addError(
               `Invalid format for tax_number in ${constants.ON_STATUS}_${state}`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -1597,7 +1540,7 @@ async function validateTags(
     if (item.code === "provider_tax_number") {
       if (item.value.length !== 10) {
         result.push(
-          createError(
+          addError(
             `Number of digits in provider tax number in message.order.tags[0].list should be 10`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -1607,7 +1550,7 @@ async function validateTags(
         const taxNumberPattern = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
         if (!taxNumberPattern.test(provider_tax_number)) {
           result.push(
-            createError(
+            addError(
               `Invalid format for provider_tax_number in ${constants.ON_STATUS}_${state}`,
               ERROR_CODES.INVALID_RESPONSE
             )
@@ -1617,35 +1560,35 @@ async function validateTags(
     }
   });
 
-  if (!tax_number) {
-    result.push(
-      createError(
-        `tax_number must be present for ${constants.ON_STATUS}_${state}`,
-        ERROR_CODES.INVALID_RESPONSE
-      )
-    );
-  }
-  if (!provider_tax_number) {
-    result.push(
-      createError(
-        `provider_tax_number must be present for ${constants.ON_STATUS}_${state}`,
-        ERROR_CODES.INVALID_RESPONSE
-      )
-    );
-  }
+  // if (!tax_number) {
+  //   result.push(
+  //     addError(
+  //       `tax_number must be present for ${constants.ON_STATUS}_${state}`,
+  //       ERROR_CODES.INVALID_RESPONSE
+  //     )
+  //   );
+  // }
+  // if (!provider_tax_number) {
+  //   result.push(
+  //     addError(
+  //       `provider_tax_number must be present for ${constants.ON_STATUS}_${state}`,
+  //       ERROR_CODES.INVALID_RESPONSE
+  //     )
+  //   );
+  // }
 
   if (tax_number.length === 15 && provider_tax_number.length === 10) {
     const pan_id = tax_number.slice(2, 12);
     if (pan_id !== provider_tax_number && np_type_on_search === "ISN") {
       result.push(
-        createError(
+        addError(
           `Pan_id is different in tax_number and provider_tax_number in message.order.tags[0].list`,
           ERROR_CODES.INVALID_RESPONSE
         )
       );
     } else if (pan_id === provider_tax_number && np_type_on_search === "MSN") {
       result.push(
-        createError(
+        addError(
           `Pan_id shouldn't be same in tax_number and provider_tax_number in message.order.tags[0].list`,
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -1660,7 +1603,7 @@ async function validateTags(
   if (order.tags && confirm_tags) {
     if (!areGSTNumbersMatching(confirm_tags, order.tags, "bpp_terms")) {
       result.push(
-        createError(
+        addError(
           `Tags should have same and valid gst_number as passed in /${constants.CONFIRM}`,
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -1685,7 +1628,7 @@ async function validateTags(
         data.value !== ON_INIT_val
       ) {
         result.push(
-          createError(
+          addError(
             `Value of tax Number mismatched in message/order/tags/bpp_terms for ${constants.ON_INIT} and ${constants.ON_STATUS}_${state}`,
             ERROR_CODES.INVALID_RESPONSE
           )
@@ -2039,7 +1982,7 @@ const checkOnStatusPending = async (
   try {
     if (!data || isObjectEmpty(data)) {
       result.push(
-        createError("JSON cannot be empty", ERROR_CODES.INVALID_RESPONSE)
+        addError("JSON cannot be empty", ERROR_CODES.INVALID_RESPONSE)
       );
       return result;
     }
@@ -2047,7 +1990,7 @@ const checkOnStatusPending = async (
     const { context, message } = data;
     if (!message || !context || !message.order || isObjectEmpty(message)) {
       result.push(
-        createError(
+        addError(
           "/context, /message, /order or /message/order is missing or empty",
           ERROR_CODES.INVALID_RESPONSE
         )
@@ -2115,8 +2058,8 @@ const checkOnStatusPending = async (
       `!!Some error occurred while checking /${constants.ON_STATUS} API, ${err.stack}`
     );
     result.push(
-      createError(
-        "Internal error processing /on_status_pending request",
+      addError(
+        "Internal Error - The response could not be processed due to an internal error. The SNP should retry the request.",
         ERROR_CODES.INTERNAL_ERROR
       )
     );

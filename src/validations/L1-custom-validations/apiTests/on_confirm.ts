@@ -117,9 +117,6 @@ async function validateMessageId(
       `${transaction_id}_${ApiSequence.CONFIRM}_msgId`
     );
     const domain = await RedisService.getKey(`${transaction_id}_domain`);
-    console.log("domain", domain, context.domain.split(":")[1]);
-
-    console.log("diff", confirmMsgId, context.message_id);
     if (!_.isEqual(confirmMsgId, context.message_id)) {
       result.push(
         addError(
@@ -741,7 +738,7 @@ async function validateFulfillments(
     }
   }
   await RedisService.setKey(
-    "fulfillmentsItemsSet",
+    `${transaction_id}_fulfillmentsItemsSet`,
     JSON.stringify(order?.fulfillments),
     TTL_IN_SECONDS
   );

@@ -2601,7 +2601,6 @@ export default async function onSearch(
 
         i++;
       }
-      console.log('Is this getting printedd 😱')
       await RedisService.setKey(
         `${transaction_id}_onSearchItems`,
         JSON.stringify(itemsArray),
@@ -2620,7 +2619,6 @@ export default async function onSearch(
         TTL_IN_SECONDS
       );
 
-      console.log("saving this itemsId", JSON.stringify([...itemsId]));
       await RedisService.setKey(
         `${transaction_id}_${ApiSequence.ON_SEARCH}itemsId`,
         JSON.stringify([...itemsId]),
@@ -2776,10 +2774,7 @@ export default async function onSearch(
       addError(20006, `Error while checking default flow: ${error.message}`);
     }
     if (!_.isEmpty(orderValueSet)) {
-      console.log(
-        "JSON.stringify([...orderValueSet])",
-        JSON.stringify([...orderValueSet])
-      );
+     
       await RedisService.setKey(
         `${transaction_id}_${ApiSequence.ON_SEARCH}_orderValueSet`,
         JSON.stringify([...orderValueSet]),

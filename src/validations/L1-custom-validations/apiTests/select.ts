@@ -699,9 +699,6 @@ const select = async (data: any) => {
     select.items.forEach(async (item: any) => {
       const onSearchItem = onSearchItems.find((it: any) => it.id === item.id);
       if (onSearchItem) {
-        console.log(
-          `ITEM ID: ${item.id}, Price: ${onSearchItem.price.value}, Count: ${item.quantity.count}`
-        );
         itemsCtgrs[item.id] = onSearchItem.category_id;
         itemsTat.push(onSearchItem["@ondc/org/time_to_ship"]);
 
@@ -745,7 +742,6 @@ const select = async (data: any) => {
       }
     });
     const provider_id = select.provider.id;
-    console.log("provider_id", provider_id);
 
     let orderValueData = await RedisService.getKey(
       `${transaction_id}_${ApiSequence.ON_SEARCH}_orderValueSet`

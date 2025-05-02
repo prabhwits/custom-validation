@@ -320,8 +320,16 @@ const confirm = async (data: any) => {
           });
         }
 
-        if (itemFlfllmnts && fulfillmentIdArray && (itemId in fulfillmentIdArray) || (itemId in itemFlfllmnts)) {
-          if (!fulfillmentIdArray.includes(confirm.items[i].fulfillment_id)  && !itemFlfllmnts[itemId]) {
+        if (
+          (itemFlfllmnts &&
+            fulfillmentIdArray &&
+            itemId in fulfillmentIdArray) ||
+          itemId in itemFlfllmnts
+        ) {
+          if (
+            !fulfillmentIdArray.includes(confirm.items[i].fulfillment_id) &&
+            !itemFlfllmnts[itemId]
+          ) {
             result.push({
               valid: false,
               code: 20000,
@@ -448,37 +456,6 @@ const confirm = async (data: any) => {
     } catch (error: any) {
       console.error(
         `!!Error while checking parent_item_id and type tags in /${constants.CONFIRM}, ${error.stack}`
-      );
-    }
-
-    try {
-      console.info(
-        `Checking for valid and present location ID inside item list for /${constants.CONFIRM}`
-      );
-      confirm.items.forEach((item: any, index: number) => {
-        onSearchItems.forEach((it: any) => {
-          const isCustomization = tagFinder(it, "customization");
-          const isNotCustomization = !isCustomization;
-
-          if (
-            it.id === item.id &&
-            it.location_id !== item.location_id &&
-            isNotCustomization
-          ) {
-            console.info(
-              `Location_id mismatch for item with ID: ${item.id} at index ${index}`
-            );
-            result.push({
-              valid: false,
-              code: 20000,
-              description: `items[${index}]: location_id for item ${item.id} must match the location_id in /${constants.ON_SEARCH}`,
-            });
-          }
-        });
-      });
-    } catch (error: any) {
-      console.error(
-        `!!Error while checking for valid and present location ID inside item list for /${constants.CONFIRM}, ${error.stack}`
       );
     }
 
@@ -650,12 +627,12 @@ const confirm = async (data: any) => {
       const itemFlfllmnts = itemFlfllmntsRaw
         ? JSON.parse(itemFlfllmntsRaw)
         : null;
-        const fulfillmentIdArrayRaw = await RedisService.getKey(
-          `${transaction_id}_fulfillmentIdArray`
-        );
-        const fulfillmentIdArray = fulfillmentIdArrayRaw
-          ? JSON.parse(fulfillmentIdArrayRaw)
-          : null;
+      const fulfillmentIdArrayRaw = await RedisService.getKey(
+        `${transaction_id}_fulfillmentIdArray`
+      );
+      const fulfillmentIdArray = fulfillmentIdArrayRaw
+        ? JSON.parse(fulfillmentIdArrayRaw)
+        : null;
       let i = 0;
       const len = confirm.fulfillments?.length || 0;
       const gpsRegex = /^-?\d{1,3}\.\d+,-?\d{1,3}\.\d+$/;
@@ -833,8 +810,6 @@ const confirm = async (data: any) => {
           sttlmntdtls
         )
       ) {
-        console.log(`👺 ${confirm.payment["@ondc/org/settlement_details"]}`)
-        console.log('👀', sttlmntdtls)
         result.push({
           valid: false,
           code: 20000,
@@ -852,10 +827,7 @@ const confirm = async (data: any) => {
           description: `order created and updated timestamps are mandatory in /${constants.CONFIRM}`,
         });
       } else {
-        const tmpstmpRaw = await RedisService.getKey(
-          `${transaction_id}_${ApiSequence.ON_INIT}_tmpstmp`
-        );
-        const tmpstmp = tmpstmpRaw ? JSON.parse(tmpstmpRaw) : null;
+        const tmpstmp = context?.timestamp;
         if (!_.isEqual(confirm.created_at, tmpstmp)) {
           result.push({
             valid: false,
