@@ -209,9 +209,7 @@ export class ValidationController {
         const error = invalidResult[0].description;
         const code = invalidResult[0].code as number;
         await saveLog(sessionId, `L1 validation failed: ${error}`, "error");
-        res
-          .status(200)
-          .send(setAckResponse(false, req.body, invalidResult));
+        res.status(400).send(setAckResponse(false, req.body, invalidResult));
         return;
       }
       await saveLog(sessionId, "second level validations passed successfully");
@@ -240,7 +238,7 @@ export class ValidationController {
         .join("\n");
       const code = l1Result[0].code as number;
       res
-        .status(200)
+        .status(400)
         .send(setAckResponse(false, req.body, allErrors, code.toString()));
       return;
     }
@@ -291,7 +289,7 @@ export class ValidationController {
     );
     if (!contextValidations.valid) {
       res
-        .status(200)
+        .status(400)
         .send(setAckResponse(false, req.body, contextValidations.error, "400"));
       return;
     }

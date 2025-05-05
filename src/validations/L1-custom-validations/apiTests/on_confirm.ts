@@ -18,7 +18,6 @@ import {
   payment_status,
   addFulfillmentIdToRedisSet,
   addActionToRedisSet,
-  tagFinder,
 } from "../../../utils/helper";
 import constants, {
   ApiSequence,
@@ -61,8 +60,9 @@ async function validateContext(
 ): Promise<void> {
   const contextRes = checkContext(context, constants.ON_CONFIRM);
   if (!contextRes?.valid) {
-    contextRes?.ERRORS.forEach((error: string) =>
-      result.push(addError(error, ERROR_CODES.INVALID_RESPONSE))
+    const errors = contextRes?.ERRORS;
+    Object.keys(errors).forEach((key: string) =>
+      result.push(addError(errors[key], ERROR_CODES.INVALID_RESPONSE))
     );
   }
 
@@ -194,10 +194,9 @@ async function validateOrder(
   parentItemIdSet: any,
   result: ValidationError[]
 ): Promise<void> {
-  const cnfrmOrdrIdRaw = await RedisService.getKey(
+  const cnfrmOrdrId = await RedisService.getKey(
     `${transaction_id}_cnfrmOrdrId`
   );
-  const cnfrmOrdrId = cnfrmOrdrIdRaw ? JSON.parse(cnfrmOrdrIdRaw) : null;
   if (cnfrmOrdrId && cnfrmOrdrId !== order.id) {
     result.push(
       addError(
@@ -337,8 +336,11 @@ async function validateOrder(
         )
       );
     }
-    if (itemFlfllmnts   && (item.id in itemFlfllmnts)) {
-      if (fulfillmentIdArray.includes(item.fulfillment_id) && !itemFlfllmnts[item.id]) {
+    if (itemFlfllmnts && item.id in itemFlfllmnts) {
+      if (
+        fulfillmentIdArray.includes(item.fulfillment_id) &&
+        !itemFlfllmnts[item.id]
+      ) {
         result.push(
           addError(
             `items[${index}].fulfillment_id mismatches for Item ${item.id} in /${constants.ON_SELECT} and /${constants.ON_CONFIRM}`,
@@ -347,7 +349,6 @@ async function validateOrder(
         );
       }
     } else {
-    
       result.push(
         addError(
           `Item Id ${item.id} does not exist in /${constants.ON_SELECT}`,
@@ -410,12 +411,12 @@ async function validateFulfillments(
     const on_select_fulfillment_tat_obj = on_select_fulfillment_tat_objRaw
       ? JSON.parse(on_select_fulfillment_tat_objRaw)
       : null;
-      const fulfillmentIdArrayRaw = await RedisService.getKey(
-        `${transaction_id}_fulfillmentIdArray`
-      );
-      const fulfillmentIdArray = fulfillmentIdArrayRaw
-        ? JSON.parse(fulfillmentIdArrayRaw)
-        : null;
+    const fulfillmentIdArrayRaw = await RedisService.getKey(
+      `${transaction_id}_fulfillmentIdArray`
+    );
+    const fulfillmentIdArray = fulfillmentIdArrayRaw
+      ? JSON.parse(fulfillmentIdArrayRaw)
+      : null;
     if (
       on_select_fulfillment_tat_obj &&
       on_select_fulfillment_tat_obj[fulfillment.id] !==
@@ -436,7 +437,7 @@ async function validateFulfillments(
     if (
       !fulfillment.id ||
       !itemFlfllmnts ||
-      !fulfillmentIdArray.includes(fulfillment.id) 
+      !fulfillmentIdArray.includes(fulfillment.id)
     ) {
       result.push(
         addError(
@@ -705,7 +706,14 @@ async function validateFulfillments(
     ]);
   }
 
+  await RedisService.setKey(
+    `${transaction_id}_${ApiSequence.ON_CONFIRM}_orderState`,
+    order.state,
+    TTL_IN_SECONDS
+  );
+
   if (order.state === "Accepted") {
+    const fulfillmentsItemsSet = new Set();
     if (!order.fulfillments?.length) {
       result.push(
         addError(
@@ -730,18 +738,15 @@ async function validateFulfillments(
         delete deliverObj?.tags;
         delete deliverObj?.start?.instructions;
         delete deliverObj?.end?.instructions;
-        await addFulfillmentIdToRedisSet(
-          transaction_id,
-          JSON.stringify(deliverObj)
+        fulfillmentsItemsSet.add(deliverObj);
+        await RedisService.setKey(
+          `${transaction_id}_fulfillmentsItemsSet`,
+          JSON.stringify([...fulfillmentsItemsSet]),
+          TTL_IN_SECONDS
         );
       }
     }
   }
-  await RedisService.setKey(
-    `${transaction_id}_fulfillmentsItemsSet`,
-    JSON.stringify(order?.fulfillments),
-    TTL_IN_SECONDS
-  );
 }
 
 async function validatePayment(
@@ -1227,8 +1232,10 @@ async function validateItems(
         ? JSON.parse(fulfillmentIdArrayRaw)
         : null;
       // Validate fulfillment ID
-      if (item.fulfillment_id && !fulfillmentIdArray.includes(item.fulfillment_id)) {
-       
+      if (
+        item.fulfillment_id &&
+        !fulfillmentIdArray.includes(item.fulfillment_id)
+      ) {
         result.push({
           valid: false,
           code: 20000,
@@ -1341,38 +1348,6 @@ async function validateItems(
           }
         }
       }
-
-      // Validate location ID
-      // if (checkLocationId) {
-      //   if (!item.location_id || typeof item.location_id !== "string" || item.location_id.trim() === "") {
-      //     console.info(`Missing or invalid location_id for item ID: ${itemId} at index ${i}`);
-      //     result.push({
-      //       valid: false,
-      //       code: 20000,
-      //       description: `items[${i}]: location_id is required and must be a non-empty string in /${currentApi}`,
-      //     });
-      //   } else if (onSearchItems.length > 0) {
-      //     const matchingSearchItem = onSearchItems.find((searchItem: any) => searchItem.id === itemId);
-      //     if (matchingSearchItem) {
-      //       const isCustomization = tagFinder(matchingSearchItem, "customization");
-      //       const isNotCustomization = !isCustomization;
-      //       if (isNotCustomization && matchingSearchItem.location_id !== item.location_id) {
-      //         console.info(`Location_id mismatch for item ID: ${itemId} at index ${i}`);
-      //         result.push({
-      //           valid: false,
-      //           code: 20000,
-      //           description: `items[${i}]: location_id ${item.location_id} for item ${itemId} does not match location_id in /${constants.ON_SEARCH}`,
-      //         });
-      //       }
-      //     } else {
-      //       result.push({
-      //         valid: false,
-      //         code: 20000,
-      //         description: `items[${i}]: item ${itemId} not found in /${constants.ON_SEARCH} for location_id validation`,
-      //       });
-      //     }
-      //   }
-      // }
 
       // Validate custom ID tags (existing logic)
       if (

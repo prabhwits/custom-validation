@@ -137,11 +137,12 @@ const onInit = async (data: any): Promise<ValidationError[]> => {
       console.info(`Checking context for /${constants.ON_INIT} API`);
       const contextRes: any = checkContext(context, constants.ON_INIT);
       if (!contextRes.valid) {
-        contextRes.ERRORS.forEach((error: any) => {
+        const errors = contextRes.ERRORS;
+        Object.keys(errors).forEach((key: any) => {
           result.push({
             valid: false,
             code: 20000,
-            description: error,
+            description: errors[key],
           });
         });
       }
@@ -498,19 +499,27 @@ const onInit = async (data: any): Promise<ValidationError[]> => {
     }
 
     // Compare item and fulfillment IDs
-   // Compare item and fulfillment IDs
-try {
-  console.info(`Comparing item Ids and fulfillment Ids in /${constants.ON_SELECT} and /${constants.ON_INIT}`);
-  const itemFlfllmntsRaw = await RedisService.getKey(`${transaction_id}_itemFlfllmnts`);
-  const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
-  const itemsIdListRaw = await RedisService.getKey(`${transaction_id}_itemsIdList`);
-  const itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
-  const fulfillmentIdArrayRaw = await RedisService.getKey(
-    `${transaction_id}_fulfillmentIdArray`
-  );
-  const fulfillmentIdArray = fulfillmentIdArrayRaw
-    ? JSON.parse(fulfillmentIdArrayRaw)
-    : null;
+    // Compare item and fulfillment IDs
+    try {
+      console.info(
+        `Comparing item Ids and fulfillment Ids in /${constants.ON_SELECT} and /${constants.ON_INIT}`
+      );
+      const itemFlfllmntsRaw = await RedisService.getKey(
+        `${transaction_id}_itemFlfllmnts`
+      );
+      const itemFlfllmnts = itemFlfllmntsRaw
+        ? JSON.parse(itemFlfllmntsRaw)
+        : null;
+      const itemsIdListRaw = await RedisService.getKey(
+        `${transaction_id}_itemsIdList`
+      );
+      const itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
+      const fulfillmentIdArrayRaw = await RedisService.getKey(
+        `${transaction_id}_fulfillmentIdArray`
+      );
+      const fulfillmentIdArray = fulfillmentIdArrayRaw
+        ? JSON.parse(fulfillmentIdArrayRaw)
+        : null;
 
       for (let i = 0; i < (on_init.items?.length || 0); i++) {
         const itemId: any = on_init.items[i].id;
@@ -536,22 +545,29 @@ try {
           });
         }
 
-    if (itemFlfllmnts && fulfillmentIdArray && (itemId in fulfillmentIdArray) || (itemId in itemFlfllmnts)) {
-      if (!fulfillmentIdArray.includes(on_init.items[i].fulfillment_id) && !itemFlfllmnts[itemId]) {
-        result.push({
-          valid: false,
-          code: 20000,
-          description: `items[${i}].fulfillment_id mismatches for Item ${itemId} in /${constants.ON_SELECT} and /${constants.ON_INIT}`,
-        });
-      }
-    } 
-    else {
-              result.push({
-                valid: false,
-                code: 20000,
-                description: `Item Id ${itemId} does not exist in /${constants.ON_SELECT}`,
-              });
-            }
+        if (
+          (itemFlfllmnts &&
+            fulfillmentIdArray &&
+            itemId in fulfillmentIdArray) ||
+          itemId in itemFlfllmnts
+        ) {
+          if (
+            !fulfillmentIdArray.includes(on_init.items[i].fulfillment_id) &&
+            !itemFlfllmnts[itemId]
+          ) {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `items[${i}].fulfillment_id mismatches for Item ${itemId} in /${constants.ON_SELECT} and /${constants.ON_INIT}`,
+            });
+          }
+        } else {
+          result.push({
+            valid: false,
+            code: 20000,
+            description: `Item Id ${itemId} does not exist in /${constants.ON_SELECT}`,
+          });
+        }
 
         if (itemsIdList && itemId in itemsIdList) {
           if (!item.quantity || item.quantity.count == null) {
@@ -919,7 +935,6 @@ try {
 
     // Check fulfillment objects
     try {
-
       console.info(`Checking fulfillments objects in /${constants.ON_INIT}`);
       const fulfillmentIdArrayRaw = await RedisService.getKey(
         `${transaction_id}_fulfillmentIdArray`
@@ -927,8 +942,12 @@ try {
       const fulfillmentIdArray = fulfillmentIdArrayRaw
         ? JSON.parse(fulfillmentIdArrayRaw)
         : null;
-      const itemFlfllmntsRaw = await RedisService.getKey(`${transaction_id}_itemFlfllmnts`);
-      const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
+      const itemFlfllmntsRaw = await RedisService.getKey(
+        `${transaction_id}_itemFlfllmnts`
+      );
+      const itemFlfllmnts = itemFlfllmntsRaw
+        ? JSON.parse(itemFlfllmntsRaw)
+        : null;
 
       for (let i = 0; i < (on_init.fulfillments?.length || 0); i++) {
         if (on_init.fulfillments[i].id) {
@@ -1132,14 +1151,16 @@ try {
       console.info(`Checking Settlement basis in /${constants.ON_INIT}`);
       const validSettlementBasis = ["delivery", "shipment"];
       const settlementBasis = on_init.payment["@ondc/org/settlement_basis"];
-      if (!validSettlementBasis.includes(settlementBasis)) {
-        result.push({
-          valid: false,
-          code: 20000,
-          description: `Invalid settlement basis in /${
-            constants.ON_INIT
-          }. Expected one of: ${validSettlementBasis.join(", ")}`,
-        });
+      if (settlementBasis) {
+        if (!validSettlementBasis.includes(settlementBasis)) {
+          result.push({
+            valid: false,
+            code: 20000,
+            description: `Invalid settlement basis in /${
+              constants.ON_INIT
+            }. Expected one of: ${validSettlementBasis.join(", ")}`,
+          });
+        }
       }
     } catch (error: any) {
       console.error(
@@ -1152,6 +1173,7 @@ try {
       console.info(`Checking Settlement Window in /${constants.ON_INIT}`);
       const settlementWindow = on_init.payment["@ondc/org/settlement_window"];
       if (
+        settlementWindow &&
         !/^P(?=\d|T\d)(\d+Y)?(\d+M)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+(\.\d+)?S)?)?$/.test(
           settlementWindow
         )
@@ -1267,7 +1289,7 @@ try {
       const on_select_quoteRaw = await RedisService.getKey(
         `${transaction_id}_quoteObj`
       );
-      
+
       const on_select_quote = on_select_quoteRaw
         ? JSON.parse(on_select_quoteRaw)
         : null;

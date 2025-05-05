@@ -106,11 +106,12 @@ const select = async (data: any) => {
 
   // Context validation errors
   if (!contextRes?.valid) {
-    contextRes.ERRORS.forEach((error: any) => {
+    const errors = contextRes.ERRORS;
+    Object.keys(errors).forEach((key: any) => {
       result.push({
         valid: false,
         code: 20000,
-        description: error,
+        description: errors[key],
       });
     });
   }

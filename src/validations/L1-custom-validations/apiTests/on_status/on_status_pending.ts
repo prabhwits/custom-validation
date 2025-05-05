@@ -15,7 +15,6 @@ import {
   areGSTNumbersMatching,
   addActionToRedisSet,
   addMsgIdToRedisSet,
-  addFulfillmentIdToRedisSet,
   compareCoordinates,
   checkItemTag,
   tagFinder,
@@ -48,8 +47,9 @@ const addError = (description: any, code: any) => ({
 async function validateContext(context: any, transaction_id: any, result: any) {
   const contextRes = checkContext(context, constants.ON_STATUS);
   if (!contextRes?.valid) {
-    contextRes?.ERRORS.forEach((error: any) =>
-      result.push(addError(error, ERROR_CODES.INVALID_RESPONSE))
+    const errors = contextRes?.ERRORS;
+    Object.keys(errors).forEach((key: string) =>
+      result.push(addError(errors[key], ERROR_CODES.INVALID_RESPONSE))
     );
   }
 
@@ -139,10 +139,9 @@ async function validateOrder(
   state: any,
   result: any
 ) {
-  const cnfrmOrdrIdRaw = await RedisService.getKey(
+  const cnfrmOrdrId = await RedisService.getKey(
     `${transaction_id}_cnfrmOrdrId`
   );
-  const cnfrmOrdrId = cnfrmOrdrIdRaw ? JSON.parse(cnfrmOrdrIdRaw) : null;
   if (cnfrmOrdrId && order.id !== cnfrmOrdrId) {
     result.push(
       addError(
@@ -988,38 +987,38 @@ async function validateFulfillments(
 
       // Tags validations
       if (ff.tags) {
-        const requiredTags = [
-          "@ondc/org/category",
-          "@ondc/org/subcategory",
-          "@ondc/org/provider_type",
-        ];
-        for (const tagCode of requiredTags) {
-          const tag = ff.tags.find((t: any) => t.code === tagCode);
-          if (!tag) {
-            console.info(
-              `Missing ${tagCode} tag for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-            );
-            result.push(
-              addError(
-                `fulfillments[${ffId}].tags must include ${tagCode}`,
-                ERROR_CODES.INVALID_RESPONSE
-              )
-            );
-          } else if (
-            !tag.list ||
-            !tag.list.find((l: any) => l.code === "value")?.value
-          ) {
-            console.info(
-              `Invalid ${tagCode} tag format for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-            );
-            result.push(
-              addError(
-                `fulfillments[${ffId}].tags[${tagCode}] must have a valid value`,
-                ERROR_CODES.INVALID_RESPONSE
-              )
-            );
-          }
-        }
+        // const requiredTags = [
+        //   "@ondc/org/category",
+        //   // "@ondc/org/subcategory",
+        //   "@ondc/org/provider_type",
+        // ];
+        // for (const tagCode of requiredTags) {
+        //   const tag = ff.tags.find((t: any) => t.code === tagCode);
+        //   if (!tag) {
+        //     console.info(
+        //       `Missing ${tagCode} tag for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+        //     );
+        //     result.push(
+        //       addError(
+        //         `fulfillments[${ffId}].tags must include ${tagCode}`,
+        //         ERROR_CODES.INVALID_RESPONSE
+        //       )
+        //     );
+        //   } else if (
+        //     !tag.list ||
+        //     !tag.list.find((l: any) => l.code === "value")?.value
+        //   ) {
+        //     console.info(
+        //       `Invalid ${tagCode} tag format for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+        //     );
+        //     result.push(
+        //       addError(
+        //         `fulfillments[${ffId}].tags[${tagCode}] must have a valid value`,
+        //         ERROR_CODES.INVALID_RESPONSE
+        //       )
+        //     );
+        //   }
+        // }
         if (onSelectFulfillments) {
           const selectFf = onSelectFulfillments.find((f: any) => f.id === ffId);
           if (selectFf && selectFf.tags && !_.isEqual(ff.tags, selectFf.tags)) {
@@ -1215,9 +1214,11 @@ async function validateFulfillments(
             delete deliverObj?.tags;
             delete deliverObj?.start?.instructions;
             delete deliverObj?.end?.instructions;
-            await addFulfillmentIdToRedisSet(
-              transaction_id,
-              JSON.stringify(deliverObj)
+            fulfillmentsItemsSet.add(deliverObj);
+            await RedisService.setKey(
+              `${transaction_id}_fulfillmentsItemsSet`,
+              JSON.stringify([...fulfillmentsItemsSet]),
+              TTL_IN_SECONDS
             );
           } catch (error: any) {
             console.error(
@@ -1232,24 +1233,6 @@ async function validateFulfillments(
           }
         }
       }
-    }
-
-    try {
-      await RedisService.setKey(
-        "fulfillmentsItemsSet",
-        JSON.stringify(order?.fulfillments),
-        TTL_IN_SECONDS
-      );
-    } catch (error: any) {
-      console.error(
-        `Error storing fulfillmentsItemsSet for transaction ${transaction_id}: ${error.message}`
-      );
-      result.push(
-        addError(
-          `Error storing fulfillmentsItemsSet`,
-          ERROR_CODES.INTERNAL_ERROR
-        )
-      );
     }
   } catch (error: any) {
     console.error(
@@ -1998,7 +1981,23 @@ const checkOnStatusPending = async (
       return result;
     }
 
-    const flow = (await RedisService.getKey("flow")) || "2";
+    const flow = "2";
+
+    const onConfirmOrderState = await RedisService.getKey(
+      `${context.transaction_id}_${ApiSequence.ON_CONFIRM}_orderState`
+    );
+
+    console.log("onConfirmOrderState", onConfirmOrderState);
+
+    if (onConfirmOrderState === "Accepted") {
+      result.push({
+        valid: false,
+        code: ERROR_CODES.INVALID_ORDER_STATE,
+        description: `When the onConfirm Order State is 'Accepted', the on_status_pending is not required!`,
+      });
+      return result;
+    }
+
     const { transaction_id } = context;
     const order = message.order;
 

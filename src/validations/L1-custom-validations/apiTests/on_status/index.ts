@@ -12,7 +12,10 @@ export const onStatusRouter = async (data: any) => {
   let fulfillmentsItemsSetRaw: any = await RedisService.getKey(
     `${transaction_id}_fulfillmentsItemsSet`
   );
-  let fulfillmentsItemsSet = JSON.parse(fulfillmentsItemsSetRaw);
+  let fulfillmentsItemsSet = new Set(
+    fulfillmentsItemsSetRaw ? JSON.parse(fulfillmentsItemsSetRaw) : []
+  );
+
   switch (state) {
     case "Pending":
       result = await checkOnStatusPending(data, state, fulfillmentsItemsSet);

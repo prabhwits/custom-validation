@@ -59,8 +59,9 @@ async function validateContext(
 ): Promise<void> {
   const contextRes = checkContext(context, constants.ON_STATUS);
   if (!contextRes?.valid) {
-    contextRes?.ERRORS.forEach((error: string) =>
-      result.push(addError(error, ERROR_CODES.INVALID_RESPONSE))
+    const errors = contextRes?.ERRORS;
+    Object.keys(errors).forEach((key: string) =>
+      result.push(addError(errors[key], ERROR_CODES.INVALID_RESPONSE))
     );
   }
 
@@ -165,10 +166,9 @@ async function validateOrder(
   state: string,
   result: ValidationError[]
 ): Promise<void> {
-  const cnfrmOrdrIdRaw = await RedisService.getKey(
+  const cnfrmOrdrId = await RedisService.getKey(
     `${transaction_id}_cnfrmOrdrId`
   );
-  const cnfrmOrdrId = cnfrmOrdrIdRaw ? JSON.parse(cnfrmOrdrIdRaw) : null;
   if (cnfrmOrdrId && order.id !== cnfrmOrdrId) {
     result.push(
       addError(
@@ -573,10 +573,10 @@ async function validateFulfillments(
         delete deliverObj?.end?.instructions;
         delete deliverObj?.agent;
         delete deliverObj?.start?.time?.timestamp;
-        await addFulfillmentIdToRedisSet(
-          transaction_id,
-          JSON.stringify(deliverObj)
-        );
+        // await addFulfillmentIdToRedisSet(
+        //   transaction_id,
+        //   JSON.stringify(deliverObj)
+        // );
       }
     }
   }
