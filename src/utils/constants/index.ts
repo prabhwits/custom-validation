@@ -78,6 +78,7 @@ export const ApiSequence = {
   ON_CONFIRM: 'on_confirm',
   CANCEL: 'cancel',
   ON_CANCEL: 'on_cancel',
+  ON_CANCEL_RTO: 'on_cancel_rto',
   TRACK: 'track',
   ON_TRACK: 'on_track',
   STATUS: 'status',

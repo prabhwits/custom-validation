@@ -413,8 +413,9 @@ export default async function search(payload: any): Promise<ValidationOutput> {
     );
 
     if (!contextRes?.valid) {
-      contextRes.ERRORS.forEach((err: any) =>
-        addError(40000, err.description || "Context validation failed")
+      const errors = contextRes?.ERRORS;
+      Object.keys(errors).forEach((key: string) =>
+        addError(40000, errors[key] || "Context validation failed")
       );
     }
     return result;

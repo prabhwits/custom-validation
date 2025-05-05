@@ -122,11 +122,12 @@ const init = async (data: any) => {
     }
 
     if (!contextRes?.valid) {
-      contextRes.ERRORS.forEach((error: any) => {
+      const errors = contextRes.ERRORS;
+      Object.keys(errors).forEach((key: any) => {
         result.push({
           valid: false,
           code: 20000,
-          description: error,
+          description: errors[key],
         });
       });
     }
@@ -567,28 +568,6 @@ const init = async (data: any) => {
               valid: false,
               code: 20000,
               description: `fulfillment id ${id} does not exist in /${constants.ON_SELECT}`,
-            });
-          }
-
-          // Check if tracking is present and a boolean
-          const tracking = init.fulfillments[i].tracking;
-          if (tracking == null) {
-            console.info(
-              `Missing tracking for fulfillment at index ${i} in /${constants.INIT}`
-            );
-            result.push({
-              valid: false,
-              code: 20000,
-              description: `fulfillments[${i}].tracking is missing in /${constants.INIT}`,
-            });
-          } else if (typeof tracking !== "boolean") {
-            console.info(
-              `Invalid tracking value for fulfillment at index ${i} in /${constants.INIT}`
-            );
-            result.push({
-              valid: false,
-              code: 20000,
-              description: `fulfillments[${i}].tracking must be a boolean (true or false) in /${constants.INIT}`,
             });
           }
 

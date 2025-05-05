@@ -153,11 +153,12 @@ const confirm = async (data: any) => {
     }
 
     if (!contextRes?.valid) {
-      contextRes.ERRORS.forEach((error: any) => {
+      const errors = contextRes.ERRORS;
+      Object.keys(errors).forEach((key: any) => {
         result.push({
           valid: false,
           code: 20000,
-          description: error,
+          description: errors[key],
         });
       });
     }
@@ -216,7 +217,7 @@ const confirm = async (data: any) => {
     const cnfrmOrdrId = confirm.id;
     await RedisService.setKey(
       `${transaction_id}_cnfrmOrdrId`,
-      JSON.stringify(cnfrmOrdrId),
+      cnfrmOrdrId,
       TTL_IN_SECONDS
     );
 

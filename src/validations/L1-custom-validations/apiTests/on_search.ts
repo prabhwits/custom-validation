@@ -119,8 +119,9 @@ export default async function onSearch(
 
     const contextRes: any = checkContext(context, constants.ON_SEARCH);
     if (!contextRes?.valid) {
-      contextRes.ERRORS.forEach((err: any) =>
-        addError(20006, err.description || "Context validation failed")
+      const errors = contextRes?.ERRORS;
+      Object.keys(errors).forEach((key: string) =>
+        addError(20006, errors[key] || "Context validation failed")
       );
     }
 
@@ -1990,10 +1991,10 @@ export default async function onSearch(
                 }
               }
             );
-            let countSeq = 0;
 
             customMenuIds.map((category_id: any) => {
               const categoryArray = categoryMap[`${category_id}`];
+              console.log("categoryArray", JSON.stringify([...categoryArray]));
               if (!categoryArray) {
                 addError(
                   20006,
@@ -2001,6 +2002,8 @@ export default async function onSearch(
                 );
               } else {
                 let i = 0;
+                let countSeq = 0;
+
                 while (i < categoryArray.length) {
                   countSeq++;
                   const exist = categoryArray.includes(countSeq);
@@ -2774,7 +2777,6 @@ export default async function onSearch(
       addError(20006, `Error while checking default flow: ${error.message}`);
     }
     if (!_.isEmpty(orderValueSet)) {
-     
       await RedisService.setKey(
         `${transaction_id}_${ApiSequence.ON_SEARCH}_orderValueSet`,
         JSON.stringify([...orderValueSet]),
