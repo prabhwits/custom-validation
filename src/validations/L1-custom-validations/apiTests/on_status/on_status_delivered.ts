@@ -584,10 +584,6 @@ async function validateFulfillments(
         delete deliverObj?.agent;
         delete deliverObj?.start?.time?.timestamp;
         delete deliverObj?.end?.time?.timestamp;
-        // await addFulfillmentIdToRedisSet(
-        //   transaction_id,
-        //   JSON.stringify(deliverObj)
-        // );
       }
     }
   }

@@ -1193,8 +1193,8 @@ const onInit = async (data: any): Promise<ValidationError[]> => {
     // Check payment details
     try {
       console.info(`Checking payment object in /${constants.ON_INIT}`);
-      const settlementDetails =
-        on_init.payment["@ondc/org/settlement_details"]?.[0];
+      const payment = on_init.payment;
+      const settlementDetails = payment["@ondc/org/settlement_details"]?.[0];
       if (!settlementDetails) {
         result.push({
           valid: false,
@@ -1274,6 +1274,199 @@ const onInit = async (data: any): Promise<ValidationError[]> => {
           JSON.stringify(settlementDetails),
           TTL_IN_SECONDS
         );
+      }
+
+      const collected_by = on_init.payment?.collected_by;
+
+      if (collected_by && collected_by === "BPP") {
+        // Top-Level Field Checks
+        if (!payment.type || payment.type !== "ON-ORDER") {
+          result.push({
+            valid: false,
+            code: 20006,
+            description:
+              "Type is missing or not equal to 'ON-ORDER' in payment",
+          });
+        }
+
+        if (
+          !payment.uri ||
+          !/^https?:\/\/[^\s/$.?#].[^\s]*$/.test(payment.uri)
+        ) {
+          result.push({
+            valid: false,
+            code: 20006,
+            description: "Uri is missing or not a valid URL in payment",
+          });
+        }
+
+        if (!payment.status || payment.status !== "NOT-PAID") {
+          result.push({
+            valid: false,
+            code: 20006,
+            description:
+              "Status is missing or not equal to 'NOT-PAID' in payment",
+          });
+        }
+
+        if (
+          !payment.params ||
+          typeof payment.params !== "object" ||
+          payment.params === null
+        ) {
+          result.push({
+            valid: false,
+            code: 20006,
+            description: "Params is missing, not an object, or null in payment",
+          });
+        }
+
+        if (
+          !payment["@ondc/org/settlement_basis"] ||
+          payment["@ondc/org/settlement_basis"] !== "delivery"
+        ) {
+          result.push({
+            valid: false,
+            code: 20006,
+            description:
+              "Settlement_basis is missing or not equal to 'delivery' in payment",
+          });
+        }
+
+        if (
+          !payment["@ondc/org/settlement_window"] ||
+          !/^P(\d+D)?$/.test(payment["@ondc/org/settlement_window"])
+        ) {
+          result.push({
+            valid: false,
+            code: 20006,
+            description:
+              "Settlement_window is missing or not a valid ISO 8601 duration in payment",
+          });
+        }
+
+        if (
+          !payment.tags ||
+          !Array.isArray(payment.tags) ||
+          payment.tags.length === 0
+        ) {
+          result.push({
+            valid: false,
+            code: 20006,
+            description: "Tags is missing, not an array, or empty in payload",
+          });
+        }
+
+        // Params Object Checks
+        if (payment.params) {
+          if (
+            !payment.params.currency ||
+            !/^[A-Z]{3}$/.test(payment.params.currency)
+          ) {
+            result.push({
+              valid: false,
+              code: 20006,
+              description:
+                "Currency is missing or not a valid ISO 4217 code in params",
+            });
+          }
+
+          if (
+            !payment.params.transaction_id ||
+            typeof payment.params.transaction_id !== "string" ||
+            payment.params.transaction_id === ""
+          ) {
+            result.push({
+              valid: false,
+              code: 20006,
+              description:
+                "Transaction_id is missing, not a string, or empty in payment.params",
+            });
+          }
+
+          if (
+            !payment.params.amount ||
+            !/^\d*\.\d{2}$/.test(payment.params.amount)
+          ) {
+            result.push({
+              valid: false,
+              code: 20006,
+              description:
+                "Amount is missing or not a valid decimal number in payment.params",
+            });
+          }
+        }
+
+        // Tags Array Checks
+        if (payment.tags && Array.isArray(payment.tags)) {
+          payment.tags.forEach((tag: any, index: number) => {
+            if (!tag.code || tag.code !== "bpp_collect") {
+              result.push({
+                valid: false,
+                code: 20006,
+                description: `payment.tag[${index}].code is missing or not equal to 'bpp_collect'`,
+              });
+            }
+
+            if (
+              !tag.list ||
+              !Array.isArray(tag.list) ||
+              tag.list.length === 0
+            ) {
+              result.push({
+                valid: false,
+                code: 20006,
+                description: `payment.tag[${index}].list is missing, not an array, or empty`,
+              });
+            }
+
+            if (tag.list && Array.isArray(tag.list)) {
+              const codes = new Set();
+              tag.list.forEach((item: any, itemIndex: number) => {
+                if (!item.code || !["success", "error"].includes(item.code)) {
+                  result.push({
+                    valid: false,
+                    code: 20006,
+                    description: `payment.tag[${index}].list[${itemIndex}].code is missing or not 'success' or 'error'`,
+                  });
+                }
+
+                if (item.code && codes.has(item.code)) {
+                  result.push({
+                    valid: false,
+                    code: 20006,
+                    description: `payment.tag[${index}].list[${itemIndex}].code is a duplicate in the list`,
+                  });
+                } else if (item.code) {
+                  codes.add(item.code);
+                }
+
+                if (!item.value || typeof item.value !== "string") {
+                  result.push({
+                    valid: false,
+                    code: 20006,
+                    description: `payment.tag[${index}].list[${itemIndex}].value is missing or not a string`,
+                  });
+                } else if (item.code === "success" && item.value !== "Y") {
+                  result.push({
+                    valid: false,
+                    code: 20006,
+                    description: `payment.tag[${index}].list[${itemIndex}].value must be 'Y' for code 'success'`,
+                  });
+                } else if (
+                  item.code === "error" &&
+                  (item.value === "" || item.value === "..")
+                ) {
+                  result.push({
+                    valid: false,
+                    code: 20006,
+                    description: `payment.tag[${index}].list[${itemIndex}].value is empty or invalid for code 'error'`,
+                  });
+                }
+              });
+            }
+          });
+        }
       }
     } catch (error: any) {
       console.error(
