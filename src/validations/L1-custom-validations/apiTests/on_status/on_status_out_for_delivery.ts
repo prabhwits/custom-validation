@@ -19,7 +19,6 @@ import {
   areGSTNumbersMatching,
   addActionToRedisSet,
   addMsgIdToRedisSet,
-  addFulfillmentIdToRedisSet,
   payment_status,
   compareCoordinates,
   checkItemTag,
@@ -573,10 +572,6 @@ async function validateFulfillments(
         delete deliverObj?.end?.instructions;
         delete deliverObj?.agent;
         delete deliverObj?.start?.time?.timestamp;
-        // await addFulfillmentIdToRedisSet(
-        //   transaction_id,
-        //   JSON.stringify(deliverObj)
-        // );
       }
     }
   }
@@ -701,6 +696,14 @@ async function validateOutForDeliveryTimestamps(
         }
       }
     }
+  }
+
+  if (order.updated_at) {
+    await RedisService.setKey(
+      `${transaction_id}_PreviousUpdatedTimestamp`,
+      JSON.stringify(order.updated_at),
+      TTL_IN_SECONDS
+    );
   }
 
   await RedisService.setKey(

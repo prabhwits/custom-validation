@@ -19,7 +19,6 @@ import {
   areGSTNumbersMatching,
   addActionToRedisSet,
   addMsgIdToRedisSet,
-  addFulfillmentIdToRedisSet,
   compareCoordinates,
   payment_status,
   checkItemTag,
@@ -473,10 +472,6 @@ async function validateFulfillments(
         delete deliverObj?.tags;
         delete deliverObj?.start?.instructions;
         delete deliverObj?.end?.instructions;
-        // await addFulfillmentIdToRedisSet(
-        //   transaction_id,
-        //   JSON.stringify(deliverObj)
-        // );
       }
     }
   }

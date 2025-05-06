@@ -61,6 +61,15 @@ export const isValidISO8601Duration = (value: string): boolean => {
   return iso8601DurationRegex.test(value) && value !== "P" && value !== "PT";
 };
 
+export const isValidUrl = (url: string) => {
+  try {
+    new URL(url);
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
 export const checkTagConditions = async (
   message: any,
   context: any,
@@ -259,35 +268,6 @@ export const addActionToRedisSet = async (
   } catch (error: any) {
     console.error(`Error in addActionToRedisSet: ${error.stack}`);
     throw error;
-  }
-};
-
-export const addFulfillmentIdToRedisSet = async (
-  transactionId: string,
-  fulfillment_id: string
-) => {
-  try {
-    const key = `${transactionId}_msgId_set`;
-    let existingSet: string[] = [];
-
-    const existing = await RedisService.getKey(key);
-    if (existing) {
-      existingSet = JSON.parse(existing);
-    }
-
-    if (!existingSet.includes(fulfillment_id)) {
-      existingSet.push(fulfillment_id);
-      await RedisService.setKey(
-        key,
-        JSON.stringify(existingSet),
-        TTL_IN_SECONDS
-      );
-
-      return false;
-    }
-    return true;
-  } catch (error: any) {
-    console.error(`Error in addFulfillmentIdToRedisSet: ${error.stack}`);
   }
 };
 
@@ -1237,7 +1217,7 @@ export const mapCancellationID = (
     );
     results.push({
       valid: false,
-      code: 20006,
+      code: 22502,
       description: `Invalid CancellationID ${reason_id} or not allowed for ${cancelled_by}`,
     });
     return false;
