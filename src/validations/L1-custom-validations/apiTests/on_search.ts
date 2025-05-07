@@ -398,11 +398,16 @@ export default async function onSearch(
           const collect_payment = tag.list.find(
             (item) => item.code === "collect_payment"
           );
+
           if (collect_payment) {
-            addError(
-              20006,
-              `collect_payment is not required in bpp/descriptor/tags`
-            );
+            const value = collect_payment.value;
+
+            if (value !== "Y" || value !== "N") {
+              addError(
+                20006,
+                `Invalid collect_payment value: ${value}. Expected "Y" or "N".`
+              );
+            }
           }
         }
       });
@@ -2364,10 +2369,10 @@ export default async function onSearch(
                   (elem: any) => elem.code === "min_value"
                 );
                 if (!minValue) {
-                  addError(
-                    20000,
-                    `order_value construct /bpp/providers[${i}]/tags[${t}] must include an item with code "min_value"`
-                  );
+                  // addError(
+                  //   20000,
+                  //   `order_value construct /bpp/providers[${i}]/tags[${t}] must include an item with code "min_value"`
+                  // );
                 } else {
                   // const serializedSc = JSON.stringify(sc);
                   orderValueSet.add({
