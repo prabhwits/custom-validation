@@ -6,11 +6,13 @@ import { statutory_reqs } from "./enums";
 import { data } from "./constants/AreacodeMap";
 import { InputObject } from "./interface";
 import { reasonCodes } from "./reasonCode";
+import { createAuthorizationHeader as createAuthHeader } from "ondc-crypto-sdk-nodejs"
+import { envVariables } from "../server";
+import axios from "axios";
 
 type ObjectType = {
   [key: string]: string | string[];
 };
-
 interface ValidationError {
   valid: boolean;
   code: number;
@@ -1277,3 +1279,44 @@ export const checkQuoteTrailSum = (
     console.error(description);
   }
 };
+
+export const createAuthorizationHeader = async (payload: any) => {
+
+  try {
+    const header = await createAuthHeader({
+      body: payload,
+      privateKey: envVariables.SIGN_PRIVATE_KEY ,
+      subscriberId: envVariables.SUBSCRIBER_ID ,
+      subscriberUniqueKeyId: envVariables.UKID 
+    });
+    return header
+  } catch (error:any) {
+    console.error("createAuthorizationHeader - Error",error);
+    throw new Error(`createAuthorizationHeader - Error ${error.message}`)
+  }
+}
+
+
+export async function lookupSubscriber(authorization: string, subscriber_id: string, type: string) {
+  try {
+    console.log("authorization", authorization);
+    const response = await axios.post(
+      "https://staging.registry.ondc.org/v2.0/lookup",
+      JSON.stringify({
+        type,
+        subscriber_id
+      }), 
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authorization
+        }
+      }
+    );
+
+    return response.data;
+  } catch (error : any) {
+    console.error("Lookup API error:", error?.response?.data || error.message);
+    throw error;
+  }
+}

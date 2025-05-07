@@ -71,6 +71,7 @@ export default async function onSearch(
     }
 
     const transaction_id = context?.transaction_id;
+    
 
     try {
       const previousCallPresent = await addActionToRedisSet(
@@ -1056,6 +1057,7 @@ export default async function onSearch(
               if ("price" in item) {
                 const sPrice = parseFloat(item.price.value);
                 const maxPrice = parseFloat(item.price.maximum_value);
+                
 
                 const lower = parseFloat(item.price?.tags?.[0].list[0]?.value);
                 const upper = parseFloat(item.price?.tags?.[0].list[1]?.value);
@@ -1103,6 +1105,36 @@ export default async function onSearch(
               console.error(
                 `Error while checking selling price and maximum price for item id: ${item.id}, ${e.stack}`
               );
+            }
+            try{
+              console.info('Checking item quantity object');
+              items.forEach((item: any) => {
+                const quantity = item?.quantity;
+                if(quantity){
+                  const minimum_qty = parseFloat(quantity?.minimum?.count);
+                  const maximum_qty = parseFloat(quantity?.maximum?.count);
+                  const available_qty = parseFloat(quantity?.available?.count);
+                  if(minimum_qty && maximum_qty && minimum_qty > maximum_qty){
+                    addError(
+                      20006,
+                      `minimum quantity: ${minimum_qty} can't be greater than the maximum quantity: ${maximum_qty}`)
+                  }
+                  if(minimum_qty && available_qty && available_qty < minimum_qty){
+                    addError(
+                      20006,
+                      `available quantity: ${available_qty} can't be less than the minimum quantity: ${minimum_qty}`)
+                  }
+                  if(maximum_qty && available_qty && available_qty > maximum_qty){
+                    addError(
+                      20006,
+                      `available quantity: ${available_qty} can't be greater than the maximum quantity: ${maximum_qty}`)
+                  } 
+
+                }
+              })
+               
+            } catch(e: any){
+
             }
 
             try {
@@ -3140,6 +3172,133 @@ export default async function onSearch(
       });
       console.error(`Error while checking offers under bpp/providers: ${err.stack}`);
     }
+
+    
+    try {
+      console.info(`Checking credentials`);
+    
+      const bppProviders = payload.message.catalog["bpp/providers"];
+    
+      // Check if bpp/providers exists and is an array
+      if (!bppProviders || !Array.isArray(bppProviders)) {
+        addError(20001, "bpp/providers array is missing or invalid in /ON_SEARCH");
+      }
+    
+      // Check if bpp/providers array is not empty
+      if (bppProviders.length === 0) {
+        addError(20002, "bpp/providers array is empty in /ON_SEARCH");
+      }
+    
+      // Collect descriptors for valid credentials
+      let credsDescriptor : any = [];
+    
+      // Iterate through each provider
+      bppProviders.forEach((provider : any, providerIndex : any) => {
+        const creds = provider.creds;
+    
+        // Skip validation if creds is missing or empty (optional)
+        if (!creds || !Array.isArray(creds) || creds.length === 0) {
+          console.info(`No credentials provided for provider at index ${providerIndex}, skipping validation`);
+          return;
+        }
+    
+        // Iterate through each credential
+        creds.forEach((cred, credIndex) => {
+          let isValid = true;
+    
+          // Check required fields in credential
+          if (!cred.id || !cred.descriptor || !cred.url || !cred.tags) {
+            addError(20003, `Credential at index ${credIndex} in provider ${providerIndex} is missing required fields in /ON_SEARCH`);
+            isValid = false;
+          }
+    
+          // Validate descriptor
+          if (cred.descriptor && (!cred.descriptor.code || !cred.descriptor.short_desc)) {
+            addError(20004, `Descriptor in credential at index ${credIndex} in provider ${providerIndex} is missing code or short_desc in /ON_SEARCH`);
+            isValid = false;
+          }
+    
+          // Validate URL format
+          try {
+            if (cred.url) new URL(cred.url);
+          } catch {
+            addError(20005, `Invalid URL format in credential at index ${credIndex} in provider ${providerIndex}: ${cred.url} in /ON_SEARCH`);
+            isValid = false;
+          }
+    
+          // Find verification tag
+          const verificationTag = cred.tags && cred.tags.find((tag: any) => tag.code === "verification");
+          if (!verificationTag || !verificationTag.list) {
+            addError(20006, `Verification tag missing or invalid in credential at index ${credIndex} in provider ${providerIndex} in /ON_SEARCH`);
+            isValid = false;
+          }
+    
+          // Extract verification details
+          const verifyUrl = verificationTag?.list?.find((item: any) => item.code === "verify_url")?.value;
+          const validFrom = verificationTag?.list?.find((item: any) => item.code === "valid_from")?.value;
+          const validTo = verificationTag?.list?.find((item: any) => item.code === "valid_to")?.value;
+    
+          // Check if verification details exist
+          if (!verifyUrl || !validFrom || !validTo) {
+            addError(20007, `Verification details missing in credential at index ${credIndex} in provider ${providerIndex} in /ON_SEARCH`);
+            isValid = false;
+          }
+    
+          // Validate verify_url format
+          try {
+            if (verifyUrl) new URL(verifyUrl);
+          } catch {
+            addError(20008, `Invalid verify_url format in credential at index ${credIndex} in provider ${providerIndex}: ${verifyUrl} in /ON_SEARCH`);
+            isValid = false;
+          }
+    
+          // Validate date formats and logic
+          const fromDate = validFrom && new Date(validFrom);
+          const toDate = validTo && new Date(validTo);
+          const currentDate = new Date("2025-05-07T00:00:00.000Z");
+    
+          if (fromDate && isNaN(fromDate.getTime())) {
+            addError(20009, `Invalid valid_from date in credential at index ${credIndex} in provider ${providerIndex}: ${validFrom} in /ON_SEARCH`);
+            isValid = false;
+          }
+    
+          if (toDate && isNaN(toDate.getTime())) {
+            addError(20010, `Invalid valid_to date in credential at index ${credIndex} in provider ${providerIndex}: ${validTo} in /ON_SEARCH`);
+            isValid = false;
+          }
+    
+          if (fromDate && toDate && toDate <= fromDate) {
+            addError(20011, `valid_to must be after valid_from in credential at index ${credIndex} in provider ${providerIndex} in /ON_SEARCH`);
+            isValid = false;
+          }
+    
+          // Check if credential is expired
+          if (toDate && toDate < currentDate) {
+            addError(20012, `Credential at index ${credIndex} in provider ${providerIndex} is expired (valid_to: ${validTo}) in /ON_SEARCH`);
+            isValid = false;
+          }
+    
+          // Collect descriptor if credential is valid
+          if (isValid && cred.descriptor) {
+            credsDescriptor.push(cred.descriptor);
+            console.info(`Credential at index ${credIndex} in provider ${providerIndex} is valid`);
+          }
+        });
+      });
+    
+      // Store credsDescriptor in Redis
+      await RedisService.setKey(
+        `${transaction_id}_${ApiSequence.ON_SEARCH}_credsDescriptor`,
+        JSON.stringify(credsDescriptor),
+        TTL_IN_SECONDS
+      );
+    
+    } catch (e : any) {
+      console.error("Credential validation failed", e);
+      addError(20013, `Error during credential validation in /ON_SEARCH: ${e.message}`);
+    }
+    
+    
   
 
     

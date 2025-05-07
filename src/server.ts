@@ -1,14 +1,21 @@
 import express, { Application, Request, Response, NextFunction } from "express";
 import cors from "cors";
 import logger from "./utils/logger";
-import { config } from "./config/serverConfig";
+import loadEnv, { config } from "./config/serverConfig";
 import apiRouter from "./routes/public-routes";
 import testRoutes from "./routes/test-routes";
 import { setAckResponse, setBadRequestNack } from "./utils/ackUtils";
 import mockRouter from "./routes/private-routes";
-
+let envVariables: any;
 const createServer = (): Application => {
 	const app = express();
+	
+	try{
+		envVariables = loadEnv();
+	} catch(err: any){
+		logger.error("Error loading config from API:", err);
+	}
+
 
 	// Middleware
 	app.use(express.json({ limit: "50mb" }));
@@ -21,6 +28,7 @@ const createServer = (): Application => {
 			next();
 		});
 	}
+	
 
 	var domain = process.env.DOMAIN;
 	var version = process.env.VERSION;
@@ -49,5 +57,6 @@ const createServer = (): Application => {
 
 	return app;
 };
-
+// module.exports = envVariables;
+export {envVariables}
 export default createServer;
