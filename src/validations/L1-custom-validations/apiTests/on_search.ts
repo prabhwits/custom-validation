@@ -122,10 +122,7 @@ export default async function onSearch(
       const errors = contextRes?.ERRORS;
       Object.keys(errors).forEach((key: string) =>
         addError(20006, errors[key] || "Context validation failed")
-      const errors = contextRes?.ERRORS;
-      Object.keys(errors).forEach((key: string) =>
-        addError(20006, errors[key] || "Context validation failed")
-      );
+      )
     }
 
     validateBapUri(context.bap_uri, context.bap_id, result, addError);
