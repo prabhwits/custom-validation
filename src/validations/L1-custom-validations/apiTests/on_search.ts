@@ -119,8 +119,9 @@ export default async function onSearch(
 
     const contextRes: any = checkContext(context, constants.ON_SEARCH);
     if (!contextRes?.valid) {
-      contextRes.ERRORS.forEach((err: any) =>
-        addError(20006, err.description || "Context validation failed")
+      const errors = contextRes?.ERRORS;
+      Object.keys(errors).forEach((key: string) =>
+        addError(20006, errors[key] || "Context validation failed")
       );
     }
 
@@ -1357,7 +1358,7 @@ export default async function onSearch(
               );
               if (providerOffers && providerOffers.length > 0) {
                 await RedisService.setKey(
-                  `${ApiSequence.ON_SEARCH}_offers`,
+                  `${transaction_id}_${ApiSequence.ON_SEARCH}_offers`,
                   JSON.stringify(providerOffers)
                 );
               }
@@ -2001,10 +2002,10 @@ export default async function onSearch(
                 }
               }
             );
-            let countSeq = 0;
 
             customMenuIds.map((category_id: any) => {
               const categoryArray = categoryMap[`${category_id}`];
+              console.log("categoryArray", JSON.stringify([...categoryArray]));
               if (!categoryArray) {
                 addError(
                   20006,
@@ -2012,6 +2013,8 @@ export default async function onSearch(
                 );
               } else {
                 let i = 0;
+                let countSeq = 0;
+
                 while (i < categoryArray.length) {
                   countSeq++;
                   const exist = categoryArray.includes(countSeq);
@@ -2898,6 +2901,27 @@ export default async function onSearch(
                 console.error(`'auto' with value 'yes' or 'no' is mandatory in meta tag for offers[${offerIdx}] in bpp/providers[${providerIdx}]`);
               }
             }
+            // time validations
+            const { label, range } = offer?.time || {}
+            const start = range?.start
+            const end = range?.end
+            if (label !== 'valid' || !start || !end) {
+              result.push({
+                valid: false,
+                code: 20000,
+                description: `Offer with id ${offer.id} has an invalid or missing time configuration.`,
+              })
+            }
+            const currentTimeStamp = new Date(context?.timestamp)
+            const startTime = new Date(start)
+            const endTime = new Date(end)
+            if (!(currentTimeStamp >= startTime && currentTimeStamp <= endTime)) {
+              result.push({
+                valid: false,
+                code: 20000,
+                description: `Offer with id ${offer.id} is not currently valid based on time range.`,
+              })
+            }
     
             // Offer type validations
             const offerValidations = {
@@ -3107,11 +3131,7 @@ export default async function onSearch(
           }
         });
       });
-      await RedisService.setKey(
-        `${transaction_id}_${ApiSequence.ON_SEARCH}offers`,
-        JSON.stringify(result),
-        TTL_IN_SECONDS
-      )
+     
     } catch (err: any) {
       result.push({
         valid: false,
@@ -3124,7 +3144,6 @@ export default async function onSearch(
 
     
     if (!_.isEmpty(orderValueSet)) {
-     
       await RedisService.setKey(
         `${transaction_id}_${ApiSequence.ON_SEARCH}_orderValueSet`,
         JSON.stringify([...orderValueSet]),

@@ -110,11 +110,12 @@ const select = async (data: any) => {
 
   // Context validation errors
   if (!contextRes?.valid) {
-    contextRes.ERRORS.forEach((error: any) => {
+    const errors = contextRes.ERRORS;
+    Object.keys(errors).forEach((key: any) => {
       result.push({
         valid: false,
         code: 20000,
-        description: error,
+        description: errors[key],
       });
     });
   }
@@ -969,7 +970,7 @@ const select = async (data: any) => {
 
   
     if (select?.offers && select?.offers.length > 0) {
-      const providerOffersRaw = await RedisService.getKey(`${transaction_id}_${ApiSequence.ON_SEARCH}offers`) 
+      const providerOffersRaw = await RedisService.getKey(`${transaction_id}_${ApiSequence.ON_SEARCH}_offers`) 
       const providerOffers = providerOffersRaw ? JSON.parse(providerOffersRaw) : [];
       const applicableOffers : any= [];
       const orderItemIds = select?.items?.map((item: any) => item.id) || [];
@@ -1073,9 +1074,10 @@ const select = async (data: any) => {
         });
         return;
       }
+     
   
       console.log('Applicable Offers in select:', applicableOffers);
-      await RedisService.setKey(`${transaction_id}_applicable_offers`, JSON.stringify(applicableOffers), TTL_IN_SECONDS);
+      await RedisService.setKey(`${transaction_id}_selected_offers`, JSON.stringify(applicableOffers), TTL_IN_SECONDS);
     }
   
    

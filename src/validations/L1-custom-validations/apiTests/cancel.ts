@@ -70,11 +70,12 @@ export const cancel = async (data: any) => {
     }
 
     if (!contextRes?.valid) {
-      contextRes.ERRORS.forEach((error: any) => {
+      const errors = contextRes?.ERRORS;
+      Object.keys(errors).forEach((key: any) => {
         result.push({
           valid: false,
           code: 40000,
-          description: error.message,
+          description: errors[key],
         });
       });
     }
@@ -167,10 +168,14 @@ export const cancel = async (data: any) => {
       console.info(
         `Comparing timestamp of /${constants.ON_INIT} and /${constants.CANCEL}`
       );
-      const storedTimestampRaw = await RedisService.getKey(timestampKey);
+      const storedTimestampRaw = await RedisService.getKey(
+        `${context.transaction_id}__${ApiSequence.ON_INIT}_tmpstmp`
+      );
       const storedTimestamp = storedTimestampRaw
         ? JSON.parse(storedTimestampRaw)
         : null;
+
+      console.log("timestamp", storedTimestamp, context.timestamp);
       if (_.gte(storedTimestamp, context.timestamp)) {
         result.push({
           valid: false,
@@ -179,7 +184,7 @@ export const cancel = async (data: any) => {
         });
       }
       await RedisService.setKey(
-        timestampKey,
+        `${context.transaction_id}__${ApiSequence.CANCEL}_tmpstmp`,
         JSON.stringify(context.timestamp),
         TTL_IN_SECONDS
       );
@@ -199,10 +204,7 @@ export const cancel = async (data: any) => {
         console.info(
           `Comparing order Id in /${constants.CANCEL} and /${constants.CONFIRM}`
         );
-        const confirmOrderIdRaw = await RedisService.getKey(confirmOrderIdKey);
-        const confirmOrderId = confirmOrderIdRaw
-          ? JSON.parse(confirmOrderIdRaw)
-          : null;
+        const confirmOrderId = await RedisService.getKey(confirmOrderIdKey);
         if (cancel.order_id !== confirmOrderId) {
           result.push({
             valid: false,
@@ -236,7 +238,7 @@ export const cancel = async (data: any) => {
       } else {
         await RedisService.setKey(
           cancelReasonIdKey,
-          JSON.stringify(cancel?.cancellation_reason_id),
+          cancel?.cancellation_reason_id,
           TTL_IN_SECONDS
         );
       }
@@ -287,7 +289,6 @@ export const cancel = async (data: any) => {
           const ttlResponseParam = paramsTag.list.find(
             (item: any) => item.code === "ttl_response"
           );
-
 
           // Validate force parameter
           if (!forceParam || !forceParam.code) {

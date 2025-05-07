@@ -9,6 +9,7 @@ import {
   onConfirm,
   onStatusRouter,
   cancel,
+  onCancelRouter,
 } from "../L1-custom-validations/apiTests/index";
 import { validationOutput } from "./types";
 
@@ -51,7 +52,10 @@ export async function performL1CustomValidations(
     case "cancel":
       result = await cancel(payload);
       break;
-    default:               
+    case "on_cancel":
+      result = await onCancelRouter(payload);
+      break;
+    default:
       result = [
         {
           valid: false,
@@ -63,11 +67,4 @@ export async function performL1CustomValidations(
       break;
   }
   return [...result];
-  return [
-    {
-      valid: true,
-      code: 200,
-      description: "Custom validation passed", // description is optional
-    },
-  ];
 }

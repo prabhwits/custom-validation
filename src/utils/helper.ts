@@ -5,6 +5,7 @@ import { groceryCategoryMappingWithStatutory } from "./constants/category";
 import { statutory_reqs } from "./enums";
 import { data } from "./constants/AreacodeMap";
 import { InputObject } from "./interface";
+import { reasonCodes } from "./reasonCode";
 
 type ObjectType = {
   [key: string]: string | string[];
@@ -58,6 +59,15 @@ export const isValidISO8601Duration = (value: string): boolean => {
   const iso8601DurationRegex =
     /^P(?:\d+Y)?(?:\d+M)?(?:\d+D)?(?:T(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d+)?S)?)?$/;
   return iso8601DurationRegex.test(value) && value !== "P" && value !== "PT";
+};
+
+export const isValidUrl = (url: string) => {
+  try {
+    new URL(url);
+    return true;
+  } catch (error) {
+    return false;
+  }
 };
 
 export const checkTagConditions = async (
@@ -258,35 +268,6 @@ export const addActionToRedisSet = async (
   } catch (error: any) {
     console.error(`Error in addActionToRedisSet: ${error.stack}`);
     throw error;
-  }
-};
-
-export const addFulfillmentIdToRedisSet = async (
-  transactionId: string,
-  fulfillment_id: string
-) => {
-  try {
-    const key = `${transactionId}_msgId_set`;
-    let existingSet: string[] = [];
-
-    const existing = await RedisService.getKey(key);
-    if (existing) {
-      existingSet = JSON.parse(existing);
-    }
-
-    if (!existingSet.includes(fulfillment_id)) {
-      existingSet.push(fulfillment_id);
-      await RedisService.setKey(
-        key,
-        JSON.stringify(existingSet),
-        TTL_IN_SECONDS
-      );
-
-      return false;
-    }
-    return true;
-  } catch (error: any) {
-    console.error(`Error in addFulfillmentIdToRedisSet: ${error.stack}`);
   }
 };
 
@@ -862,7 +843,8 @@ export function compareQuoteObjects(
       const sameTitleType =
         item1["@ondc/org/title_type"] === item2["@ondc/org/title_type"];
       const sameParentItemId =
-        !item1?.item?.parent_item_id || item1?.item?.parent_item_id === item2?.item?.parent_item_id;
+        !item1?.item?.parent_item_id ||
+        item1?.item?.parent_item_id === item2?.item?.parent_item_id;
       return sameItemId && sameTitleType && sameParentItemId;
     });
 
@@ -1158,17 +1140,6 @@ function isValidTimestamp(timestamp: string): boolean {
   return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(timestamp);
 }
 
-// export async function notExist  (transactionId: string) : boolean{
-//   const key = await RedisService.getKey(`${transactionId}_`);
-//   if (key) {
-//     const existingSet = JSON.parse(key);
-//     if (existingSet[0].length > 0) {
-//       return false;
-//     }
-//   }
-//   return true;
-// }
-
 export const tagFinder = (item: { tags: any[] }, value: string): any => {
   const res = item?.tags?.find((tag: any) => {
     return (
@@ -1180,4 +1151,129 @@ export const tagFinder = (item: { tags: any[] }, value: string): any => {
     );
   });
   return res;
+};
+
+export const checkQuoteTrail = (
+  quoteTrailItems: any[],
+  results: any,
+  selectPriceMap: any,
+  itemSet: any
+) => {
+  try {
+    for (const item of quoteTrailItems) {
+      let value = null;
+      let itemValue = null;
+      let itemID = null;
+      let type = null;
+      for (const val of item.list) {
+        if (val.code === "id") {
+          itemID = val.value;
+          value = selectPriceMap.get(val.value);
+        } else if (val.code === "value") {
+          itemValue = Math.abs(parseFloat(val.value));
+        } else if (val.code === "type") {
+          type = val.value;
+        }
+      }
+
+      if (value && itemValue && value !== itemValue && type === "item") {
+        results.push({
+          valid: false,
+          code: 20006,
+          description: `Price mismatch for  [${itemID}] provided in quote object '[${value}]'. Should be same as in quote of ${constants.ON_SELECT}`,
+        });
+      }
+
+      if (!itemSet.has(itemID) && type === "item") {
+        results.push({
+          valid: false,
+          code: 20006,
+          description: `Invalid Item ID,  [${itemID}] not present in items array`,
+        });
+      }
+    }
+  } catch (error: any) {
+    console.error(error);
+  }
+};
+
+export const mapCancellationID = (
+  cancelled_by: string,
+  reason_id: string,
+  results: any
+) => {
+  console.info(`Mapping cancellationID with valid ReasonID`);
+  if (
+    reason_id in reasonCodes &&
+    reasonCodes[reason_id].USED_BY.includes(cancelled_by)
+  ) {
+    console.info(
+      `CancellationID ${reason_id} mapped with valid ReasonID for ${cancelled_by}`
+    );
+    return true;
+  } else {
+    console.error(
+      `Invalid CancellationID ${reason_id} or not allowed for ${cancelled_by}`
+    );
+    results.push({
+      valid: false,
+      code: 22502,
+      description: `Invalid CancellationID ${reason_id} or not allowed for ${cancelled_by}`,
+    });
+    return false;
+  }
+};
+
+export const checkQuoteTrailSum = (
+  fulfillmentArr: any[],
+  price: number,
+  priceAtConfirm: number,
+  results: any[],
+  apiSeq: string
+) => {
+  let quoteTrailSum = 0;
+  const arrType = ["misc", "packing", "delivery", "tax", "item"];
+
+  for (const obj of fulfillmentArr) {
+    const quoteTrailItems = _.filter(obj.tags, { code: "quote_trail" });
+    for (const item of quoteTrailItems) {
+      for (const val of item.list) {
+        if (val.code === "type") {
+          if (!arrType.includes(val.value)) {
+            results.push({
+              valid: false,
+              code: 20006,
+              description: `Invalid Quote Trail Type '${val.value}' in ${apiSeq}. It should be one of: 'misc', 'packing', 'delivery', 'tax', or 'item'`,
+            });
+          }
+        }
+        if (val.code === "value") {
+          const value = Number(val.value);
+          if (isNaN(value)) {
+            results.push({
+              valid: false,
+              code: 20006,
+              description: `Invalid Quote Trail value '${val.value}' in ${apiSeq}. It must be a valid number`,
+            });
+          } else {
+            quoteTrailSum += value;
+          }
+        }
+      }
+    }
+  }
+
+  quoteTrailSum = Number(quoteTrailSum.toFixed(2));
+  const totalPrice = Number((price + quoteTrailSum).toFixed(2)) * -1;
+  const confirmPrice = Number(priceAtConfirm.toFixed(2));
+
+  if (totalPrice !== confirmPrice) {
+    const description = `quote_trail price and item quote price sum (${totalPrice}) for ${apiSeq} should equal the price in ${constants.ON_CONFIRM} (${confirmPrice})`;
+    results.push({
+      valid: false,
+      code: 22503,
+      description,
+    });
+    console.error(description);
+  }
 };

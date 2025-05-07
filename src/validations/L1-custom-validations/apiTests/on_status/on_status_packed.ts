@@ -19,7 +19,6 @@ import {
   areGSTNumbersMatching,
   addActionToRedisSet,
   addMsgIdToRedisSet,
-  addFulfillmentIdToRedisSet,
   compareCoordinates,
   payment_status,
   checkItemTag,
@@ -59,8 +58,9 @@ async function validateContext(
 ): Promise<void> {
   const contextRes = checkContext(context, constants.ON_STATUS);
   if (!contextRes?.valid) {
-    contextRes?.ERRORS.forEach((error: string) =>
-      result.push(addError(error, ERROR_CODES.INVALID_RESPONSE))
+    const errors = contextRes?.ERRORS;
+    Object.keys(errors).forEach((key: string) =>
+      result.push(addError(errors[key], ERROR_CODES.INVALID_RESPONSE))
     );
   }
 
@@ -165,10 +165,9 @@ async function validateOrder(
   state: string,
   result: ValidationError[]
 ): Promise<void> {
-  const cnfrmOrdrIdRaw = await RedisService.getKey(
+  const cnfrmOrdrId = await RedisService.getKey(
     `${transaction_id}_cnfrmOrdrId`
   );
-  const cnfrmOrdrId = cnfrmOrdrIdRaw ? JSON.parse(cnfrmOrdrIdRaw) : null;
   if (cnfrmOrdrId && order.id !== cnfrmOrdrId) {
     result.push(
       addError(
@@ -441,7 +440,7 @@ async function validateFulfillments(
             delete obj2?.state;
             delete obj1?.state;
           }
-
+          console.log("wertyuio",     JSON.stringify(obj1), JSON.stringify(obj2));
           const errors = compareFulfillmentObject(obj1, obj2, keys, i, apiSeq);
           errors.forEach((item: any) => {
             result.push(addError(item.errMsg, ERROR_CODES.INVALID_RESPONSE));
@@ -473,11 +472,6 @@ async function validateFulfillments(
         delete deliverObj?.tags;
         delete deliverObj?.start?.instructions;
         delete deliverObj?.end?.instructions;
-        await addFulfillmentIdToRedisSet(
-          transaction_id,
-          JSON.stringify(deliverObj)
-        );
-        deliverObj;
       }
     }
   }
