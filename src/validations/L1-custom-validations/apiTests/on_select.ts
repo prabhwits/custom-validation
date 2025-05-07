@@ -867,6 +867,29 @@ const onSelect = async (data: any) => {
         }
       }
     );
+  const parentItemIds = on_select.items
+    .map((item: any) => item.parent_item_id)
+    .filter((id: any) => id); 
+    const parentItemIdsQuotes = on_select.quote.breakup
+    .map((breakupItem: any) => breakupItem.item?.parent_item_id)
+    .filter((id: any) => id); // Remove undefined/null values
+    console.log('ParentItemIdsqweqwerqer124124124', parentItemIds);
+    console.log('ParentItemIdsQuotes2423423442', parentItemIdsQuotes);
+ 
+  parentItemIdsQuotes.forEach((quoteParentId : any, index : any) => {
+    if (!parentItemIds.includes(quoteParentId)) {
+      const errorMsg = `parent_item_id '${quoteParentId}' in quote.breakup[${index}] is not present in items array`;
+      result.push({
+        valid: false,
+        code: 20000,
+        description: errorMsg,
+      });
+      console.error(
+        `!!Error: ${errorMsg} in /${constants.ON_SELECT}`)
+      
+    }
+  });
+    
     await RedisService.setKey(
       `${transaction_id}_selectPriceMap`,
       JSON.stringify(Array.from(itemPrices.entries())),
@@ -987,6 +1010,7 @@ const onSelect = async (data: any) => {
               item["@ondc/org/title_type"]
             )
           ) {
+            
             result.push({
               valid: false,
               code: 20000,
@@ -995,8 +1019,10 @@ const onSelect = async (data: any) => {
           }
           if (
             item["@ondc/org/title_type"] !== "item" &&
+            item['@ondc/org/title_type'] !== 'offer' &&
             !(item.title.toLowerCase().trim() in retailPymntTtl)
           ) {
+            
             result.push({
               valid: false,
               code: 20000,
@@ -1004,6 +1030,7 @@ const onSelect = async (data: any) => {
             });
           } else if (
             item["@ondc/org/title_type"] !== "item" &&
+            item['@ondc/org/title_type'] !== 'offer' &&
             retailPymntTtl[item.title.toLowerCase().trim()] !==
               item["@ondc/org/title_type"]
           ) {
@@ -1068,12 +1095,116 @@ const onSelect = async (data: any) => {
       `${transaction_id}_itemsCtgrs`
     );
     const itemsCtgrs = itemsCtgrsRaw ? JSON.parse(itemsCtgrsRaw) : null;
+    const providerOffersRaw: any = await RedisService.getKey(`${transaction_id}_${ApiSequence.ON_SEARCH}_offers`) 
+    const providerOffers = providerOffersRaw
+      ? JSON.parse(providerOffersRaw)
+      : null;
+    const applicableOffers: any[] = []
+    const orderItemIds = on_select?.items?.map((item: any) => item.id) || []
+     const items: any = orderItemIds
+      .map((id: any) => {
+        const item = on_select?.quote?.breakup.find((entry: any) => entry['@ondc/org/item_id'] === id)
+        return item ? { id, price: item.price.value } : null
+      })
+      .filter((item: any) => item !== null)
+
+      const priceSums = items.reduce((acc: Record<string, number>, item: { id: string; price: string }) => {
+        const { id, price } = item
+        acc[id] = (acc[id] || 0) + parseFloat(price)
+        return acc
+      }, {})
+      const totalWithoutOffers = on_select?.quote?.breakup.reduce((sum: any, item: any) => {
+        if (item['@ondc/org/title_type'] !== 'offer') {
+          const value = parseFloat(item.price?.value || '0')
+          return sum + value
+        }
+        return sum
+      }, 0)
+      const offers: any = on_select.quote.breakup.filter((offer: any) => offer['@ondc/org/title_type'] === 'offer')
+      const applicableOfferRaw = await RedisService.getKey(`${transaction_id}_selected_offers`)
+      const applicableOffer = applicableOfferRaw
+        ? JSON.parse(applicableOfferRaw)
+        : null
+      console.info(`Calculating Items' prices in /${constants.ON_SELECT}`);
+      const deliveryCharges =
+      Math.abs(
+        parseFloat(
+          on_select.quote.breakup.find((item: any) => item['@ondc/org/title_type'] === 'delivery')?.price?.value,
+        ),
+      ) || 0
+      if (offers.length > 0) {
+        await RedisService.setKey(`${transaction_id}_on_select_offers`, JSON.stringify(offers), TTL_IN_SECONDS)
+        const additiveOffers = offers.filter((offer: any) => {
+          const metaTag = offer?.item.tags?.find((tag: any) => tag.code === 'offer')
+          return metaTag?.list?.some((entry: any) => entry.code === 'additive' && entry.value.toLowerCase() === 'yes')
+        })
+
+        const nonAdditiveOffers = offers.filter((offer: any) => {
+          const metaTag = offer?.item.tags?.find((tag: any) => tag.code === 'offer')
+          return metaTag?.list?.some((entry: any) => entry.code === 'additive' && entry.value.toLowerCase() === 'no')
+        })
+
+        if (additiveOffers.length > 0) {
+          offers.length = 0
+          additiveOffers.forEach((offer: any) => {
+            const providerOffer = providerOffers.find((o: any) => o.id === offer.id)
+            if (providerOffer) {
+              applicableOffers.push(providerOffer)
+            }
+          })
+        } else if (nonAdditiveOffers.length === 1) {
+          // Apply the single non-additive offer
+          applicableOffers.length = 0
+          const offer = nonAdditiveOffers[0]
+          const offerId = offer?.item?.tags
+            ?.find((tag: any) => tag.code === 'offer')
+            ?.list?.find((entry: any) => entry.code === 'id')?.value
+          const providerOffer = providerOffers.find((o: any) => o.id === offerId)
+          if (providerOffer) {
+            applicableOffers.push(providerOffer)
+          }
+        } else if (nonAdditiveOffers.length > 1) {
+          console.log('nonAdditiveOffers', nonAdditiveOffers)
+
+          applicableOffers.length = 0
+          nonAdditiveOffers.forEach((offer: any) => {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `Offer ${offer.id} is non-additive and cannot be combined with other non-additive offers.`,
+            })
+           
+          })
+          // setValue('Addtive-Offers',false)
+          return
+        }
+        console.log('Applicable Offers:', applicableOffers)
+      }
     if (on_select.quote) {
-      on_select.quote.breakup.forEach((element: any, i: any) => {
+      on_select.quote.breakup.forEach(async (element: any, i: any) => {
         const titleType = element["@ondc/org/title_type"];
         console.info(
           `Calculating quoted Price Breakup for element ${element.title}`
         );
+        if (titleType === 'offer') {
+          const priceValue = parseFloat(element.price.value)
+
+          if (isNaN(priceValue)) {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `Price for title type "offer" is not a valid number.`,
+            })
+            
+          } else if (priceValue >= 0) {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `Price for title type "offer" must be negative, but got ${priceValue}.`,
+            })
+          
+          }
+        }
         onSelectPrice += parseFloat(element.price.value);
         if (titleType === "item") {
           if (!(element["@ondc/org/item_id"] in itemFlfllmnts)) {
@@ -1109,7 +1240,7 @@ const onSelect = async (data: any) => {
             });
           }
         }
-        console.info(`Calculating Items' prices in /${constants.ON_SELECT}`);
+       
         if (
           typeof itemsIdList === "object" &&
           itemsIdList &&
@@ -1125,7 +1256,7 @@ const onSelect = async (data: any) => {
             onSelectItemsPrice += parseFloat(element.price.value);
           }
         }
-        if (titleType === "item") {
+        if (titleType === 'tax' || titleType === 'discount') {
           if (!(element["@ondc/org/item_id"] in itemFlfllmnts)) {
             result.push({
               valid: false,
@@ -1147,7 +1278,786 @@ const onSelect = async (data: any) => {
             });
           }
         }
+        if (titleType === 'offer' && providerOffers.length > 0 && offers.length > 0) {
+          try {
+            if (applicableOffers?.length > 0) {
+              const offerType = element?.item?.tags
+                ?.find((tag: any) => tag.code === 'offer')
+                ?.list?.find((entry: any) => entry.code === 'type')?.value
+              const offerId = element?.item?.tags
+                ?.find((tag: any) => tag.code === 'offer')
+                ?.list?.find((entry: any) => entry.code === 'id')?.value 
+              const onSelectOfferAutoApplicable = element?.item?.tags
+                ?.find((tag: any) => tag.code === 'offer')
+                ?.list?.find((entry: any) => entry.code === 'auto')?.value
+              if (!offerId) {
+                result.push({
+                  valid: false,
+                  code: 20000,
+                  description: `Offer id cannot be null or empty.`, 
+                });
+              
+                return
+              }
+              const quoteType =
+                element?.item?.tags
+                  .find((tag: any) => tag.code === 'quote')
+                  ?.list?.map((type: any) => type.value)
+                  .join(',') || ''
+  
+              console.log('quoteType', quoteType)
+              // if(quoteType == "order"){
+              //   const offerId = element['@ondc/org/item_id']
+              //   if (!offerId) {
+              //     errorObj['inVldItemId'] = [`offerId cannot be null or empty.`]
+              //     return
+              //   }
+              //   const applicableOffer = getValue('selected_offer')
+              //   console.log('applicableOffer', applicableOffer)
+              //   const offer = applicableOffer?.find((offer: any) => offer?.id === offerId)
+              //   if(!offer){
+              //     errorObj[`invalidOffer`] =
+              //     `Offer with id '${offerId}' is not applicable for this order.`;
+              //   return;
+              //   }
+  
+              // }
+              const offerPriceValue: number = Math.abs(parseFloat(element?.price?.value))
+              console.log('offerType', offerType)
+              console.log('offerId', offerId)
+  
+              // const applicableOffer = getValue('selected_offer')
+              // console.log('applicableOffer', applicableOffer)
+              const selectedOffer = applicableOffer?.find((offer: any) => offer?.id === offerId)
+              if (!applicableOffer) {
+                const providerOffer = applicableOffers?.find((p: any) => p?.id === offerId)
+                const providerMetaTag =
+                  providerOffer?.tags
+                    ?.find((tag: any) => tag.code === 'meta')
+                    ?.list?.find((code: any) => code.code === 'auto')?.value || {}
+                const offerAutoApplicable: boolean =
+                  providerMetaTag === onSelectOfferAutoApplicable && onSelectOfferAutoApplicable === 'yes'
+                if (!offerAutoApplicable && offerId) {
+                  result.push({
+                    valid: false,
+                    code: 20000,
+                    description: `Offer with id '${offerId}' is not applicable for this order as this offer cannot be auto applied but found in on select as defined in the catalog.`,
+                  })
+                
+                  return
+                }
+                if (!selectedOffer && !offerAutoApplicable) {
+                  const key = `inVldItemId[${i}]`
+                  result.push({
+                    valid: false,
+                    code: 20000,
+                    description: `item with id: ${element['@ondc/org/item_id']} in quote.breakup[${i}] does not exist in select offers id (should be a valid item id) `,
+                  })
+                  
+                }
+              }
+  
+              const providerOffer = providerOffers?.find((p: any) => p?.id === offerId)
+              const orderLocationIds = on_select?.provider?.locations?.map((loc: any) => loc.id) || []
+  
+              console.log('providerOffer', JSON.stringify(providerOffer))
+  
+              const offerLocationIds = providerOffer?.location_ids || []
+              const locationMatch = offerLocationIds.some((id: string) => orderLocationIds.includes(id))
+  
+              if (!locationMatch) {
+                result.push({
+                  valid: false,
+                  code: 20000,
+                  description: `Offer with id '${offerId}' is not applicable for any of the order's locations. \nApplicable locations in offer: [${offerLocationIds.join(', ')}], \nLocations in order: [${orderLocationIds.join(', ')}].`,
+                })
+               
+                return
+              }
+  
+              const offerItemIds = providerOffer?.item_ids || []
+              const itemMatch = offerItemIds.some((id: string) => orderItemIds.includes(id))
+  
+              if (!itemMatch && titleType === 'buyXgetY') {
+                result.push({
+                  valid: false,
+                  code: 20000,
+                  description: `Offer with id '${offerId}' is not applicable for any of the ordered item(s). \nApplicable items in offer: [${offerItemIds.join(', ')}], \nItems in order: [${orderItemIds.join(', ')}].`,
+                })
+               
+              }
+  
+              const benefitTag: any = providerOffer?.tags?.find((tag: any) => {
+                return tag?.code === 'benefit'
+              })
+              const benefitList = benefitTag?.list || []
+              const qualifierTag: any = providerOffer?.tags?.find((tag: any) => {
+                return tag?.code === 'qualifier'
+              })
+              const qualifierList: any = qualifierTag?.list || []
+              console.log('qualifierList', qualifierList, qualifierTag)
+  
+              const minValue = parseFloat(qualifierList.find((l: any) => l.code === 'min_value')?.value) || 0
+              console.log('min_value', minValue)
+              const itemsOnSearchRaw: any = await RedisService.getKey(`${transaction_id}_onSearchItems`) 
+              const itemsOnSearch = itemsOnSearchRaw
+                ? JSON.parse(itemsOnSearchRaw)
+                : null
+              
+              if (offerType === 'discount') {
+                if (minValue > 0 && minValue !== null) {
+                  const qualifies: boolean = totalWithoutOffers >= minValue
+                  console.log('qualifies', qualifies, minValue)
+  
+                  if (!qualifies) {
+                    result.push({
+                      valid: false,
+                      code: 20000,
+                      description: `Offer with id '${offerId}' is not applicable for quote with actual quote value before discount is ₹${totalWithoutOffers} as required min_value for order is ₹${minValue}.`,
+                    })  
+                    
+                  }
+                }
+  
+                const benefitList = benefitTag?.list || []
+  
+                const valueType = benefitList.find((l: any) => l?.code === 'value_type')?.value
+                const value_cap = Math.abs(
+                  parseFloat(benefitList.find((l: any) => l?.code === 'value_cap')?.value || '0'),
+                )
+                const benefitAmount = Math.abs(
+                  parseFloat(benefitList.find((l: any) => l.code === 'value')?.value || '0'),
+                )
+                const quotedPrice = parseFloat(on_select.quote.price.value || '0')
+  
+                let benefitValue = 0
+                let qualifies = false
+  
+                if (valueType === 'percent') {
+                  if (value_cap > 0) {
+                    benefitValue = (benefitAmount / 100) * value_cap
+  
+                    if (offerPriceValue !== benefitValue) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Discount mismatch: Expected discount is -₹${benefitValue.toFixed(2)} (i.e., ${benefitAmount}% of capped value ₹${value_cap}), but found -₹${offerPriceValue.toFixed(2)}.`,
+                      })
+                      
+                    }
+  
+                    qualifies = Math.abs(value_cap - benefitValue - quotedPrice) < 0.01
+  
+                    if (!qualifies) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Quoted price mismatch: After ${benefitAmount}% discount on ₹${value_cap}, expected price is ₹${(value_cap - benefitValue).toFixed(2)}, but got ₹${quotedPrice.toFixed(2)}.`,
+                      })
+                    
+                    }
+                  } else {
+                    const quotePercentageAmount = (benefitAmount / 100) * totalWithoutOffers
+  
+                    if (offerPriceValue !== quotePercentageAmount) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Discount mismatch: Expected discount is -₹${quotePercentageAmount.toFixed(2)} (i.e., ${benefitAmount}% of ₹${totalWithoutOffers}), but found -₹${offerPriceValue.toFixed(2)}.`,
+                      })
+                     
+                    }
+  
+                    const quoteAfterBenefit = totalWithoutOffers - quotePercentageAmount
+                    qualifies = Math.abs(quoteAfterBenefit - quotedPrice) < 0.01
+  
+                    if (!qualifies) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Quoted price mismatch: After ${benefitAmount}% discount on ₹${totalWithoutOffers}, expected price is ₹${quoteAfterBenefit.toFixed(2)}, but got ₹${quotedPrice.toFixed(2)}.`,
+                      })
+                      
+                    }
+                  }
+                } else {
+                  if (value_cap > 0) {
+                    benefitValue = value_cap - benefitAmount
+  
+                    if (offerPriceValue !== benefitAmount) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Discount mismatch: Expected discount is -₹${benefitAmount.toFixed(2)} (from capped value ₹${value_cap}), but found -₹${offerPriceValue.toFixed(2)}.`,
+                      })
+                     
+                    }
+  
+                    qualifies = Math.abs(benefitValue - quotedPrice) < 0.01
+  
+                    if (!qualifies) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Quoted price mismatch: After applying ₹${benefitAmount} on cap ₹${value_cap}, expected price is ₹${benefitValue.toFixed(2)}, but got ₹${quotedPrice.toFixed(2)}.`,
+                      })
+                    
+                    }
+                  } else {
+                    const quoteAfterBenefit = totalWithoutOffers - benefitAmount
+  
+                    if (offerPriceValue !== benefitAmount) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Discount mismatch: Expected discount is -₹${benefitAmount.toFixed(2)} (from ₹${totalWithoutOffers}), but found -₹${offerPriceValue.toFixed(2)}.`,
+                      })
+                     
+                    }
+  
+                    qualifies = Math.abs(quoteAfterBenefit - quotedPrice) < 0.01
+  
+                    if (!qualifies) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Quoted price mismatch: After applying ₹${benefitAmount} on ₹${totalWithoutOffers}, expected price is ₹${quoteAfterBenefit.toFixed(2)}, but got ₹${quotedPrice.toFixed(2)}.`,
+                      })
+                     
+                    }
+                  }
+                }
+              }
+  
+              if (offerType === 'freebie') {
+                // const benefitTag: any = providerOffer?.tags?.find((tag: any) => {
+                //   return tag?.code === 'benefit'
+                // })
+                // const benefitList = benefitTag?.list || []
+                // const qualifierTag: any = providerOffer?.tags?.find((tag: any) => {
+                //   return tag?.code === 'qualifier'
+                // })
+                // if(!benefitTag){
+                //   errorObj.invalidTags = `bpp/providers/offers/${offerId} tags with code benefit are missing and required`
+                //   return
+                // }
+                // const qualifierList: any = qualifierTag?.list || []
+                // console.log('qualifierList', qualifierList, qualifierTag)
+  
+                // const minValue = parseFloat(qualifierList.find((l: any) => l.code === 'min_value')?.value) || 0
+                // console.log('min_value', minValue)
+  
+                if (minValue > 0 && minValue !== null) {
+                  console.log('benefit lsit', benefitList)
+                  const qualifies: boolean = totalWithoutOffers >= minValue
+  
+                  console.log('qualifies', qualifies, minValue)
+  
+                  if (!qualifies) {
+                    result.push({
+                      valid: false,
+                      code: 20000,
+                      description: `Offer with id '${offerId}' is not applicable for quote with actual quote value before discount is ₹${totalWithoutOffers} as required min_value for order is ₹${minValue}.`,
+                    })
+                    
+                  }
+                  const benefitItemId = benefitList.find((entry: any) => entry.code === 'item_id')?.value || ''
+                  const benefitItemCount = parseInt(
+                    benefitList.find((entry: any) => entry.code === 'item_count')?.value || '0',
+                  )
+                  const itemTags = element?.item?.tags || []
+  
+                  const offerTag = itemTags.find((tag: any) => tag.code === 'offer')
+                  if (!offerTag) {
+                    result.push({
+                      valid: false,
+                      code: 20000,
+                      description: `tags are required in on_select   /quote with @ondc/org/title_type:${titleType} and offerId:${offerId}`,
+                    })
+                  
+                  }
+  
+                  const offerItemId = offerTag?.list?.find((entry: any) => entry.code === 'item_id')?.value || ''
+                  const offerItemCount = parseInt(
+                    offerTag?.list?.find((entry: any) => entry.code === 'item_count')?.value || '0',
+                  )
+                  if (!offerItemCount) {
+                    result.push({
+                      valid: false,
+                      code: 20000,
+                      description: `item_count is required in on_select   /quote with @ondc/org/title_type:${titleType} `,
+                    })
+                  
+                  }
+                  if (offerItemId !== benefitItemId) {
+                    result.push({
+                      valid: false,
+                      code: 20000,
+                      description: `Mismatch: item_id used in on_select quote.breakup (${offerItemId}) doesn't match with offer benefit item_id (${benefitItemId}) in on_search catalog for offer ID: ${offerId}`,
+                    })
+                    
+                  }
+                  if (benefitItemCount !== offerItemCount) {
+                    result.push({
+                      valid: false,
+                      code: 20000,
+                      description: `Mismatch: item_id used in on_select quote.breakup (${offerItemCount}) quantity doesn't match with offer benefit item_id (${benefitItemCount}) in on_search catalog  for offer ID: ${offerId}`,
+                    })
+                   
+                  }
+                  if (!offerItemId) {
+                    result.push({
+                      valid: false,
+                      code: 20000,
+                      description: `item_id is required in on_select   /quote with @ondc/org/title_type:${titleType} with  offer_id:${offerId}`,
+                    })
+                    
+                  }
+  
+                  // const offerPrice = Math.abs(parseFloat(element?.price?.value || '0'))
+  
+                  const itemIds = offerItemId.split(',').map((id: string) => id.trim())
+  
+                  const matchedItems = itemsOnSearch[0].filter((item: any) => itemIds.includes(item.id))
+  
+                  const priceMismatchItems: string[] = []
+                  let totalExpectedOfferValue: number = 0
+                  console.log(totalExpectedOfferValue)
+                  let allItemsEligible = true
+  
+                  matchedItems.forEach((item: any) => {
+                    const itemPrice = Math.abs(parseFloat(item?.price?.value || '0'))
+                    const availableCount = parseInt(item?.quantity?.available?.count || '0', 10)
+  
+                    // Calculate the expected total price for the item
+                    const expectedItemTotal = itemPrice * offerItemCount
+                    totalExpectedOfferValue += expectedItemTotal
+  
+                    // Validate stock availability
+                    if (availableCount < offerItemCount) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Item ID: ${item.id} does not have sufficient stock. Required: ${offerItemCount}, Available: ${availableCount}`,
+                      })
+                    
+                      allItemsEligible = false
+                    }
+  
+                    // Validate price consistency
+                    const quotedPrice = Math.abs(parseFloat(element?.price?.value || '0'))
+                    if (expectedItemTotal !== quotedPrice) {
+                      priceMismatchItems.push(
+                        `ID: ${item.id} (Expected Total: ₹${expectedItemTotal}, Quoted: ₹${quotedPrice})`,
+                      )
+                      allItemsEligible = false
+                    }
+                  })
+  
+                  if (priceMismatchItems.length > 0) {
+                    result.push({
+                      valid: false,
+                      code: 20000,
+                      description: `Price mismatch found for item(s): ${priceMismatchItems.join('; ')}`,  
+                    });
+                   
+                  }
+  
+                  if (!allItemsEligible) {
+                    const missingOrOutOfStock = itemIds.filter((id: string) => {
+                      const matchedItem = matchedItems.find((item: any) => item.id === id)
+                      if (!matchedItem) return true
+                      const availableCount = parseInt(matchedItem?.quantity?.available?.count || '0', 10)
+                      return availableCount < offerItemCount
+                    })
+  
+                    if (missingOrOutOfStock.length > 0) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Item(s) with ID(s) ${missingOrOutOfStock.join(', ')} not found in catalog or do not have enough stock for offer ID: ${offerId}`,
+                      })
+                     
+                    }
+                  }
+                } else {
+                  console.log('benefit lsit', benefitList)
+                  const benefitItemId = benefitList.find((entry: any) => entry.code === 'item_id')?.value || ''
+                  const benefitItemCount = parseInt(
+                    benefitList.find((entry: any) => entry.code === 'item_count')?.value || '0',
+                  )
+                  const itemTags = element?.item?.tags || []
+  
+                  const offerTag = itemTags.find((tag: any) => tag.code === 'offer')
+                  if (!offerTag) {
+                    result.push({
+                      valid: false,
+                      code: 20000,
+                      description: `tags are required in on_select   /quote with @ondc/org/title_type:${titleType} and offerId:${offerId}`,
+                    })
+                    
+                  }
+  
+                  const offerItemId = offerTag?.list?.find((entry: any) => entry.code === 'item_id')?.value || ''
+                  const offerItemCount = parseInt(
+                    offerTag?.list?.find((entry: any) => entry.code === 'item_count')?.value || '0',
+                  )
+                  if (!offerItemCount) {
+                    result.push({
+                      valid: false,
+                      code: 20000,
+                      description: `item_count is required in on_select   /quote with @ondc/org/title_type:${titleType} `,
+                    })
+                  
+                  }
+                  if (offerItemId !== benefitItemId) {
+                    result.push({
+                      valid: false,
+                      code: 20000,
+                      description: `Mismatch: item_id used in on_select quote.breakup (${offerItemId}) doesn't match with offer benefit item_id (${benefitItemId}) in on_search catalog for offer ID: ${offerId}`,
+                    })
+                    
+                  }
+                  if (benefitItemCount !== offerItemCount) {
+                    result.push({
+                      valid: false,
+                      code: 20000,
+                      description: `Mismatch: item_id used in on_select quote.breakup (${offerItemCount}) quantity doesn't match with offer benefit item_id (${benefitItemCount}) in on_search catalog  for offer ID: ${offerId}`,
+                    })
+                    
+                  }
+                  if (!offerItemId) {
+                    result.push({
+                      valid: false,
+                      code: 20000,
+                      description: `item_id is required in on_select   /quote with @ondc/org/title_type:${titleType} with  offer_id:${offerId}`,
+                    })
+                  
+                  }
+  
+                  // const offerPrice = Math.abs(parseFloat(element?.price?.value || '0'))
+  
+                  const itemIds = offerItemId.split(',').map((id: string) => id.trim())
+                  // let totalExpectedOfferValue = 0
+                  const matchedItems = itemsOnSearch[0].filter((item: any) => itemIds.includes(item.id))
+  
+                  const priceMismatchItems: string[] = []
+                  let totalExpectedOfferValue = 0
+                  console.log(totalExpectedOfferValue)
+                  let allItemsEligible = true
+  
+                  matchedItems.forEach((item: any) => {
+                    const itemPrice = Math.abs(parseFloat(item?.price?.value || '0'))
+                    const availableCount = parseInt(item?.quantity?.available?.count || '0', 10)
+  
+                    // Calculate the expected total price for the item
+                    const expectedItemTotal = itemPrice * offerItemCount
+                    totalExpectedOfferValue += expectedItemTotal
+  
+                    // Validate stock availability
+                    if (availableCount < offerItemCount) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Item ID: ${item.id} does not have sufficient stock. Required: ${offerItemCount}, Available: ${availableCount}`,
+                      })
+                    
+                      allItemsEligible = false
+                    }
+  
+                    // Validate price consistency
+                    const quotedPrice = Math.abs(parseFloat(element?.price?.value || '0'))
+                    if (expectedItemTotal !== quotedPrice) {
+                      priceMismatchItems.push(
+                        `ID: ${item.id} (Expected Total: ₹${expectedItemTotal}, Quoted: ₹${quotedPrice})`,
+                      )
+                      allItemsEligible = false
+                    }
+                  })
+  
+                  // Report any price mismatches
+                  if (priceMismatchItems.length > 0) {
+                    result.push({
+                      valid: false,
+                      code: 20000,
+                      description: `Price mismatch found for item(s): ${priceMismatchItems.join('; ')}`,
+                    })
+                   
+                  }
+  
+                  // If not all items are eligible, identify missing or out-of-stock items
+                  if (!allItemsEligible) {
+                    const missingOrOutOfStock = itemIds.filter((id: string) => {
+                      const matchedItem = matchedItems.find((item: any) => item.id === id)
+                      if (!matchedItem) return true
+                      const availableCount = parseInt(matchedItem?.quantity?.available?.count || '0', 10)
+                      return availableCount < offerItemCount
+                    })
+  
+                    if (missingOrOutOfStock.length > 0) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Item(s) with ID(s) ${missingOrOutOfStock.join(', ')} not found in catalog or do not have enough stock for offer ID: ${offerId}`,
+                      })
+                      
+                    }
+                  }
+                }
+              }
+  
+              if (offerType === 'buyXgetY') {
+                const offerMinItemCount =
+                  parseFloat(qualifierList.find((l: any) => l.code === 'item_count')?.value) || 0
+                if (!offerMinItemCount || offerMinItemCount === 0) {
+                  result.push({
+                    valid: false,
+                    code: 20000,
+                    description: `Minimum Item Count required in catalog /offers/tags/qualifier/list/code:item_count or minimum item_count cannot be 0 for offer with id :${offerId}`,
+                  })
+                
+                }
+                if (minValue > 0 && minValue !== null) {
+                  const qualifies: boolean = minValue >= priceSums
+                  console.log('qualifies', qualifies, minValue)
+  
+                  if (!qualifies) {
+                    result.push({
+                      valid: false,
+                      code: 20000,
+                      description: `Offer with id '${offerId}' is not applicable for quote with actual quote value before discount is ₹${totalWithoutOffers} as required min_value for order is ₹${minValue}.`,
+                    })
+                   
+                  }
+                }
+                const benefitItemId = benefitList.find((entry: any) => entry.code === 'item_id')?.value || ''
+                const benefitItemCount = parseInt(
+                  benefitList.find((entry: any) => entry.code === 'item_count')?.value || '0',
+                )
+                const itemTags = element?.item?.tags || []
+  
+                const offerTag = itemTags.find((tag: any) => tag.code === 'offer')
+                if (!offerTag) {
+                  result.push({
+                    valid: false,
+                    code: 20000,
+                    description: `tags are required in on_select   /quote with @ondc/org/title_type:${titleType} and offerId:${offerId}`,
+                  })
+                  
+                }
+  
+                const offerItemId = offerTag?.list?.find((entry: any) => entry.code === 'item_id')?.value || ''
+                const offerItemCount = parseInt(
+                  offerTag?.list?.find((entry: any) => entry.code === 'item_count')?.value || '0',
+                )
+                if (!offerItemCount) {
+                  result.push({
+                    valid: false,
+                    code: 20000,
+                    description: `item_count is required in on_select   /quote with @ondc/org/title_type:${titleType} `,
+                  })
+                 
+                }
+                if (offerItemId !== benefitItemId) {
+                  result.push({
+                    valid: false,
+                    code: 20000,
+                    description: `Mismatch: item_id used in on_select quote.breakup (${offerItemId}) doesn't match with offer benefit item_id (${benefitItemId}) in on_search catalog for offer ID: ${offerId}`,
+                  })
+                  
+                }
+                if (benefitItemCount !== offerItemCount) {
+                  result.push({
+                    valid: false,
+                    code: 20000,
+                    description: `Mismatch: item_id used in on_select quote.breakup (${offerItemCount}) quantity doesn't match with offer benefit item_id (${benefitItemCount}) in on_search catalog  for offer ID: ${offerId}`,
+                  })
+                 
+                }
+                if (offerItemId) {
+                  const itemIds = offerItemId.split(',').map((id: string) => id.trim())
+                  // let totalExpectedOfferValue = 0
+                  const matchedItems = itemsOnSearch[0].filter((item: any) => itemIds.includes(item.id))
+  
+                  const priceMismatchItems: string[] = []
+                  let totalExpectedOfferValue = 0
+                  console.log(totalExpectedOfferValue)
+                  let allItemsEligible = true
+  
+                  matchedItems.forEach((item: any) => {
+                    const itemPrice = Math.abs(parseFloat(item?.price?.value || '0'))
+                    const availableCount = parseInt(item?.quantity?.available?.count || '0', 10)
+  
+                    // Calculate the expected total price for the item
+                    const expectedItemTotal = itemPrice * offerItemCount
+                    totalExpectedOfferValue += expectedItemTotal
+  
+                    // Validate stock availability
+                    if (availableCount < offerItemCount) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Item ID: ${item.id} does not have sufficient stock. Required: ${offerItemCount}, Available: ${availableCount}`,
+                      })
+                    
+                      allItemsEligible = false
+                    }
+  
+                    // Validate price consistency
+                    const quotedPrice = Math.abs(parseFloat(element?.price?.value || '0'))
+                    if (expectedItemTotal !== quotedPrice) {
+                      priceMismatchItems.push(
+                        `ID: ${item.id} (Expected Total: ₹${expectedItemTotal}, Quoted: ₹${quotedPrice})`,
+                      )
+                      allItemsEligible = false
+                    }
+                  })
+  
+                  // Report any price mismatches
+                  if (priceMismatchItems.length > 0) {
+                    result.push({
+                      valid: false,
+                      code: 20000,
+                      description: `Price mismatch found for item(s): ${priceMismatchItems.join('; ')}`,
+                    })
+                   
+                  }
+  
+                  // If not all items are eligible, identify missing or out-of-stock items
+                  if (!allItemsEligible) {
+                    const missingOrOutOfStock = itemIds.filter((id: string) => {
+                      const matchedItem = matchedItems.find((item: any) => item.id === id)
+                      if (!matchedItem) return true
+                      const availableCount = parseInt(matchedItem?.quantity?.available?.count || '0', 10)
+                      return availableCount < offerItemCount
+                    })
+  
+                    if (missingOrOutOfStock.length > 0) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Item(s) with ID(s) ${missingOrOutOfStock.join(', ')} not found in catalog or do not have enough stock for offer ID: ${offerId}`,
+                      })
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Item(s) with ID(s) ${missingOrOutOfStock.join(', ')} not found in catalog or do not have enough stock for offer ID: ${offerId}`,
+                      })
+                     
+                    }
+                  }
+                }
+              }
+              if (offerType === 'delivery' && quoteType === 'fulfillment') {
+                if (deliveryCharges > 0 || deliveryCharges !== null) {
+                  if (minValue > 0 && minValue !== null) {
+                    const qualifies: boolean = totalWithoutOffers >= minValue
+                    console.log('qualifies', qualifies, minValue)
+  
+                    if (!qualifies) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Offer with id '${offerId}' is not applicable for quote with actual quote value before discount is ₹${totalWithoutOffers} as required min_value for order is ₹${minValue}.`,
+                      })
+                   
+                    }
+                  }
+  
+                  const benefitList = benefitTag?.list || []
+  
+                  const valueType = benefitList.find((l: any) => l?.code === 'value_type')?.value
+                  const value_cap = Math.abs(
+                    parseFloat(benefitList.find((l: any) => l?.code === 'value_cap')?.value || '0'),
+                  )
+                  const benefitValue = Math.abs(
+                    parseFloat(benefitList.find((l: any) => l.code === 'value')?.value || '0'),
+                  )
+                  const quotedPrice = parseFloat(on_select.quote.price.value || '0')
+                  let qualifies = false
+  
+                  if (valueType === 'percent') {
+                    if (value_cap === 0) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Offer with id '${offerId}' is not applicable for quote with actual quote value before discount is ₹${totalWithoutOffers} as required min_value for order is ₹${minValue}.`,
+                      })
+                     
+                    } else {
+                      console.log('delivery charges', deliveryCharges, offerPriceValue)
+                      let expectedDiscount = 0
+                      expectedDiscount = (benefitValue / 100) * deliveryCharges
+                      if (expectedDiscount > value_cap) {
+                        expectedDiscount = value_cap
+                      }
+                      if (expectedDiscount > deliveryCharges) {
+                        result.push({
+                          valid: false,
+                          code: 20000,
+                          description: `Discount exceeds delivery charge. Discount: ₹${expectedDiscount.toFixed(2)}, Delivery Charge: ₹${deliveryCharges.toFixed(2)}`,
+                        })
+                        
+                      }
+                      if (offerPriceValue !== expectedDiscount) {
+                        result.push({
+                          valid: false,
+                          code: 20000,
+                          description: `Discount mismatch: Expected discount is -₹${expectedDiscount.toFixed(2)} (i.e., ${benefitValue}% of capped value ₹${value_cap}), but found -₹${offerPriceValue.toFixed(2)}.`,
+                        })
+                       
+                      }
+                    }
+                  } else {
+                    if (benefitValue !== offerPriceValue) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Discount mismatch: Expected discount is -₹${benefitValue.toFixed(2)} (from ₹${totalWithoutOffers}), but found -₹${offerPriceValue.toFixed(2)}.`,
+                      })
+                     
+                    }
+  
+                    if (offerPriceValue !== deliveryCharges) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Discount mismatch: Expected discount is -₹${offerPriceValue.toFixed(2)}, but delivery charges are -₹${deliveryCharges.toFixed(2)}.`,
+                      })
+                      
+                    }
+  
+                    const quoteAfterBenefit = totalWithoutOffers - benefitValue
+  
+                    qualifies = Math.abs(quoteAfterBenefit - quotedPrice) < 0.01
+  
+                    if (!qualifies) {
+                      result.push({
+                        valid: false,
+                        code: 20000,
+                        description: `Quoted price mismatch: After applying ₹${benefitValue} on ₹${totalWithoutOffers}, expected price is ₹${quoteAfterBenefit.toFixed(2)}, but got ₹${quotedPrice.toFixed(2)}.`,
+                      })
+                    
+                    }
+                  }
+                } else {
+                  result.push({
+                    valid: false,
+                    code: 20000,
+                    description: `Delivery charges are required in on_select   /quote with @ondc/org/title_type:${titleType} with  offer_id:${offerId}`,
+                  })
+                 
+                }
+              }
+            }
+          } catch (error: any) {
+            console.error(
+              `!!Error while checking and validating the offer price in /${constants.ON_SELECT}, ${error.stack}`,
+            )
+          }
+        }
       });
+     
       await RedisService.setKey(
         `${transaction_id}_onSelectPrice`,
         JSON.stringify(on_select.quote.price.value),

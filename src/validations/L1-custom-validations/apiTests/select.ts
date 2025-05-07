@@ -17,6 +17,10 @@ const select = async (data: any) => {
   const TTL_IN_SECONDS: number = Number(process.env.TTL_IN_SECONDS) || 3600;
   const flow: string = "2";
   const apiSeq: string = ApiSequence.SELECT;
+  const addError = (code:any, description:any) => {
+    result.push({ valid: false, code, description });
+  };
+
 
   // Check if data is empty
   if (!data || isObjectEmpty(data)) {
@@ -958,6 +962,129 @@ const select = async (data: any) => {
       );
     }
   };
+  try {
+    console.info(`Checking for offers in /${constants.SELECT}`);
+    console.log("offers in select call", JSON.stringify(select.offers));
+  
+    
+
+  
+    if (select?.offers && select?.offers.length > 0) {
+      const providerOffersRaw = await RedisService.getKey(`${transaction_id}_${ApiSequence.ON_SEARCH}_offers`) 
+      const providerOffers = providerOffersRaw ? JSON.parse(providerOffersRaw) : [];
+      const applicableOffers : any= [];
+      const orderItemIds = select?.items?.map((item: any) => item.id) || [];
+      const orderLocationIds = select?.provider?.locations?.map((item : any) => item.id) || [];
+  
+      select.offers.forEach((offer: any, index: any) => {
+        const providerOffer = providerOffers.find((providedOffer: any) => providedOffer?.id === offer?.id);
+        console.log("providerOffer in select call", JSON.stringify(providerOffer));
+  
+        if (!providerOffer) {
+          addError(40000, `Offer with id ${offer.id} is not available for the provider.`);
+          return;
+        }
+  
+        const offerLocationIds = providerOffer?.location_ids || [];
+        const locationMatch = offerLocationIds.some((id: any) => orderLocationIds.includes(id));
+        if (!locationMatch) {
+          addError(
+            40000,
+            `Offer with id '${offer.id}' is not applicable for any of the order's locations [${orderLocationIds.join(', ')}].`
+          );
+          return;
+        }
+  
+        const offerItemIds = providerOffer?.item_ids || [];
+        const itemMatch = offerItemIds.some((id: any) => orderItemIds.includes(id));
+        if (!itemMatch) {
+          addError(
+            40000,
+            `Offer with id '${offer.id}' is not applicable for any of the ordered item(s) [${orderItemIds.join(', ')}].`
+          );
+          return;
+        }
+  
+        const { label, range } = providerOffer?.time || {};
+        const start = range?.start;
+        const end = range?.end;
+        if (label !== 'valid' || !start || !end) {
+          addError(40000, `Offer with id ${offer.id} has an invalid or missing time configuration.`);
+          return;
+        }
+  
+        const currentTimeStamp = new Date(context?.timestamp);
+        const startTime = new Date(start);
+        const endTime = new Date(end);
+        if (!(currentTimeStamp >= startTime && currentTimeStamp <= endTime)) {
+          addError(40000, `Offer with id ${offer.id} is not currently valid based on time range.`);
+          return;
+        }
+  
+        const isSelected = offer?.tags?.some(
+          (tag: any) =>
+            tag.code === 'selection' &&
+            tag.list?.some((entry: any) => entry.code === 'apply' && entry.value === 'yes')
+        );
+        if (!isSelected) {
+          addError(40000, `Offer with id ${offer.id} is not selected (apply: "yes" missing).`);
+          return;
+        }
+  
+        applicableOffers.push({ ...providerOffer, index });
+        console.log("applicableOffers", JSON.stringify(applicableOffers));
+      });
+  
+      // Additive validation
+      const additiveOffers = applicableOffers.filter((offer: any) => {
+        const metaTag = offer.tags?.find((tag: any) => tag.code === 'meta');
+        return metaTag?.list?.some((entry: any) => entry.code === 'additive' && entry.value.toLowerCase() === 'yes');
+      });
+  
+      const nonAdditiveOffers = applicableOffers.filter((offer: any) => {
+        const metaTag = offer.tags?.find((tag: any) => tag.code === 'meta');
+        return metaTag?.list?.some((entry: any) => entry.code === 'additive' && entry.value.toLowerCase() === 'no');
+      });
+  
+      if (additiveOffers.length > 0) {
+        // Apply all additive offers
+        applicableOffers.length = 0;
+        additiveOffers.forEach((offer: any) => {
+          const providerOffer = providerOffers.find((o: any) => o.id === offer.id);
+          if (providerOffer) {
+            applicableOffers.push(providerOffer);
+          }
+        });
+      } else if (nonAdditiveOffers.length === 1) {
+        // Apply the single non-additive offer
+        applicableOffers.length = 0;
+        const offer = nonAdditiveOffers[0];
+        const providerOffer = providerOffers.find((o: any) => o.id === offer.id);
+        if (providerOffer) {
+          applicableOffers.push(providerOffer);
+        }
+      } else if (nonAdditiveOffers.length > 1) {
+        // Multiple non-additive offers selected; add errors
+        applicableOffers.length = 0;
+        nonAdditiveOffers.forEach((offer: any) => {
+          addError(
+            40000,
+            `Offer ${offer.id} is non-additive and cannot be combined with other non-additive offers.`
+          );
+        });
+        return;
+      }
+     
+  
+      console.log('Applicable Offers in select:', applicableOffers);
+      await RedisService.setKey(`${transaction_id}_selected_offers`, JSON.stringify(applicableOffers), TTL_IN_SECONDS);
+    }
+  
+   
+  } catch (err: any) {
+    console.error(`Error while checking for offers in /${constants.SELECT}, ${err.stack}`);
+    return [{ valid: false, code: 40000, description: `Error while checking for offers: ${err.message}` }];
+  }
 
   // Call provider checks if valid provider exists
   if (providerOnSelect) {
