@@ -1987,7 +1987,6 @@ const checkOnStatusPending = async (
       `${context.transaction_id}_${ApiSequence.ON_CONFIRM}_orderState`
     );
 
-    console.log("onConfirmOrderState", onConfirmOrderState);
 
     if (onConfirmOrderState === "Accepted") {
       result.push({
