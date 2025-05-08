@@ -17,11 +17,14 @@ import {
   timeDiff as timeDifference,
   payment_status,
   addActionToRedisSet,
+  lookupSubscriber,
+  createAuthorizationHeader,
 } from "../../../utils/helper";
 import constants, {
   ApiSequence,
   PAYMENT_STATUS,
 } from "../../../utils/constants";
+import { createAuthHeader } from "../../../utils/headerUtils";
 
 // Minimal interface for validation error
 interface ValidationError {
@@ -373,7 +376,7 @@ async function validateOrder(
 async function validateFulfillments(
   order: any,
   transaction_id: string,
-  result: ValidationError[]
+  result: ValidationError[],
 ): Promise<void> {
   const [
     itemFlfllmntsRaw,
@@ -402,6 +405,46 @@ async function validateFulfillments(
           ERROR_CODES.INVALID_RESPONSE
         )
       );
+    }
+    if(fulfillment?.provider_id){
+      const provider_id = fulfillment?.provider_id;
+    let authorization ;
+    let lookup_payload = {
+      type:"BPP",
+      subscriber_id: provider_id,
+    };
+    try{
+      const lookup_payload_string = JSON.stringify(lookup_payload);
+      
+      authorization = await createAuthorizationHeader(lookup_payload_string);
+    } catch(err: any){
+      console.error('Failed to create Authorization header', err)
+    }
+      try{
+        const isValidProviderId = await lookupSubscriber(authorization as string, provider_id, 'BPP')
+        if(!isValidProviderId){
+          result.push(
+            addError(
+              `Invalid provider_id ${provider_id} in fulfillments/provider_id /${constants.ON_CONFIRM}`,
+              ERROR_CODES.INVALID_RESPONSE
+            )
+          )
+        }
+        if(isValidProviderId){
+          await RedisService.setKey(`${transaction_id}_provider_id_${ApiSequence.ON_CONFIRM}`, provider_id, TTL_IN_SECONDS)
+        }
+        console.log("isValidProviderId: ", isValidProviderId)
+      }
+      catch(err: any){
+        result.push(
+          addError(
+            `Invalid provider_id ${provider_id} in fulfillments/provider_id /${constants.ON_CONFIRM}`,
+            ERROR_CODES.INVALID_RESPONSE
+          )
+        )
+        console.error('👀 ', err)
+      }
+     
     }
 
     const on_select_fulfillment_tat_objRaw = await RedisService.getKey(
@@ -1404,7 +1447,96 @@ async function validateBilling(
     );
   }
 }
+async function validateCreds(order: any, transaction_id: string, result: ValidationError[]): Promise<void> {
+  try {
+    console.info(`Validating credentials for transaction ${transaction_id}`);
+    if(!order?.creds){
+      return
+    }
 
+    // Retrieve creds from Redis
+    const credsRaw = await RedisService.getKey(`${transaction_id}_${ApiSequence.ON_SEARCH}_credsDescriptor`);
+    const creds = credsRaw ? JSON.parse(credsRaw) : null;
+
+    // Check if order.creds exists
+    if (!order?.creds) {
+      result.push({
+        valid: false,
+        code: 30001,
+        description: "order.creds is missing in /ON_SEARCH",
+      });
+      return;
+    }
+
+    // Check if order.creds.descriptor exists
+    if (!order.creds.descriptor) {
+      result.push({
+        valid: false,
+        code: 30002,
+        description: "order.creds.descriptor is missing in /ON_SEARCH",
+      });
+      return;
+    }
+
+    // Check if order.creds.descriptor has id and code
+    const { id, code } = order.creds.descriptor;
+    if (!id || !code) {
+      result.push({
+        valid: false,
+        code: 30003,
+        description: "order.creds.descriptor is missing id or code in /ON_SEARCH",
+      });
+      return;
+    }
+
+    // Check if creds exists and is an array
+    if (!creds || !Array.isArray(creds)) {
+      result.push({
+        valid: false,
+        code: 30004,
+        description: "Credentials array from Redis is missing or invalid in /ON_SEARCH",
+      });
+      return;
+    }
+
+    // Check if creds array is not empty
+    if (creds.length === 0) {
+      result.push({
+        valid: false,
+        code: 30005,
+        description: "Credentials array from Redis is empty in /ON_SEARCH",
+      });
+      return;
+    }
+
+    // Check if order.creds.descriptor matches any creds descriptor
+    const isValid = creds.some((cred: any) => {
+      return (
+        cred.descriptor &&
+        cred.descriptor.id === id &&
+        cred.descriptor.code === code
+      );
+    });
+
+    if (!isValid) {
+      result.push({
+        valid: false,
+        code: 30006,
+        description: `No matching credential found for descriptor id: ${id}, code: ${code} in /ON_SEARCH`,
+      });
+      return;
+    }
+
+    console.info(`Credential validation successful for id: ${id}, code: ${code}`);
+  } catch (e : any) {
+    console.error("Credential validation failed", e);
+    result.push({
+      valid: false,
+      code: 30007,
+      description: `Error during credential validation in /ON_SEARCH: ${e.message}`,
+    });
+  }
+}
 const onConfirm = async (data: any): Promise<ValidationError[]> => {
   const result: ValidationError[] = [];
   const flow = "2";
@@ -1432,7 +1564,7 @@ const onConfirm = async (data: any): Promise<ValidationError[]> => {
       );
       return result;
     }
-
+   
     try {
       const previousCallPresent = await addActionToRedisSet(
         context.transaction_id,
@@ -1484,12 +1616,14 @@ const onConfirm = async (data: any): Promise<ValidationError[]> => {
       validateTags(order, transaction_id, context, result),
       validateItems(transaction_id, order.items, result),
       validateBilling(order, transaction_id, result),
+      validateCreds(order, transaction_id, result),
       RedisService.setKey(
         `${transaction_id}_${ApiSequence.ON_CONFIRM}`,
         JSON.stringify(data),
         TTL_IN_SECONDS
       ),
-    ]);
+    ])
+   ;
 
     return result;
   } catch (err: any) {
