@@ -440,7 +440,6 @@ async function validateFulfillments(
             delete obj2?.state;
             delete obj1?.state;
           }
-          console.log("wertyuio",     JSON.stringify(obj1), JSON.stringify(obj2));
           const errors = compareFulfillmentObject(obj1, obj2, keys, i, apiSeq);
           errors.forEach((item: any) => {
             result.push(addError(item.errMsg, ERROR_CODES.INVALID_RESPONSE));

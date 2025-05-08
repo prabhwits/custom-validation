@@ -175,7 +175,6 @@ export const cancel = async (data: any) => {
         ? JSON.parse(storedTimestampRaw)
         : null;
 
-      console.log("timestamp", storedTimestamp, context.timestamp);
       if (_.gte(storedTimestamp, context.timestamp)) {
         result.push({
           valid: false,

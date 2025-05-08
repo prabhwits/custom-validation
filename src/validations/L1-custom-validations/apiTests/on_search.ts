@@ -42,7 +42,6 @@ export default async function onSearch(
   // Helper function to add validation errors
   const addError = (code: number, description: string) => {
     result.push({ valid: false, code, description });
-    console.log("result", result);
   };
 
   try {
@@ -399,11 +398,16 @@ export default async function onSearch(
           const collect_payment = tag.list.find(
             (item) => item.code === "collect_payment"
           );
+
           if (collect_payment) {
-            addError(
-              20006,
-              `collect_payment is not required in bpp/descriptor/tags`
-            );
+            const value = collect_payment.value;
+
+            if (value !== "Y" || value !== "N") {
+              addError(
+                20006,
+                `Invalid collect_payment value: ${value}. Expected "Y" or "N".`
+              );
+            }
           }
         }
       });
@@ -811,7 +815,6 @@ export default async function onSearch(
                           codeList.value === "variant_group"
                         )
                       ) {
-                        console.log("codeList.value", codeList.value);
                         addError(
                           20006,
                           `list.code == type then value should be one of 'custom_menu','custom_group' and 'variant_group' in bpp/providers[${i}]`
@@ -2037,7 +2040,6 @@ export default async function onSearch(
 
             customMenuIds.map((category_id: any) => {
               const categoryArray = categoryMap[`${category_id}`];
-              console.log("categoryArray", JSON.stringify([...categoryArray]));
               if (!categoryArray) {
                 addError(
                   20006,
@@ -2407,10 +2409,10 @@ export default async function onSearch(
                   (elem: any) => elem.code === "min_value"
                 );
                 if (!minValue) {
-                  addError(
-                    20000,
-                    `order_value construct /bpp/providers[${i}]/tags[${t}] must include an item with code "min_value"`
-                  );
+                  // addError(
+                  //   20000,
+                  //   `order_value construct /bpp/providers[${i}]/tags[${t}] must include an item with code "min_value"`
+                  // );
                 } else {
                   // const serializedSc = JSON.stringify(sc);
                   orderValueSet.add({

@@ -217,7 +217,6 @@ export const onCancel = async (
         ? JSON.parse(onConfirmTimestampRaw)
         : null;
 
-      console.log("first");
       if (onConfirmTimestamp && _.gte(onConfirmTimestamp, context.timestamp)) {
         results.push({
           valid: false,

@@ -1299,9 +1299,8 @@ export const createAuthorizationHeader = async (payload: any) => {
 
 export async function lookupSubscriber(authorization: string, subscriber_id: string, type: string) {
   try {
-    console.log("authorization", authorization);
     const response = await axios.post(
-      "https://staging.registry.ondc.org/v2.0/lookup",
+      "https://preprod.registry.ondc.org/v2.0/lookup",
       JSON.stringify({
         type,
         subscriber_id

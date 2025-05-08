@@ -4,6 +4,7 @@ import checkOnStatusOutForDelivery from "./on_status_out_for_delivery";
 import checkOnStatusPacked from "./on_status_packed";
 import checkOnStatusPending from "./on_status_pending";
 import checkOnStatusPicked from "./on_status_picked";
+import checkOnStatusRTODelivered from "./on_status_rto_delivered";
 import _ from "lodash";
 
 export const onStatusRouter = async (data: any) => {
@@ -46,6 +47,10 @@ export const onStatusRouter = async (data: any) => {
       break;
     case "Order-delivered":
       result = await checkOnStatusDelivered(data, state, fulfillmentsItemsSet);
+      break;
+    case "RTO-Disposed":
+    case "RTO-Delivered":
+      result = await checkOnStatusRTODelivered(data);
       break;
     default:
       result = [
