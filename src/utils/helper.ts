@@ -619,17 +619,20 @@ export const checkGpsPrecision = (coordinates: string) => {
     const [lat, long] = coordinates.split(",");
     const latPrecision = getDecimalPrecision(lat);
     const longPrecision = getDecimalPrecision(long);
-    const expectedPrecision = constants.DECIMAL_PRECISION;
+    const minPrecision = constants.DECIMAL_PRECISION || 4;
 
-    return latPrecision === expectedPrecision &&
-      longPrecision === expectedPrecision
-      ? 1
+    const isLatValid = latPrecision >= minPrecision;
+    const isLongValid = longPrecision >= minPrecision;
+
+    return isLatValid && isLongValid
+      ? true
       : { latPrecision, longPrecision };
   } catch (error) {
     console.error(error);
     return error;
   }
 };
+
 
 export function findItemByItemType(item: any) {
   const tags = item.tags;

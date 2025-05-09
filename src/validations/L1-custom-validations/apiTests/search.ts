@@ -11,7 +11,6 @@ import {
 import { bap_features } from "../../../utils/bap_features";
 import { RedisService } from "ondc-automation-cache-lib";
 
-
 const TTL_IN_SECONDS: number = Number(process.env.TTL_IN_SECONDS) || 3600;
 
 interface ValidationError {
@@ -156,7 +155,7 @@ export default async function search(payload: any): Promise<ValidationOutput> {
           if (!location.gps) {
             addError(40000, "location.gps is required");
           } else if (!checkGpsPrecision(location.gps)) {
-            addError(40000, "location.gps must have at least 6 decimal places");
+            addError(40000, "location.gps must have at least 4 decimal places");
           }
 
           if (!location.address) {
@@ -226,6 +225,51 @@ export default async function search(payload: any): Promise<ValidationOutput> {
 
           try {
             switch (tag.code) {
+              case "bnp_demand_signal":
+                const searchTermTag = tag.list.find(
+                  (item: any) => item.code === "search_term"
+                );
+
+                if (!searchTermTag) {
+                  addError(
+                    40000,
+                    `"bnp_demand_signal" tag must include code "search_term"`
+                  );
+                } else {
+                  try {
+                    const parsedValue = JSON.parse(searchTermTag.value);
+
+                    if (!Array.isArray(parsedValue)) {
+                      addError(
+                        40000,
+                        `"search_term" value must be a JSON array`
+                      );
+                    } else {
+                      for (const obj of parsedValue) {
+                        if (
+                          typeof obj !== "object" ||
+                          Array.isArray(obj) ||
+                          obj === null ||
+                          Object.keys(obj).length !== 1 ||
+                          typeof Object.keys(obj)[0] !== "string"
+                        ) {
+                          addError(
+                            40000,
+                            `"search_term" must contain string-keyed single-entry objects like {"sweater"}`
+                          );
+                          break;
+                        }
+                      }
+                    }
+                  } catch {
+                    addError(
+                      40000,
+                      `"search_term" value must be a valid stringified JSON array`
+                    );
+                  }
+                }
+                break;
+
               case "catalog_full":
                 const payloadType = tag.list.find(
                   (item: any) => item.code === "payload_type"
@@ -263,25 +307,47 @@ export default async function search(payload: any): Promise<ValidationOutput> {
                 break;
 
               case "bap_terms":
-                const hasStaticTerms = tag.list.some(
+                const staticTerms = tag.list.find(
                   (item: any) => item.code === "static_terms"
                 );
-                const hasStaticTermsNew = tag.list.some(
+                const staticTermsNew = tag.list.find(
                   (item: any) => item.code === "static_terms_new"
                 );
-                const hasEffectiveDate = tag.list.some(
+                const effectiveDate = tag.list.find(
                   (item: any) => item.code === "effective_date"
                 );
 
+                if (!staticTerms) {
+                  addError(
+                    40000,
+                    `"bap_terms" tag must include code "static_terms"`
+                  );
+                }
+
                 if (
-                  !hasStaticTerms ||
-                  !hasStaticTermsNew ||
-                  !hasEffectiveDate
+                  !staticTermsNew ||
+                  !/^https:\/\/.+/.test(staticTermsNew.value)
                 ) {
                   addError(
                     40000,
-                    'bap_terms tag must contain "static_terms", "static_terms_new", and "effective_date"'
+                    `"bap_terms" tag must include valid "static_terms_new" with an HTTPS URL`
                   );
+                }
+
+                if (!effectiveDate || isNaN(Date.parse(effectiveDate.value))) {
+                  addError(
+                    40000,
+                    `"bap_terms" tag must include valid "effective_date" in ISO format`
+                  );
+                } else {
+                  const effective = new Date(effectiveDate.value);
+                  const timestamp = new Date(context.timestamp);
+                  if (effective > timestamp) {
+                    addError(
+                      40000,
+                      `"effective_date" must be less than or equal from timestamp`
+                    );
+                  }
                 }
                 break;
 
