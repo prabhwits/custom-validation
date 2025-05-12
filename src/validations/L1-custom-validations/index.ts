@@ -11,6 +11,7 @@ import {
   cancel,
   onCancelRouter,
 } from "../L1-custom-validations/apiTests/index";
+import { onUpdateRouter, updateRouter } from "./apiTests/update";
 import { validationOutput } from "./types";
 
 export async function performL1CustomValidations(
@@ -54,6 +55,12 @@ export async function performL1CustomValidations(
       break;
     case "on_cancel":
       result = await onCancelRouter(payload);
+      break;
+    case "update":
+      result = await updateRouter(payload);
+      break;
+    case "on_update":
+      result = await onUpdateRouter(payload);
       break;
     default:
       result = [

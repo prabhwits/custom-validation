@@ -14,7 +14,6 @@ import {
   isTagsValid,
   payment_status,
   sumQuoteBreakUp,
-  tagFinder,
 } from "../../../utils/helper";
 import constants, { ApiSequence } from "../../../utils/constants";
 
@@ -854,7 +853,7 @@ const confirm = async (data: any) => {
     try {
       console.info(`storing payment object in /${constants.CONFIRM}`);
       await RedisService.setKey(
-        `${transaction_id}_cnfrmpymnt`,
+        `${transaction_id}_prevPayment`,
         JSON.stringify(confirm.payment),
         TTL_IN_SECONDS
       );

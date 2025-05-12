@@ -20,7 +20,6 @@ export const onCancelRouter = async (data: any) => {
     );
   }
 
-
   switch (actionCall) {
     case `${ApiSequence.ON_CANCEL}`:
       result = await onCancel(data, "4");

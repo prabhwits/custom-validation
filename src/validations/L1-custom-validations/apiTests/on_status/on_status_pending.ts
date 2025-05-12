@@ -1187,7 +1187,7 @@ async function validateFulfillments(
         );
         if (flow !== "3" && !deliveryObjArr.length) {
           console.info(
-            `Missing Delivery fulfillment for flow ${flow} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+            `Missing Delivery fulfillment in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
             addError(
@@ -1198,11 +1198,11 @@ async function validateFulfillments(
         }
         if (flow === "3" && selfPickupObjArr.length !== 1) {
           console.info(
-            `Invalid number of Self-Pickup fulfillments for flow ${flow} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+            `Invalid number of Self-Pickup fulfillments in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
             addError(
-              `Exactly one Self-Pickup fulfillment must be present for flow 3 in ${ApiSequence.ON_STATUS_PENDING}`,
+              `Exactly one Self-Pickup fulfillment must be present in ${ApiSequence.ON_STATUS_PENDING}`,
               ERROR_CODES.INVALID_RESPONSE
             )
           );
@@ -1305,14 +1305,15 @@ async function validatePayment(
   result: any,
   state: any
 ) {
-  const cnfrmpymntRaw = await RedisService.getKey(
-    `${transaction_id}_cnfrmpymnt`
+  const prevPaymentRaw = await RedisService.getKey(
+    `${transaction_id}_prevPayment`
   );
-  const cnfrmpymnt = cnfrmpymntRaw ? JSON.parse(cnfrmpymntRaw) : null;
-  if (cnfrmpymnt && !_.isEqual(cnfrmpymnt, order.payment)) {
+  const prevPayment = prevPaymentRaw ? JSON.parse(prevPaymentRaw) : null;
+
+  if (prevPayment && !_.isEqual(prevPayment, order.payment)) {
     result.push(
       addError(
-        `payment object mismatches in /${constants.CONFIRM} & /${constants.ON_STATUS}_${state}`,
+        `payment object mismatches with the previous action call and /${constants.ON_STATUS}_${state}`,
         ERROR_CODES.INVALID_RESPONSE
       )
     );
@@ -1365,7 +1366,7 @@ async function validatePayment(
   ) {
     result.push(
       addError(
-        `Payment status should be ${PAYMENT_STATUS.NOT_PAID} for ${FLOW.FLOW2A} flow (Cash on Delivery)`,
+        `Payment status should be ${PAYMENT_STATUS.NOT_PAID} (Cash on Delivery)`,
         ERROR_CODES.INVALID_RESPONSE
       )
     );

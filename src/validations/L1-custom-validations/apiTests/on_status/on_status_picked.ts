@@ -718,14 +718,14 @@ async function validatePayment(
   state: string,
   result: ValidationError[]
 ): Promise<void> {
-  const cnfrmpymntRaw = await RedisService.getKey(
-    `${transaction_id}_cnfrmpymnt`
+  const prevPaymentRaw = await RedisService.getKey(
+    `${transaction_id}_prevPayment`
   );
-  const cnfrmpymnt = cnfrmpymntRaw ? JSON.parse(cnfrmpymntRaw) : null;
-  if (cnfrmpymnt && !_.isEqual(cnfrmpymnt, order.payment)) {
+  const prevPayment = prevPaymentRaw ? JSON.parse(prevPaymentRaw) : null;
+  if (prevPayment && !_.isEqual(prevPayment, order.payment)) {
     result.push(
       addError(
-        `payment object mismatches in /${constants.CONFIRM} & /${constants.ON_STATUS}_${state}`,
+        `payment object mismatches with the previous action call and /${constants.ON_STATUS}_${state}`,
         ERROR_CODES.INVALID_RESPONSE
       )
     );

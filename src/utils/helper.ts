@@ -1261,15 +1261,15 @@ export const checkQuoteTrailSum = (
               description: `Invalid Quote Trail value '${val.value}' in ${apiSeq}. It must be a valid number`,
             });
           } else {
-            quoteTrailSum += value;
+            quoteTrailSum -= value;
           }
         }
       }
     }
   }
 
-  quoteTrailSum = Number(quoteTrailSum.toFixed(2));
-  const totalPrice = Number((price + quoteTrailSum).toFixed(2)) * -1;
+  quoteTrailSum = Math.abs(Number(quoteTrailSum.toFixed(2)));
+  const totalPrice = Number((price + quoteTrailSum).toFixed(2));
   const confirmPrice = Number(priceAtConfirm.toFixed(2));
 
   if (totalPrice !== confirmPrice) {

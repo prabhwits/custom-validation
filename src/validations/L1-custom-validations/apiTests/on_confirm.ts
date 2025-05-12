@@ -809,7 +809,7 @@ async function validatePayment(
   }
 
   const cnfrmpymntRaw = await RedisService.getKey(
-    `${transaction_id}_cnfrmpymnt`
+    `${transaction_id}_prevPayment`
   );
   const cnfrmpymnt = cnfrmpymntRaw ? JSON.parse(cnfrmpymntRaw) : null;
   if (cnfrmpymnt && !_.isEqual(cnfrmpymnt, order.payment)) {
