@@ -468,6 +468,17 @@ export const checkUpdate = async (
           JSON.stringify([...settlementDetatilSet]),
           TTL_IN_SECONDS
         );
+        const quoteTrailSum = await RedisService.getKey(`${context.transaction_id}_quoteTrailSum`);
+
+
+        if(settlement_details?.[0]?.settlement_amount && quoteTrailSum && Number(settlement_details?.[0]?.settlement_amount) !== Number(quoteTrailSum)) {
+          result.push(
+            addError(
+              `Settlement amount in payment object should be equal to the sum of quote trail i.e ${quoteTrailSum}`,
+              ERROR_CODES.INVALID_ORDER
+            )
+          );
+        }
       }
     } catch (error: any) {
       console.error(

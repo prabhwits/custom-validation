@@ -285,6 +285,13 @@ export default async function search(payload: any): Promise<ValidationOutput> {
                     'payload_type value must be either "link" or "inline"'
                   );
                 }
+                else if(payloadType.value === "link") {
+                  await RedisService.setKey(
+                    `${context.transaction_id}_${ApiSequence.SEARCH}_payload_type`,
+                    payloadType.value,
+                    TTL_IN_SECONDS
+                  );
+                }
                 break;
 
               case "catalog_inc":

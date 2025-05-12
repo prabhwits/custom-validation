@@ -631,7 +631,31 @@ export const checkOnUpdate = async (
             }
           });
         }
+
       });
+
+      let quoteTrailSum = 0
+      const lastFulfillment = fulfillments[fulfillments.length - 1].tags;
+      if (lastFulfillment) {
+        lastFulfillment.forEach((tag: any) => {
+          if (tag.code === "quote_trail") {
+            tag.list.forEach((data: any) => {
+              if (data.code === "value") {
+                quoteTrailSum += Number(data.value);
+              }
+            });
+          }
+        });
+      }   
+      quoteTrailSum =  Math.abs(quoteTrailSum);  
+      console.log('22323', quoteTrailSum)
+      if(quoteTrailSum !== 0) {
+      await RedisService.setKey(
+        `${transaction_id}_quoteTrailSum`,
+        String(quoteTrailSum),
+        TTL_IN_SECONDS
+      );
+    }
     } catch (error: any) {
       console.error(
         `Error while checking for the availability of initiated_by in ${apiSeq}`
@@ -953,7 +977,7 @@ export const checkOnUpdate = async (
         );
 
         const timestampOnUpdatePartCancel = timestampOnUpdatePartCancelRaw
-          ? JSON.parse(timestampOnUpdatePartCancelRaw)
+          ? timestampOnUpdatePartCancelRaw
           : null;
 
         const timeDif = timeDiff(
@@ -994,7 +1018,7 @@ export const checkOnUpdate = async (
         );
       } catch (e: any) {
         console.error(
-          `Error while checking context/timestamp for the /${apiSeq}`
+          `Error while checking context/timestamp for the /${apiSeq} -=> ${e.stack}`
         );
         result.push({
           valid: false,

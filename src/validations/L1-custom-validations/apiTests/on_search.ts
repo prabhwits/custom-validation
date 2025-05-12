@@ -70,7 +70,6 @@ export default async function onSearch(
     }
 
     const transaction_id = context?.transaction_id;
-    
 
     try {
       const previousCallPresent = await addActionToRedisSet(
@@ -122,7 +121,7 @@ export default async function onSearch(
       const errors = contextRes?.ERRORS;
       Object.keys(errors).forEach((key: string) =>
         addError(20006, errors[key] || "Context validation failed")
-      )
+      );
     }
 
     validateBapUri(context.bap_uri, context.bap_id, result, addError);
@@ -532,6 +531,85 @@ export default async function onSearch(
         }
 
         try {
+          const payloadTypeKey = `${context.transaction_id}_${ApiSequence.SEARCH}_payload_type`;
+          const payloadType = await RedisService.getKey(payloadTypeKey);
+
+          if (payloadType === "link") {
+            bppPrvdrs.forEach((provider: any) => {
+              if (provider.items && provider.items.length > 0) {
+                result.push({
+                  valid: false,
+                  code: 20001,
+                  description: `Provider ${provider.id} must not include items inline when payload_type is 'link'`,
+                });
+              }
+
+              const catalogLinkTag = provider.tags?.find(
+                (tag: any) => tag.code === "catalog_link"
+              );
+
+              if (!catalogLinkTag) {
+                result.push({
+                  valid: false,
+                  code: 20002,
+                  description: `Provider ${provider.id} is missing 'catalog_link' tag`,
+                });
+              }
+
+              const tagMap = new Map();
+              catalogLinkTag.list?.forEach((item: any) => {
+                tagMap.set(item.code, item.value);
+              });
+
+              const type = tagMap.get("type");
+              const typeValue = tagMap.get("type_value");
+              const typeValidity = tagMap.get("type_validity");
+              const lastUpdate = tagMap.get("last_update");
+
+              if (type !== "link") {
+                result.push({
+                  valid: false,
+                  code: 20003,
+                  description: `Provider ${provider.id} has invalid 'type' in catalog_link tag: ${type}`,
+                });
+              }
+
+              if (!typeValue || !/^https:\/\/.+/.test(typeValue)) {
+                result.push({
+                  valid: false,
+                  code: 20004,
+                  description: `Provider ${provider.id} has invalid or missing 'type_value' (must be a valid HTTPS URL)`,
+                });
+              }
+
+              if (
+                !typeValidity ||
+                !/^P(T(\d+H)?(\d+M)?(\d+S)?)$/.test(typeValidity)
+              ) {
+                result.push({
+                  valid: false,
+                  code: 20005,
+                  description: `Provider ${provider.id} has invalid or missing 'type_validity' (must be ISO 8601 duration)`,
+                });
+              }
+
+              const rfc3339Regex =
+                /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
+
+              if (!lastUpdate || !rfc3339Regex.test(lastUpdate)) {
+                result.push({
+                  valid: false,
+                  code: 20006,
+                  description: `Provider ${provider.id} has invalid or missing 'last_update' (must be RFC3339 timestamp)`,
+                });
+              }
+            });
+          }
+        } catch (err: any) {
+          console.error(`Error while checking catalog_link validations`, err);
+        }
+
+        try {
           console.info(`Checking for empty list arrays in tags`);
           const categories = prvdr["categories"];
           categories.forEach(
@@ -742,7 +820,7 @@ export default async function onSearch(
           }
         });
         await RedisService.setKey(
-          `${transaction_id}_prvdrLocationIds`,  
+          `${transaction_id}_prvdrLocationIds`,
           JSON.stringify([...prvdrLocationIds]),
           TTL_IN_SECONDS
         );
@@ -993,7 +1071,6 @@ export default async function onSearch(
           JSON.stringify([...categoriesId]),
           TTL_IN_SECONDS
         );
-       
 
         try {
           console.info(
@@ -1060,7 +1137,6 @@ export default async function onSearch(
               if ("price" in item) {
                 const sPrice = parseFloat(item.price.value);
                 const maxPrice = parseFloat(item.price.maximum_value);
-                
 
                 const lower = parseFloat(item.price?.tags?.[0].list[0]?.value);
                 const upper = parseFloat(item.price?.tags?.[0].list[1]?.value);
@@ -1109,36 +1185,43 @@ export default async function onSearch(
                 `Error while checking selling price and maximum price for item id: ${item.id}, ${e.stack}`
               );
             }
-            try{
-              console.info('Checking item quantity object');
+            try {
+              console.info("Checking item quantity object");
               items.forEach((item: any) => {
                 const quantity = item?.quantity;
-                if(quantity){
+                if (quantity) {
                   const minimum_qty = parseFloat(quantity?.minimum?.count);
                   const maximum_qty = parseFloat(quantity?.maximum?.count);
                   const available_qty = parseFloat(quantity?.available?.count);
-                  if(minimum_qty && maximum_qty && minimum_qty > maximum_qty){
+                  if (minimum_qty && maximum_qty && minimum_qty > maximum_qty) {
                     addError(
                       20006,
-                      `minimum quantity: ${minimum_qty} can't be greater than the maximum quantity: ${maximum_qty}`)
+                      `minimum quantity: ${minimum_qty} can't be greater than the maximum quantity: ${maximum_qty}`
+                    );
                   }
-                  if(minimum_qty && available_qty && available_qty < minimum_qty){
+                  if (
+                    minimum_qty &&
+                    available_qty &&
+                    available_qty < minimum_qty
+                  ) {
                     addError(
                       20006,
-                      `available quantity: ${available_qty} can't be less than the minimum quantity: ${minimum_qty}`)
+                      `available quantity: ${available_qty} can't be less than the minimum quantity: ${minimum_qty}`
+                    );
                   }
-                  if(maximum_qty && available_qty && available_qty > maximum_qty){
+                  if (
+                    maximum_qty &&
+                    available_qty &&
+                    available_qty > maximum_qty
+                  ) {
                     addError(
                       20006,
-                      `available quantity: ${available_qty} can't be greater than the maximum quantity: ${maximum_qty}`)
-                  } 
-
+                      `available quantity: ${available_qty} can't be greater than the maximum quantity: ${maximum_qty}`
+                    );
+                  }
                 }
-              })
-               
-            } catch(e: any){
-
-            }
+              });
+            } catch (e: any) {}
 
             try {
               console.info(`Checking fulfillment_id for item id: ${item.id}`);
@@ -2823,487 +2906,873 @@ export default async function onSearch(
     }
     try {
       console.info(`Checking offers under bpp/providers`);
-    
+
       // Fetch all Redis keys concurrently
-      const [itemIdArrayRaw, locationIdArrayRaw, categoryIdArrayRaw] = await Promise.all([
-        RedisService.getKey(`${transaction_id}_ItemList`),
-        RedisService.getKey(`${transaction_id}_prvdrLocationIds`),
-        RedisService.getKey(`${transaction_id}_categoryIds`)
-      ]);
-    
+      const [itemIdArrayRaw, locationIdArrayRaw, categoryIdArrayRaw] =
+        await Promise.all([
+          RedisService.getKey(`${transaction_id}_ItemList`),
+          RedisService.getKey(`${transaction_id}_prvdrLocationIds`),
+          RedisService.getKey(`${transaction_id}_categoryIds`),
+        ]);
+
       // Helper function to safely parse JSON or return empty array
-      const parseOrEmpty = (raw : any) => raw ? JSON.parse(raw) : [];
-    
+      const parseOrEmpty = (raw: any) => (raw ? JSON.parse(raw) : []);
+
       // Parse arrays
       const itemIdArray = parseOrEmpty(itemIdArrayRaw);
       const locationIdArray = parseOrEmpty(locationIdArrayRaw);
       const categoryIdArray = parseOrEmpty(categoryIdArrayRaw);
-    
+
       // Validate providers and offers
-      message.catalog["bpp/providers"].forEach((provider : any, providerIdx : any) => {
-        const offers = provider?.offers ?? [];
-    
-        if (!Array.isArray(offers)) {
-          result.push({
-            valid: false,
-            code: 20006,
-            description: `Offers must be an array in bpp/providers[${providerIdx}]`
-          });
-          console.error(`Offers must be an array in bpp/providers[${providerIdx}]`);
-          return;
-        }
-    
-        offers.forEach((offer, offerIdx) => {
-          // Validate mandatory fields
-          const validations = [
-            { field: 'id', desc: 'Offer ID' },
-            { field: 'descriptor.code', desc: 'Descriptor with code' },
-            { field: 'location_ids', desc: 'Location IDs array', isArray: true },
-            { field: 'item_ids', desc: 'Item IDs array', isArray: true },
-            { field: 'time.label', desc: 'Time object with label and range' },
-            { field: 'time.range.start', desc: 'Time range start' },
-            { field: 'time.range.end', desc: 'Time range end' },
-            { field: 'tags', desc: 'Tags array', isArray: true }
-          ];
-    
-          validations.forEach(({ field, desc, isArray }) => {
-            const value = field.split('.').reduce((obj, key) => obj?.[key], offer);
-            if (!value || (isArray && (!Array.isArray(value) || value.length === 0))) {
-              result.push({
-                valid: false,
-                code: 20006,
-                description: `${desc} is mandatory for offers[${offerIdx}] in bpp/providers[${providerIdx}]`
-              });
-              console.error(`${desc} is mandatory for offers[${offerIdx}] in bpp/providers[${providerIdx}]`);
-            }
-          });
-    
-          // Validate IDs against Redis lists
-          const idValidations = [
-            { ids: offer.item_ids, array: itemIdArray, type: 'Item' },
-            { ids: offer.location_ids, array: locationIdArray, type: 'Location' },
-            { ids: offer.category_ids, array: categoryIdArray, type: 'Category' }
-          ];
-    
-          idValidations.forEach(({ ids, array, type }) => {
-            if (Array.isArray(ids)) {
-              ids.forEach(id => {
-                if (!array.includes(id)) {
+      message.catalog["bpp/providers"].forEach(
+        (provider: any, providerIdx: any) => {
+          const offers = provider?.offers ?? [];
+
+          if (!Array.isArray(offers)) {
+            result.push({
+              valid: false,
+              code: 20006,
+              description: `Offers must be an array in bpp/providers[${providerIdx}]`,
+            });
+            console.error(
+              `Offers must be an array in bpp/providers[${providerIdx}]`
+            );
+            return;
+          }
+
+          offers.forEach((offer, offerIdx) => {
+            // Validate mandatory fields
+            const validations = [
+              { field: "id", desc: "Offer ID" },
+              { field: "descriptor.code", desc: "Descriptor with code" },
+              {
+                field: "location_ids",
+                desc: "Location IDs array",
+                isArray: true,
+              },
+              { field: "item_ids", desc: "Item IDs array", isArray: true },
+              { field: "time.label", desc: "Time object with label and range" },
+              { field: "time.range.start", desc: "Time range start" },
+              { field: "time.range.end", desc: "Time range end" },
+              { field: "tags", desc: "Tags array", isArray: true },
+            ];
+
+            validations.forEach(({ field, desc, isArray }) => {
+              const value = field
+                .split(".")
+                .reduce((obj, key) => obj?.[key], offer);
+              if (
+                !value ||
+                (isArray && (!Array.isArray(value) || value.length === 0))
+              ) {
+                result.push({
+                  valid: false,
+                  code: 20006,
+                  description: `${desc} is mandatory for offers[${offerIdx}] in bpp/providers[${providerIdx}]`,
+                });
+                console.error(
+                  `${desc} is mandatory for offers[${offerIdx}] in bpp/providers[${providerIdx}]`
+                );
+              }
+            });
+
+            // Validate IDs against Redis lists
+            const idValidations = [
+              { ids: offer.item_ids, array: itemIdArray, type: "Item" },
+              {
+                ids: offer.location_ids,
+                array: locationIdArray,
+                type: "Location",
+              },
+              {
+                ids: offer.category_ids,
+                array: categoryIdArray,
+                type: "Category",
+              },
+            ];
+
+            idValidations.forEach(({ ids, array, type }) => {
+              if (Array.isArray(ids)) {
+                ids.forEach((id) => {
+                  if (!array.includes(id)) {
+                    result.push({
+                      valid: false,
+                      code: 20006,
+                      description: `${type} id ${id} is not present in the ${type.toLowerCase()} list in offers[${offerIdx}] of bpp/providers[${providerIdx}]`,
+                    });
+                    console.error(
+                      `${type} id ${id} is not present in the ${type.toLowerCase()} list in offers[${offerIdx}] of bpp/providers[${providerIdx}]`
+                    );
+                  }
+                });
+              }
+            });
+
+            // Validate tags
+            if (Array.isArray(offer.tags)) {
+              const qualifier = offer.tags.find(
+                (tag: any) => tag.code === "qualifier"
+              );
+              const benefit = offer.tags.find(
+                (tag: any) => tag.code === "benefit"
+              );
+              const meta = offer.tags.find((tag: any) => tag.code === "meta");
+
+              // Validate meta tag
+              if (!meta || !Array.isArray(meta.list)) {
+                result.push({
+                  valid: false,
+                  code: 20006,
+                  description: `'meta' tag with list is mandatory for offers[${offerIdx}] in bpp/providers[${providerIdx}]`,
+                });
+                console.error(
+                  `'meta' tag with list is mandatory for offers[${offerIdx}] in bpp/providers[${providerIdx}]`
+                );
+              } else {
+                const additive = meta.list.find(
+                  (item: any) => item.code === "additive"
+                );
+                const auto = meta.list.find(
+                  (item: any) => item.code === "auto"
+                );
+
+                if (!additive || !["yes", "no"].includes(additive.value)) {
                   result.push({
                     valid: false,
                     code: 20006,
-                    description: `${type} id ${id} is not present in the ${type.toLowerCase()} list in offers[${offerIdx}] of bpp/providers[${providerIdx}]`
+                    description: `'additive' with value 'yes' or 'no' is mandatory in meta tag for offers[${offerIdx}] in bpp/providers[${providerIdx}]`,
                   });
-                  console.error(`${type} id ${id} is not present in the ${type.toLowerCase()} list in offers[${offerIdx}] of bpp/providers[${providerIdx}]`);
+                  console.error(
+                    `'additive' with value 'yes' or 'no' is mandatory in meta tag for offers[${offerIdx}] in bpp/providers[${providerIdx}]`
+                  );
                 }
-              });
+                if (!auto || !["yes", "no"].includes(auto.value)) {
+                  result.push({
+                    valid: false,
+                    code: 20006,
+                    description: `'auto' with value 'yes' or 'no' is mandatory in meta tag for offers[${offerIdx}] in bpp/providers[${providerIdx}]`,
+                  });
+                  console.error(
+                    `'auto' with value 'yes' or 'no' is mandatory in meta tag for offers[${offerIdx}] in bpp/providers[${providerIdx}]`
+                  );
+                }
+              }
+              // time validations
+              const { label, range } = offer?.time || {};
+              const start = range?.start;
+              const end = range?.end;
+              if (label !== "valid" || !start || !end) {
+                result.push({
+                  valid: false,
+                  code: 20000,
+                  description: `Offer with id ${offer.id} has an invalid or missing time configuration.`,
+                });
+              }
+              const currentTimeStamp = new Date(context?.timestamp);
+              const startTime = new Date(start);
+              const endTime = new Date(end);
+              if (
+                !(currentTimeStamp >= startTime && currentTimeStamp <= endTime)
+              ) {
+                result.push({
+                  valid: false,
+                  code: 20000,
+                  description: `Offer with id ${offer.id} is not currently valid based on time range.`,
+                });
+              }
+
+              // Offer type validations
+              const offerValidations = {
+                discount: () => {
+                  if (
+                    !qualifier?.list.some(
+                      (item: any) => item.code === "min_value"
+                    )
+                  ) {
+                    result.push({
+                      valid: false,
+                      code: 20006,
+                      description: `'qualifier' tag must include 'min_value' for offers[${offerIdx}]`,
+                    });
+                    console.error(
+                      `'qualifier' tag must include 'min_value' for offers[${offerIdx}]`
+                    );
+                  }
+                  if (!benefit) {
+                    result.push({
+                      valid: false,
+                      code: 20006,
+                      description: `'benefit' tag is required for offers[${offerIdx}]`,
+                    });
+                    console.error(
+                      `'benefit' tag is required for offers[${offerIdx}]`
+                    );
+                  } else {
+                    const valueType = benefit.list.find(
+                      (item: any) => item.code === "value_type"
+                    );
+                    const value = benefit.list.find(
+                      (item: any) => item.code === "value"
+                    );
+                    const valueCap = benefit.list.find(
+                      (item: any) => item.code === "value_cap"
+                    );
+
+                    if (!valueType) {
+                      result.push({
+                        valid: false,
+                        code: 20006,
+                        description: `'value_type' is required in benefit tag for offers[${offerIdx}]`,
+                      });
+                      console.error(
+                        `'value_type' is required in benefit tag for offers[${offerIdx}]`
+                      );
+                    }
+                    if (!value) {
+                      result.push({
+                        valid: false,
+                        code: 20006,
+                        description: `'value' is required in benefit tag for offers[${offerIdx}]`,
+                      });
+                      console.error(
+                        `'value' is required in benefit tag for offers[${offerIdx}]`
+                      );
+                    }
+
+                    if (valueType && valueType.value === "percent") {
+                      if (!value || isNaN(parseFloat(value.value))) {
+                        result.push({
+                          valid: false,
+                          code: 20006,
+                          description: `'value' must be a valid number in benefit tag for offers[${offerIdx}]`,
+                        });
+                        console.error(
+                          `'value' must be a valid number in benefit tag for offers[${offerIdx}]`
+                        );
+                      } else {
+                        const absValue = Math.abs(parseFloat(value.value));
+                        if (absValue < 1 || absValue > 100) {
+                          result.push({
+                            valid: false,
+                            code: 20006,
+                            description: `'value' must be between 1 and 100 in benefit tag for offers[${offerIdx}]`,
+                          });
+                          console.error(
+                            `'value' must be between 1 and 100 in benefit tag for offers[${offerIdx}]`
+                          );
+                        }
+                      }
+                      if (!valueCap || isNaN(parseFloat(valueCap.value))) {
+                        result.push({
+                          valid: false,
+                          code: 20006,
+                          description: `'value_cap' must be a valid number in benefit tag for offers[${offerIdx}]`,
+                        });
+                        console.error(
+                          `'value_cap' must be a valid number in benefit tag for offers[${offerIdx}]`
+                        );
+                      }
+                    } else if (
+                      value &&
+                      (isNaN(parseFloat(value.value)) ||
+                        parseFloat(value.value) >= 0)
+                    ) {
+                      result.push({
+                        valid: false,
+                        code: 20006,
+                        description: `'value' must be a valid negative number in benefit tag for offers[${offerIdx}]`,
+                      });
+                      console.error(
+                        `'value' in benefit tag must be a valid negative number for offers[${offerIdx}]`
+                      );
+                    }
+                  }
+                },
+                buyXgetY: () => {
+                  if (
+                    !qualifier?.list.some(
+                      (item: any) => item.code === "min_value"
+                    ) ||
+                    !qualifier?.list.some(
+                      (item: any) => item.code === "item_count"
+                    )
+                  ) {
+                    result.push({
+                      valid: false,
+                      code: 20006,
+                      description: `'qualifier' tag must include 'min_value' and 'item_count' for offers[${offerIdx}]`,
+                    });
+                    console.error(
+                      `'qualifier' tag must include 'min_value' and 'item_count' for offers[${offerIdx}]`
+                    );
+                  }
+                  if (
+                    !benefit?.list.some(
+                      (item: any) => item.code === "item_count"
+                    )
+                  ) {
+                    result.push({
+                      valid: false,
+                      code: 20006,
+                      description: `'benefit' tag must include 'item_count' for offers[${offerIdx}]`,
+                    });
+                    console.error(
+                      `'benefit' tag must include 'item_count' for offers[${offerIdx}]`
+                    );
+                  }
+                },
+                freebie: () => {
+                  if (
+                    !qualifier?.list.some(
+                      (item: any) => item.code === "min_value"
+                    )
+                  ) {
+                    result.push({
+                      valid: false,
+                      code: 20006,
+                      description: `'qualifier' tag must include 'min_value' for offers[${offerIdx}]`,
+                    });
+                    console.error(
+                      `'qualifier' tag must include 'min_value' for offers[${offerIdx}]`
+                    );
+                  }
+                  if (
+                    !benefit?.list.some(
+                      (item: any) => item.code === "item_count"
+                    ) ||
+                    !benefit?.list.some(
+                      (item: any) => item.code === "item_id"
+                    ) ||
+                    !benefit?.list.some(
+                      (item: any) => item.code === "item_value"
+                    )
+                  ) {
+                    result.push({
+                      valid: false,
+                      code: 20006,
+                      description: `'benefit' tag must include 'item_count', 'item_id', and 'item_value' for offers[${offerIdx}]`,
+                    });
+                    console.error(
+                      `'benefit' tag must include 'item_count', 'item_id', and 'item_value' for offers[${offerIdx}]`
+                    );
+                  }
+                },
+                slab: () => {
+                  if (
+                    !qualifier?.list.some(
+                      (item: any) => item.code === "min_value"
+                    )
+                  ) {
+                    result.push({
+                      valid: false,
+                      code: 20006,
+                      description: `'qualifier' tag must include 'min_value' for offers[${offerIdx}]`,
+                    });
+                    console.error(
+                      `'qualifier' tag must include 'min_value' for offers[${offerIdx}]`
+                    );
+                  }
+                  if (!benefit) {
+                    result.push({
+                      valid: false,
+                      code: 20006,
+                      description: `'benefit' tag is required for offers[${offerIdx}]`,
+                    });
+                    console.error(
+                      `'benefit' tag is required for offers[${offerIdx}]`
+                    );
+                  } else {
+                    const valueType = benefit.list.find(
+                      (item: any) => item.code === "value_type"
+                    );
+                    const value = benefit.list.find(
+                      (item: any) => item.code === "value"
+                    );
+                    const valueCap = benefit.list.find(
+                      (item: any) => item.code === "value_cap"
+                    );
+
+                    if (!valueType) {
+                      result.push({
+                        valid: false,
+                        code: 20006,
+                        description: `'value_type' is required in benefit tag for offers[${offerIdx}]`,
+                      });
+                      console.error(
+                        `'value_type' is required in benefit tag for offers[${offerIdx}]`
+                      );
+                    }
+                    if (!value) {
+                      result.push({
+                        valid: false,
+                        code: 20006,
+                        description: `'value' is required in benefit tag for offers[${offerIdx}]`,
+                      });
+                      console.error(
+                        `'value' is required in benefit tag for offers[${offerIdx}]`
+                      );
+                    }
+                    if (!valueCap) {
+                      result.push({
+                        valid: false,
+                        code: 20006,
+                        description: `'value_cap' is required in benefit tag for offers[${offerIdx}]`,
+                      });
+                      console.error(
+                        `'value_cap' is required in benefit tag for offers[${offerIdx}]`
+                      );
+                    }
+
+                    if (valueType && valueType.value === "percent") {
+                      if (!value || isNaN(parseFloat(value.value))) {
+                        result.push({
+                          valid: false,
+                          code: 20006,
+                          description: `'value' must be a valid number in benefit tag for offers[${offerIdx}]`,
+                        });
+                        console.error(
+                          `'value' must be a valid number in benefit tag for offers[${offerIdx}]`
+                        );
+                      } else {
+                        const absValue = Math.abs(parseFloat(value.value));
+                        if (absValue < 1 || absValue > 100) {
+                          result.push({
+                            valid: false,
+                            code: 20006,
+                            description: `'value' must be between 1 and 100 in benefit tag for offers[${offerIdx}]`,
+                          });
+                          console.error(
+                            `'value' must be between 1 and 100 in benefit tag for offers[${offerIdx}]`
+                          );
+                        }
+                      }
+                      if (!valueCap || isNaN(parseFloat(valueCap.value))) {
+                        result.push({
+                          valid: false,
+                          code: 20006,
+                          description: `'value_cap' must be a valid number in benefit tag for offers[${offerIdx}]`,
+                        });
+                        console.error(
+                          `'value_cap' must be a valid number in benefit tag for offers[${offerIdx}]`
+                        );
+                      }
+                    } else if (value && isNaN(parseFloat(value.value))) {
+                      result.push({
+                        valid: false,
+                        code: 20006,
+                        description: `'value' must be a valid number in benefit tag for offers[${offerIdx}]`,
+                      });
+                      console.error(
+                        `'value' must be a valid number in benefit tag for offers[${offerIdx}]`
+                      );
+                    }
+                  }
+                },
+                combo: () => {
+                  if (
+                    !qualifier?.list.some(
+                      (item: any) => item.code === "min_value"
+                    ) ||
+                    !qualifier?.list.some(
+                      (item: any) => item.code === "item_id"
+                    )
+                  ) {
+                    result.push({
+                      valid: false,
+                      code: 20006,
+                      description: `'qualifier' tag must include 'min_value' and 'item_id' for offers[${offerIdx}]`,
+                    });
+                    console.error(
+                      `'qualifier' tag must include 'min_value' and 'item_id' for offers[${offerIdx}]`
+                    );
+                  }
+                  if (!benefit) {
+                    result.push({
+                      valid: false,
+                      code: 20006,
+                      description: `'benefit' tag is required for offers[${offerIdx}]`,
+                    });
+                    console.error(
+                      `'benefit' tag is required for offers[${offerIdx}]`
+                    );
+                  } else {
+                    const valueType = benefit.list.find(
+                      (item: any) => item.code === "value_type"
+                    );
+                    const value = benefit.list.find(
+                      (item: any) => item.code === "value"
+                    );
+                    const valueCap = benefit.list.find(
+                      (item: any) => item.code === "value_cap"
+                    );
+
+                    if (!valueType) {
+                      result.push({
+                        valid: false,
+                        code: 20006,
+                        description: `'value_type' is required in benefit tag for offers[${offerIdx}]`,
+                      });
+                      console.error(
+                        `'value_type' is required in benefit tag for offers[${offerIdx}]`
+                      );
+                    }
+                    if (!value) {
+                      result.push({
+                        valid: false,
+                        code: 20006,
+                        description: `'value' is required in benefit tag for offers[${offerIdx}]`,
+                      });
+                      console.error(
+                        `'value' is required in benefit tag for offers[${offerIdx}]`
+                      );
+                    }
+                    if (!valueCap) {
+                      result.push({
+                        valid: false,
+                        code: 20006,
+                        description: `'value_cap' is required in benefit tag for offers[${offerIdx}]`,
+                      });
+                      console.error(
+                        `'value_cap' is required in benefit tag for offers[${offerIdx}]`
+                      );
+                    }
+
+                    if (valueType && valueType.value === "percent") {
+                      if (!value || isNaN(parseFloat(value.value))) {
+                        result.push({
+                          valid: false,
+                          code: 20006,
+                          description: `'value' must be a valid number in benefit tag for offers[${offerIdx}]`,
+                        });
+                        console.error(
+                          `'value' must be a valid number in benefit tag for offers[${offerIdx}]`
+                        );
+                      } else {
+                        const absValue = Math.abs(parseFloat(value.value));
+                        if (absValue < 1 || absValue > 100) {
+                          result.push({
+                            valid: false,
+                            code: 20006,
+                            description: `'value' must be between 1 and 100 in benefit tag for offers[${offerIdx}]`,
+                          });
+                          console.error(
+                            `'value' must be between 1 and 100 in benefit tag for offers[${offerIdx}]`
+                          );
+                        }
+                      }
+                      if (!valueCap || isNaN(parseFloat(valueCap.value))) {
+                        result.push({
+                          valid: false,
+                          code: 20006,
+                          description: `'value_cap' must be a valid number in benefit tag for offers[${offerIdx}]`,
+                        });
+                        console.error(
+                          `'value_cap' must be a valid number in benefit tag for offers[${offerIdx}]`
+                        );
+                      }
+                    } else if (value && isNaN(parseFloat(value.value))) {
+                      result.push({
+                        valid: false,
+                        code: 20006,
+                        description: `'value' must be a valid number in benefit tag for offers[${offerIdx}]`,
+                      });
+                      console.error(
+                        `'value' must be a valid number in benefit tag for offers[${offerIdx}]`
+                      );
+                    }
+                  }
+                },
+                delivery: () => {
+                  if (
+                    !qualifier?.list.some(
+                      (item: any) => item.code === "min_value"
+                    )
+                  ) {
+                    result.push({
+                      valid: false,
+                      code: 20006,
+                      description: `'qualifier' tag must include 'min_value' for offers[${offerIdx}]`,
+                    });
+                    console.error(
+                      `'qualifier' tag must include 'min_value' for offers[${offerIdx}]`
+                    );
+                  }
+                  if (!benefit) {
+                    result.push({
+                      valid: false,
+                      code: 20006,
+                      description: `'benefit' tag is required for offers[${offerIdx}]`,
+                    });
+                    console.error(
+                      `'benefit' tag is required for offers[${offerIdx}]`
+                    );
+                  } else {
+                    const valueType = benefit.list.find(
+                      (item: any) => item.code === "value_type"
+                    );
+                    const value = benefit.list.find(
+                      (item: any) => item.code === "value"
+                    );
+
+                    if (!valueType) {
+                      result.push({
+                        valid: false,
+                        code: 20006,
+                        description: `'value_type' is required in benefit tag for offers[${offerIdx}]`,
+                      });
+                      console.error(
+                        `'value_type' is required in benefit tag for offers[${offerIdx}]`
+                      );
+                    }
+                    if (!value) {
+                      result.push({
+                        valid: false,
+                        code: 20006,
+                        description: `'value' is required in benefit tag for offers[${offerIdx}]`,
+                      });
+                      console.error(
+                        `'value' is required in benefit tag for offers[${offerIdx}]`
+                      );
+                    }
+                    if (value && isNaN(parseFloat(value.value))) {
+                      result.push({
+                        valid: false,
+                        code: 20006,
+                        description: `'value' must be a valid number in benefit tag for offers[${offerIdx}]`,
+                      });
+                      console.error(
+                        `'value' must be a valid number in benefit tag for offers[${offerIdx}]`
+                      );
+                    }
+                  }
+                },
+                exchange: () => {
+                  if (
+                    !qualifier?.list.some(
+                      (item: any) => item.code === "min_value"
+                    )
+                  ) {
+                    result.push({
+                      valid: false,
+                      code: 20006,
+                      description: `'qualifier' tag must include 'min_value' for offers[${offerIdx}]`,
+                    });
+                    console.error(
+                      `'qualifier' tag must include 'min_value' for offers[${offerIdx}]`
+                    );
+                  }
+                  if (benefit && benefit.list.length > 0) {
+                    result.push({
+                      valid: false,
+                      code: 20006,
+                      description: `'benefit' tag must not include any values for offers[${offerIdx}]`,
+                    });
+                    console.error(
+                      `'benefit' tag must not include any values for offers[${offerIdx}]`
+                    );
+                  }
+                },
+              };
+
+              const validateOffer =
+                offerValidations[
+                  offer.descriptor?.code as keyof typeof offerValidations
+                ];
+              if (validateOffer) validateOffer();
+              else {
+                console.info(
+                  `No specific validation required for offer type: ${offer.descriptor?.code}`
+                );
+              }
             }
           });
-    
-          // Validate tags
-          if (Array.isArray(offer.tags)) {
-            const qualifier = offer.tags.find((tag: any) => tag.code === 'qualifier');
-            const benefit = offer.tags.find((tag: any) => tag.code === 'benefit');
-            const meta = offer.tags.find((tag: any) => tag.code === 'meta');
-    
-            // Validate meta tag
-            if (!meta || !Array.isArray(meta.list)) {
-              result.push({
-                valid: false,
-                code: 20006,
-                description: `'meta' tag with list is mandatory for offers[${offerIdx}] in bpp/providers[${providerIdx}]`
-              });
-              console.error(`'meta' tag with list is mandatory for offers[${offerIdx}] in bpp/providers[${providerIdx}]`);
-            } else {
-              const additive = meta.list.find((item: any) => item.code === 'additive');
-              const auto = meta.list.find((item: any) => item.code === 'auto');
-    
-              if (!additive || !['yes', 'no'].includes(additive.value)) {
-                result.push({
-                  valid: false,
-                  code: 20006,
-                  description: `'additive' with value 'yes' or 'no' is mandatory in meta tag for offers[${offerIdx}] in bpp/providers[${providerIdx}]`
-                });
-                console.error(`'additive' with value 'yes' or 'no' is mandatory in meta tag for offers[${offerIdx}] in bpp/providers[${providerIdx}]`);
-              }
-              if (!auto || !['yes', 'no'].includes(auto.value)) {
-                result.push({
-                  valid: false,
-                  code: 20006,
-                  description: `'auto' with value 'yes' or 'no' is mandatory in meta tag for offers[${offerIdx}] in bpp/providers[${providerIdx}]`
-                });
-                console.error(`'auto' with value 'yes' or 'no' is mandatory in meta tag for offers[${offerIdx}] in bpp/providers[${providerIdx}]`);
-              }
-            }
-            // time validations
-            const { label, range } = offer?.time || {}
-            const start = range?.start
-            const end = range?.end
-            if (label !== 'valid' || !start || !end) {
-              result.push({
-                valid: false,
-                code: 20000,
-                description: `Offer with id ${offer.id} has an invalid or missing time configuration.`,
-              })
-            }
-            const currentTimeStamp = new Date(context?.timestamp)
-            const startTime = new Date(start)
-            const endTime = new Date(end)
-            if (!(currentTimeStamp >= startTime && currentTimeStamp <= endTime)) {
-              result.push({
-                valid: false,
-                code: 20000,
-                description: `Offer with id ${offer.id} is not currently valid based on time range.`,
-              })
-            }
-    
-            // Offer type validations
-            const offerValidations = {
-              discount: () => {
-                if (!qualifier?.list.some((item: any) => item.code === 'min_value')) {
-                  result.push({ valid: false, code: 20006, description: `'qualifier' tag must include 'min_value' for offers[${offerIdx}]` });
-                  console.error(`'qualifier' tag must include 'min_value' for offers[${offerIdx}]`);
-                }
-                if (!benefit) {
-                  result.push({ valid: false, code: 20006, description: `'benefit' tag is required for offers[${offerIdx}]` });
-                  console.error(`'benefit' tag is required for offers[${offerIdx}]`);
-                } else {
-                  const valueType = benefit.list.find((item: any) => item.code === 'value_type');
-                  const value = benefit.list.find((item: any) => item.code === 'value');
-                  const valueCap = benefit.list.find((item: any) => item.code === 'value_cap');
-    
-                  if (!valueType) {
-                    result.push({ valid: false, code: 20006, description: `'value_type' is required in benefit tag for offers[${offerIdx}]` });
-                    console.error(`'value_type' is required in benefit tag for offers[${offerIdx}]`);
-                  }
-                  if (!value) {
-                    result.push({ valid: false, code: 20006, description: `'value' is required in benefit tag for offers[${offerIdx}]` });
-                    console.error(`'value' is required in benefit tag for offers[${offerIdx}]`);
-                  }
-    
-                  if (valueType && valueType.value === 'percent') {
-                    if (!value || isNaN(parseFloat(value.value))) {
-                      result.push({ valid: false, code: 20006, description: `'value' must be a valid number in benefit tag for offers[${offerIdx}]` });
-                      console.error(`'value' must be a valid number in benefit tag for offers[${offerIdx}]`);
-                    } else {
-                      const absValue = Math.abs(parseFloat(value.value));
-                      if (absValue < 1 || absValue > 100) {
-                        result.push({ valid: false, code: 20006, description: `'value' must be between 1 and 100 in benefit tag for offers[${offerIdx}]` });
-                        console.error(`'value' must be between 1 and 100 in benefit tag for offers[${offerIdx}]`);
-                      }
-                    }
-                    if (!valueCap || isNaN(parseFloat(valueCap.value))) {
-                      result.push({ valid: false, code: 20006, description: `'value_cap' must be a valid number in benefit tag for offers[${offerIdx}]` });
-                      console.error(`'value_cap' must be a valid number in benefit tag for offers[${offerIdx}]`);
-                    }
-                  } else if (value && (isNaN(parseFloat(value.value)) || parseFloat(value.value) >= 0)) {
-                    result.push({ valid: false, code: 20006, description: `'value' must be a valid negative number in benefit tag for offers[${offerIdx}]` });
-                    console.error(`'value' in benefit tag must be a valid negative number for offers[${offerIdx}]`);
-                  }
-                }
-              },
-              buyXgetY: () => {
-                if (!qualifier?.list.some((item: any) => item.code === 'min_value') || !qualifier?.list.some((item: any) => item.code === 'item_count')) {
-                  result.push({ valid: false, code: 20006, description: `'qualifier' tag must include 'min_value' and 'item_count' for offers[${offerIdx}]` });
-                  console.error(`'qualifier' tag must include 'min_value' and 'item_count' for offers[${offerIdx}]`);
-                }
-                if (!benefit?.list.some((item: any) => item.code === 'item_count')) {
-                  result.push({ valid: false, code: 20006, description: `'benefit' tag must include 'item_count' for offers[${offerIdx}]` });
-                  console.error(`'benefit' tag must include 'item_count' for offers[${offerIdx}]`);
-                }
-              },
-              freebie: () => {
-                if (!qualifier?.list.some((item: any) => item.code === 'min_value')) {
-                  result.push({ valid: false, code: 20006, description: `'qualifier' tag must include 'min_value' for offers[${offerIdx}]` });
-                  console.error(`'qualifier' tag must include 'min_value' for offers[${offerIdx}]`);
-                }
-                if (!benefit?.list.some((item: any) => item.code === 'item_count') || 
-                    !benefit?.list.some((item: any) => item.code === 'item_id') || 
-                    !benefit?.list.some((item: any) => item.code === 'item_value')) {
-                  result.push({ valid: false, code: 20006, description: `'benefit' tag must include 'item_count', 'item_id', and 'item_value' for offers[${offerIdx}]` });
-                  console.error(`'benefit' tag must include 'item_count', 'item_id', and 'item_value' for offers[${offerIdx}]`);
-                }
-              },
-              slab: () => {
-                if (!qualifier?.list.some((item: any) => item.code === 'min_value')) {
-                  result.push({ valid: false, code: 20006, description: `'qualifier' tag must include 'min_value' for offers[${offerIdx}]` });
-                  console.error(`'qualifier' tag must include 'min_value' for offers[${offerIdx}]`);
-                }
-                if (!benefit) {
-                  result.push({ valid: false, code: 20006, description: `'benefit' tag is required for offers[${offerIdx}]` });
-                  console.error(`'benefit' tag is required for offers[${offerIdx}]`);
-                } else {
-                  const valueType = benefit.list.find((item: any) => item.code === 'value_type');
-                  const value = benefit.list.find((item: any) => item.code === 'value');
-                  const valueCap = benefit.list.find((item: any) => item.code === 'value_cap');
-    
-                  if (!valueType) {
-                    result.push({ valid: false, code: 20006, description: `'value_type' is required in benefit tag for offers[${offerIdx}]` });
-                    console.error(`'value_type' is required in benefit tag for offers[${offerIdx}]`);
-                  }
-                  if (!value) {
-                    result.push({ valid: false, code: 20006, description: `'value' is required in benefit tag for offers[${offerIdx}]` });
-                    console.error(`'value' is required in benefit tag for offers[${offerIdx}]`);
-                  }
-                  if (!valueCap) {
-                    result.push({ valid: false, code: 20006, description: `'value_cap' is required in benefit tag for offers[${offerIdx}]` });
-                    console.error(`'value_cap' is required in benefit tag for offers[${offerIdx}]`);
-                  }
-    
-                  if (valueType && valueType.value === 'percent') {
-                    if (!value || isNaN(parseFloat(value.value))) {
-                      result.push({ valid: false, code: 20006, description: `'value' must be a valid number in benefit tag for offers[${offerIdx}]` });
-                      console.error(`'value' must be a valid number in benefit tag for offers[${offerIdx}]`);
-                    } else {
-                      const absValue = Math.abs(parseFloat(value.value));
-                      if (absValue < 1 || absValue > 100) {
-                        result.push({ valid: false, code: 20006, description: `'value' must be between 1 and 100 in benefit tag for offers[${offerIdx}]` });
-                        console.error(`'value' must be between 1 and 100 in benefit tag for offers[${offerIdx}]`);
-                      }
-                    }
-                    if (!valueCap || isNaN(parseFloat(valueCap.value))) {
-                      result.push({ valid: false, code: 20006, description: `'value_cap' must be a valid number in benefit tag for offers[${offerIdx}]` });
-                      console.error(`'value_cap' must be a valid number in benefit tag for offers[${offerIdx}]`);
-                    }
-                  } else if (value && isNaN(parseFloat(value.value))) {
-                    result.push({ valid: false, code: 20006, description: `'value' must be a valid number in benefit tag for offers[${offerIdx}]` });
-                    console.error(`'value' must be a valid number in benefit tag for offers[${offerIdx}]`);
-                  }
-                }
-              },
-              combo: () => {
-                if (!qualifier?.list.some((item: any) => item.code === 'min_value') || 
-                    !qualifier?.list.some((item: any) => item.code === 'item_id')) {
-                  result.push({ valid: false, code: 20006, description: `'qualifier' tag must include 'min_value' and 'item_id' for offers[${offerIdx}]` });
-                  console.error(`'qualifier' tag must include 'min_value' and 'item_id' for offers[${offerIdx}]`);
-                }
-                if (!benefit) {
-                  result.push({ valid: false, code: 20006, description: `'benefit' tag is required for offers[${offerIdx}]` });
-                  console.error(`'benefit' tag is required for offers[${offerIdx}]`);
-                } else {
-                  const valueType = benefit.list.find((item: any) => item.code === 'value_type');
-                  const value = benefit.list.find((item: any) => item.code === 'value');
-                  const valueCap = benefit.list.find((item: any) => item.code === 'value_cap');
-    
-                  if (!valueType) {
-                    result.push({ valid: false, code: 20006, description: `'value_type' is required in benefit tag for offers[${offerIdx}]` });
-                    console.error(`'value_type' is required in benefit tag for offers[${offerIdx}]`);
-                  }
-                  if (!value) {
-                    result.push({ valid: false, code: 20006, description: `'value' is required in benefit tag for offers[${offerIdx}]` });
-                    console.error(`'value' is required in benefit tag for offers[${offerIdx}]`);
-                  }
-                  if (!valueCap) {
-                    result.push({ valid: false, code: 20006, description: `'value_cap' is required in benefit tag for offers[${offerIdx}]` });
-                    console.error(`'value_cap' is required in benefit tag for offers[${offerIdx}]`);
-                  }
-    
-                  if (valueType && valueType.value === 'percent') {
-                    if (!value || isNaN(parseFloat(value.value))) {
-                      result.push({ valid: false, code: 20006, description: `'value' must be a valid number in benefit tag for offers[${offerIdx}]` });
-                      console.error(`'value' must be a valid number in benefit tag for offers[${offerIdx}]`);
-                    } else {
-                      const absValue = Math.abs(parseFloat(value.value));
-                      if (absValue < 1 || absValue > 100) {
-                        result.push({ valid: false, code: 20006, description: `'value' must be between 1 and 100 in benefit tag for offers[${offerIdx}]` });
-                        console.error(`'value' must be between 1 and 100 in benefit tag for offers[${offerIdx}]`);
-                      }
-                    }
-                    if (!valueCap || isNaN(parseFloat(valueCap.value))) {
-                      result.push({ valid: false, code: 20006, description: `'value_cap' must be a valid number in benefit tag for offers[${offerIdx}]` });
-                      console.error(`'value_cap' must be a valid number in benefit tag for offers[${offerIdx}]`);
-                    }
-                  } else if (value && isNaN(parseFloat(value.value))) {
-                    result.push({ valid: false, code: 20006, description: `'value' must be a valid number in benefit tag for offers[${offerIdx}]` });
-                    console.error(`'value' must be a valid number in benefit tag for offers[${offerIdx}]`);
-                  }
-                }
-              },
-              delivery: () => {
-                if (!qualifier?.list.some((item: any) => item.code === 'min_value')) {
-                  result.push({ valid: false, code: 20006, description: `'qualifier' tag must include 'min_value' for offers[${offerIdx}]` });
-                  console.error(`'qualifier' tag must include 'min_value' for offers[${offerIdx}]`);
-                }
-                if (!benefit) {
-                  result.push({ valid: false, code: 20006, description: `'benefit' tag is required for offers[${offerIdx}]` });
-                  console.error(`'benefit' tag is required for offers[${offerIdx}]`);
-                } else {
-                  const valueType = benefit.list.find((item: any) => item.code === 'value_type');
-                  const value = benefit.list.find((item: any) => item.code === 'value');
-    
-                  if (!valueType) {
-                    result.push({ valid: false, code: 20006, description: `'value_type' is required in benefit tag for offers[${offerIdx}]` });
-                    console.error(`'value_type' is required in benefit tag for offers[${offerIdx}]`);
-                  }
-                  if (!value) {
-                    result.push({ valid: false, code: 20006, description: `'value' is required in benefit tag for offers[${offerIdx}]` });
-                    console.error(`'value' is required in benefit tag for offers[${offerIdx}]`);
-                  }
-                  if (value && isNaN(parseFloat(value.value))) {
-                    result.push({ valid: false, code: 20006, description: `'value' must be a valid number in benefit tag for offers[${offerIdx}]` });
-                    console.error(`'value' must be a valid number in benefit tag for offers[${offerIdx}]`);
-                  }
-                }
-              },
-              exchange: () => {
-                if (!qualifier?.list.some((item: any) => item.code === 'min_value')) {
-                  result.push({ valid: false, code: 20006, description: `'qualifier' tag must include 'min_value' for offers[${offerIdx}]` });
-                  console.error(`'qualifier' tag must include 'min_value' for offers[${offerIdx}]`);
-                }
-                if (benefit && benefit.list.length > 0) {
-                  result.push({ valid: false, code: 20006, description: `'benefit' tag must not include any values for offers[${offerIdx}]` });
-                  console.error(`'benefit' tag must not include any values for offers[${offerIdx}]`);
-                }
-              }
-            };
-    
-            const validateOffer = offerValidations[offer.descriptor?.code as keyof typeof offerValidations];
-            if (validateOffer) validateOffer();
-            else {
-              console.info(`No specific validation required for offer type: ${offer.descriptor?.code}`);
-            }
-          }
-        });
-      });
-     
+        }
+      );
     } catch (err: any) {
       result.push({
         valid: false,
         code: 50000,
-        description: `Error processing offer validation: ${err.message}`
+        description: `Error processing offer validation: ${err.message}`,
       });
-      console.error(`Error while checking offers under bpp/providers: ${err.stack}`);
+      console.error(
+        `Error while checking offers under bpp/providers: ${err.stack}`
+      );
     }
 
-    
     try {
       console.info(`Checking credentials`);
-    
+
       const bppProviders = payload.message.catalog["bpp/providers"];
-    
+
       // Check if bpp/providers exists and is an array
       if (!bppProviders || !Array.isArray(bppProviders)) {
-        addError(20001, "bpp/providers array is missing or invalid in /ON_SEARCH");
+        addError(
+          20001,
+          "bpp/providers array is missing or invalid in /ON_SEARCH"
+        );
       }
-    
+
       // Check if bpp/providers array is not empty
       if (bppProviders.length === 0) {
         addError(20002, "bpp/providers array is empty in /ON_SEARCH");
       }
-    
+
       // Collect descriptors for valid credentials
-      let credsDescriptor : any = [];
-    
+      let credsDescriptor: any = [];
+
       // Iterate through each provider
-      bppProviders.forEach((provider : any, providerIndex : any) => {
+      bppProviders.forEach((provider: any, providerIndex: any) => {
         const creds = provider.creds;
-    
+
         // Skip validation if creds is missing or empty (optional)
         if (!creds || !Array.isArray(creds) || creds.length === 0) {
-          console.info(`No credentials provided for provider at index ${providerIndex}, skipping validation`);
+          console.info(
+            `No credentials provided for provider at index ${providerIndex}, skipping validation`
+          );
           return;
         }
-    
+
         // Iterate through each credential
         creds.forEach((cred, credIndex) => {
           let isValid = true;
-    
+
           // Check required fields in credential
           if (!cred.id || !cred.descriptor || !cred.url || !cred.tags) {
-            addError(20003, `Credential at index ${credIndex} in provider ${providerIndex} is missing required fields in /ON_SEARCH`);
+            addError(
+              20003,
+              `Credential at index ${credIndex} in provider ${providerIndex} is missing required fields in /ON_SEARCH`
+            );
             isValid = false;
           }
-    
+
           // Validate descriptor
-          if (cred.descriptor && (!cred.descriptor.code || !cred.descriptor.short_desc)) {
-            addError(20004, `Descriptor in credential at index ${credIndex} in provider ${providerIndex} is missing code or short_desc in /ON_SEARCH`);
+          if (
+            cred.descriptor &&
+            (!cred.descriptor.code || !cred.descriptor.short_desc)
+          ) {
+            addError(
+              20004,
+              `Descriptor in credential at index ${credIndex} in provider ${providerIndex} is missing code or short_desc in /ON_SEARCH`
+            );
             isValid = false;
           }
-    
+
           // Validate URL format
           try {
             if (cred.url) new URL(cred.url);
           } catch {
-            addError(20005, `Invalid URL format in credential at index ${credIndex} in provider ${providerIndex}: ${cred.url} in /ON_SEARCH`);
+            addError(
+              20005,
+              `Invalid URL format in credential at index ${credIndex} in provider ${providerIndex}: ${cred.url} in /ON_SEARCH`
+            );
             isValid = false;
           }
-    
+
           // Find verification tag
-          const verificationTag = cred.tags && cred.tags.find((tag: any) => tag.code === "verification");
+          const verificationTag =
+            cred.tags &&
+            cred.tags.find((tag: any) => tag.code === "verification");
           if (!verificationTag || !verificationTag.list) {
-            addError(20006, `Verification tag missing or invalid in credential at index ${credIndex} in provider ${providerIndex} in /ON_SEARCH`);
+            addError(
+              20006,
+              `Verification tag missing or invalid in credential at index ${credIndex} in provider ${providerIndex} in /ON_SEARCH`
+            );
             isValid = false;
           }
-    
+
           // Extract verification details
-          const verifyUrl = verificationTag?.list?.find((item: any) => item.code === "verify_url")?.value;
-          const validFrom = verificationTag?.list?.find((item: any) => item.code === "valid_from")?.value;
-          const validTo = verificationTag?.list?.find((item: any) => item.code === "valid_to")?.value;
-    
+          const verifyUrl = verificationTag?.list?.find(
+            (item: any) => item.code === "verify_url"
+          )?.value;
+          const validFrom = verificationTag?.list?.find(
+            (item: any) => item.code === "valid_from"
+          )?.value;
+          const validTo = verificationTag?.list?.find(
+            (item: any) => item.code === "valid_to"
+          )?.value;
+
           // Check if verification details exist
           if (!verifyUrl || !validFrom || !validTo) {
-            addError(20007, `Verification details missing in credential at index ${credIndex} in provider ${providerIndex} in /ON_SEARCH`);
+            addError(
+              20007,
+              `Verification details missing in credential at index ${credIndex} in provider ${providerIndex} in /ON_SEARCH`
+            );
             isValid = false;
           }
-    
+
           // Validate verify_url format
           try {
             if (verifyUrl) new URL(verifyUrl);
           } catch {
-            addError(20008, `Invalid verify_url format in credential at index ${credIndex} in provider ${providerIndex}: ${verifyUrl} in /ON_SEARCH`);
+            addError(
+              20008,
+              `Invalid verify_url format in credential at index ${credIndex} in provider ${providerIndex}: ${verifyUrl} in /ON_SEARCH`
+            );
             isValid = false;
           }
-    
+
           // Validate date formats and logic
           const fromDate = validFrom && new Date(validFrom);
           const toDate = validTo && new Date(validTo);
           const currentDate = new Date("2025-05-07T00:00:00.000Z");
-    
+
           if (fromDate && isNaN(fromDate.getTime())) {
-            addError(20009, `Invalid valid_from date in credential at index ${credIndex} in provider ${providerIndex}: ${validFrom} in /ON_SEARCH`);
+            addError(
+              20009,
+              `Invalid valid_from date in credential at index ${credIndex} in provider ${providerIndex}: ${validFrom} in /ON_SEARCH`
+            );
             isValid = false;
           }
-    
+
           if (toDate && isNaN(toDate.getTime())) {
-            addError(20010, `Invalid valid_to date in credential at index ${credIndex} in provider ${providerIndex}: ${validTo} in /ON_SEARCH`);
+            addError(
+              20010,
+              `Invalid valid_to date in credential at index ${credIndex} in provider ${providerIndex}: ${validTo} in /ON_SEARCH`
+            );
             isValid = false;
           }
-    
+
           if (fromDate && toDate && toDate <= fromDate) {
-            addError(20011, `valid_to must be after valid_from in credential at index ${credIndex} in provider ${providerIndex} in /ON_SEARCH`);
+            addError(
+              20011,
+              `valid_to must be after valid_from in credential at index ${credIndex} in provider ${providerIndex} in /ON_SEARCH`
+            );
             isValid = false;
           }
-    
+
           // Check if credential is expired
           if (toDate && toDate < currentDate) {
-            addError(20012, `Credential at index ${credIndex} in provider ${providerIndex} is expired (valid_to: ${validTo}) in /ON_SEARCH`);
+            addError(
+              20012,
+              `Credential at index ${credIndex} in provider ${providerIndex} is expired (valid_to: ${validTo}) in /ON_SEARCH`
+            );
             isValid = false;
           }
-    
+
           // Collect descriptor if credential is valid
           if (isValid && cred.descriptor) {
             credsDescriptor.push(cred.descriptor);
-            console.info(`Credential at index ${credIndex} in provider ${providerIndex} is valid`);
+            console.info(
+              `Credential at index ${credIndex} in provider ${providerIndex} is valid`
+            );
           }
         });
       });
-    
+
       // Store credsDescriptor in Redis
       await RedisService.setKey(
         `${transaction_id}_${ApiSequence.ON_SEARCH}_credsDescriptor`,
         JSON.stringify(credsDescriptor),
         TTL_IN_SECONDS
       );
-    
-    } catch (e : any) {
+    } catch (e: any) {
       console.error("Credential validation failed", e);
-      addError(20013, `Error during credential validation in /ON_SEARCH: ${e.message}`);
+      addError(
+        20013,
+        `Error during credential validation in /ON_SEARCH: ${e.message}`
+      );
     }
-    
-    
-  
 
-    
     if (!_.isEmpty(orderValueSet)) {
       await RedisService.setKey(
         `${transaction_id}_${ApiSequence.ON_SEARCH}_orderValueSet`,
