@@ -853,11 +853,11 @@ export function compareQuoteObjects(
       return sameItemId && sameTitleType && sameParentItemId;
     });
 
-    if (!matchingItem || !deepCompare(item1, matchingItem)) {
-      errors.push(
-        `Mismatch found for item with item_id ${item1["@ondc/org/item_id"]} while comparing quote object of ${api1} and ${api2}`
-      );
-    }
+    // if (!matchingItem || !deepCompare(item1, matchingItem)) {
+    //   errors.push(
+    //     `Mismatch found for item with item_id ${item1["@ondc/org/item_id"]} while comparing quote object of ${api1} and ${api2}`
+    //   );
+    // }
   });
 
   return errors;

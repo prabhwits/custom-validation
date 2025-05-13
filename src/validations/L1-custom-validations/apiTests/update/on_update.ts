@@ -288,6 +288,17 @@ export const checkOnUpdate = async (
           description: `Item quote breakup prices for /${apiSeq} should be equal to the net price.`,
         });
       }
+
+      if (
+        apiSeq == ApiSequence.ON_UPDATE_LIQUIDATED ||
+        apiSeq == ApiSequence.ON_UPDATE_PART_CANCEL
+      ) {
+        await RedisService.setKey(
+          `${transaction_id}_quoteObj`,
+          JSON.stringify(on_update.quote),
+          TTL_IN_SECONDS
+        );
+      }
     } catch (error: any) {
       console.error(
         `Error occurred while checking for valid quote breakup in ON_UPDATE`
@@ -405,6 +416,77 @@ export const checkOnUpdate = async (
           });
         }
       });
+
+      const itemsIdListRaw = await RedisService.getKey(
+        `${transaction_id}_itemsIdList`
+      );
+      const itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
+
+      const items = message.order.items;
+      const itemsMap = new Map();
+
+      for (const item of items) {
+        if (itemsMap.has(item.id)) {
+          const existing = itemsMap.get(item.id);
+          existing.quantity.count += item.quantity.count;
+        } else {
+          itemsMap.set(item.id, { ...item });
+        }
+      }
+
+      // Check if both have the same number of items
+      if (Object.keys(itemsIdList).length !== itemsMap.size) {
+        result.push({
+          valid: false,
+          code: 23001,
+          description: `Different sizes: Object has ${
+            Object.keys(itemsIdList).length
+          } items, Map has ${itemsMap.size}`,
+        });
+      }
+
+      // Check all keys exist in both structures
+      const objectKeys = new Set(Object.keys(itemsIdList));
+      const mapKeys = new Set(itemsMap.keys());
+
+      const missingInMap = [...objectKeys].filter((key) => !mapKeys.has(key));
+      const missingInObject = [...mapKeys].filter(
+        (key: any) => !objectKeys.has(key)
+      );
+
+      if (missingInMap.length > 0) {
+        result.push({
+          valid: false,
+          code: 23002,
+          description: `item.id missing in message.order.items : ${missingInMap.join(
+            ", "
+          )}`,
+        });
+      }
+
+      if (missingInObject.length > 0) {
+        result.push({
+          valid: false,
+          code: 23003,
+          description: `extra item.id found in message.order.items : ${missingInObject.join(
+            ", "
+          )}`,
+        });
+      }
+
+      for (const [key, quantity] of Object.entries(itemsIdList)) {
+        const mapItem = itemsMap.get(key);
+
+        if (!mapItem) continue;
+
+        if (mapItem.quantity.count !== quantity) {
+          result.push({
+            valid: false,
+            code: 23004,
+            description: `item.quantity.count mismatch for item_id: ${key}: i.e. ${mapItem.quantity.count} as compared with ${ApiSequence.ON_SELECT} i.e ${quantity}`,
+          });
+        }
+      }
     } catch (error: any) {
       console.error(
         `Error while checking for item IDs for /${apiSeq}, ${error.stack}`
@@ -631,10 +713,9 @@ export const checkOnUpdate = async (
             }
           });
         }
-
       });
 
-      let quoteTrailSum = 0
+      let quoteTrailSum = 0;
       const lastFulfillment = fulfillments[fulfillments.length - 1].tags;
       if (lastFulfillment) {
         lastFulfillment.forEach((tag: any) => {
@@ -646,16 +727,15 @@ export const checkOnUpdate = async (
             });
           }
         });
-      }   
-      quoteTrailSum =  Math.abs(quoteTrailSum);  
-      console.log('22323', quoteTrailSum)
-      if(quoteTrailSum !== 0) {
-      await RedisService.setKey(
-        `${transaction_id}_quoteTrailSum`,
-        String(quoteTrailSum),
-        TTL_IN_SECONDS
-      );
-    }
+      }
+      quoteTrailSum = Math.abs(quoteTrailSum);
+      if (quoteTrailSum !== 0) {
+        await RedisService.setKey(
+          `${transaction_id}_quoteTrailSum`,
+          String(quoteTrailSum),
+          TTL_IN_SECONDS
+        );
+      }
     } catch (error: any) {
       console.error(
         `Error while checking for the availability of initiated_by in ${apiSeq}`
@@ -971,14 +1051,10 @@ export const checkOnUpdate = async (
     // Flow 6-b and 6-c checks
     if (flow === "6-b" || flow === "6-c") {
       try {
-        const timestampOnUpdatePartCancelRaw = await getRedisValue(
+        const timestampOnUpdatePartCancel = await getRedisValue(
           transaction_id,
           `${ApiSequence.ON_UPDATE_PART_CANCEL}_tmpstmp`
         );
-
-        const timestampOnUpdatePartCancel = timestampOnUpdatePartCancelRaw
-          ? timestampOnUpdatePartCancelRaw
-          : null;
 
         const timeDif = timeDiff(
           context.timestamp,
@@ -992,8 +1068,7 @@ export const checkOnUpdate = async (
           });
         }
 
-        const timestampRaw = await getRedisValue(transaction_id, "timestamp_");
-        const timestamp = timestampRaw ? JSON.parse(timestampRaw) : null;
+        const timestamp = await getRedisValue(transaction_id, "timestamp_");
 
         if (timestamp && timestamp.length !== 0) {
           const timeDif2 = timeDiff(context.timestamp, timestamp[0]);
@@ -1018,12 +1093,12 @@ export const checkOnUpdate = async (
         );
       } catch (e: any) {
         console.error(
-          `Error while checking context/timestamp for the /${apiSeq} -=> ${e.stack}`
+          `Error while checking context/timestamp for the /${apiSeq} ${e.stack}`
         );
         result.push({
           valid: false,
           code: 23001,
-          description: `Error checking timestamp for /${apiSeq}: ${e.message}`,
+          description: `Error checking timestamp for /${apiSeq}: ${e}`,
         });
       }
 
