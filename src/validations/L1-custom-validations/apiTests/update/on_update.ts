@@ -10,6 +10,7 @@ import {
   checkQuoteTrailSum,
   timeDiff,
   addMsgIdToRedisSet,
+  isPresentInRedisSet,
 } from "../../../../utils/helper";
 import {
   partcancel_return_reasonCodes,
@@ -44,7 +45,7 @@ async function getRedisValue(
 export const checkOnUpdate = async (
   data: any,
   apiSeq: string,
-  settlementDetatilSet: Set<any>,
+  settlementDetailSet: Set<any>,
   quoteTrailItemsSet: Set<any>,
   fulfillmentsItemsSet: Set<any>,
   flow: string,
@@ -406,7 +407,6 @@ export const checkOnUpdate = async (
         "SelectItemList"
       );
 
-      console.log("updatedItems", updatedItems, itemsList);
       itemsList.forEach((item: any, index: number) => {
         if (!updatedItems?.includes(item.id)) {
           result.push({
@@ -543,18 +543,22 @@ export const checkOnUpdate = async (
       );
       const settlement_details: any =
         on_update.payment["@ondc/org/settlement_details"];
-      if (flow === "6-a") {
-        settlementDetatilSet.add(settlement_details[0]);
-        await RedisService.setKey(
-          `${transaction_id}_settlementDetatilSet`,
-          JSON.stringify([...settlementDetatilSet]),
-          TTL_IN_SECONDS
-        );
-      } else {
+        if (flow === "6-a") {
+          // Get the object to add
+          const newSettlementDetail = settlement_details[0];
+          if(newSettlementDetail && !isPresentInRedisSet(settlementDetailSet, newSettlementDetail)){
+            settlementDetailSet.add(newSettlementDetail);
+            await RedisService.setKey(
+              `${transaction_id}_settlementDetailSet`,
+              JSON.stringify([...settlementDetailSet]),
+              TTL_IN_SECONDS
+            );
+          }
+        }else {
         let i = 0;
-        const storedSettlementSet = new Set(
-          (await getRedisValue(transaction_id, "settlementDetatilSet")) || []
-        );
+        const storedSettlementRaw = await RedisService.getKey(`${transaction_id}_settlementDetailSet`);
+        const storedSettlementSet = storedSettlementRaw ? new Set(JSON.parse(storedSettlementRaw)) : new Set();
+
         storedSettlementSet.forEach((obj1: any) => {
           const exist = settlement_details.some((obj2: any) =>
             _.isEqual(obj1, obj2)

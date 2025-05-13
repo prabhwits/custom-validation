@@ -19,6 +19,7 @@ import {
   checkItemTag,
   tagFinder,
   isoDurToSec,
+  getRedisValue,
 } from "../../../../utils/helper";
 import { FLOW } from "../../../../utils/enums";
 import constants, {
@@ -1242,6 +1243,32 @@ async function validatePayment(
       )
     );
   }
+  const settlement_details: any =
+  order?.payment["@ondc/org/settlement_details"];
+
+
+  const storedSettlementRaw = await RedisService.getKey(`${transaction_id}_settlementDetailSet`); 
+  
+  const storedSettlementSet = storedSettlementRaw 
+    ? JSON.parse(storedSettlementRaw)
+    : null;
+  
+
+    storedSettlementSet?.forEach((obj1: any) => {
+            const exist = settlement_details.some((obj2: any) =>
+              _.isEqual(obj1, obj2)
+            );
+            if (!exist) {
+              result.push({
+                valid: false,
+                code: 20006,
+                description: `Missing payment/@ondc/org/settlement_details as compared to previous calls or not captured correctly: ${JSON.stringify(
+                  obj1
+                )}`,
+              });
+            }
+          });
+
 }
 
 async function validateQuote(
@@ -1294,7 +1321,7 @@ async function validateBilling(
 ) {
   const billingRaw = await RedisService.getKey(`${transaction_id}_billing`);
   const billing = billingRaw ? JSON.parse(billingRaw) : null;
-  const billingErrors = compareObjects(billing, order.billing);
+  const billingErrors = billing && compareObjects(billing, order.billing);
   if (billingErrors) {
     billingErrors.forEach((error: any) =>
       result.push(

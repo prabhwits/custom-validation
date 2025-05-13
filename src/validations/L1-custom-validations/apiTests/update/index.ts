@@ -36,7 +36,7 @@ export const updateRouter = async (data: any) => {
   let result: any = [];
 
   // Fetch settlement details set
-  let settlementDetatilSet = await fetchRedisSet(transaction_id, "settlementDetatilSet");
+  let settlementDetailSet = await fetchRedisSet(transaction_id, "settlementDetailSet");
 
   const updateTarget = data?.message?.update_target;
   if (updateTarget) {
@@ -67,7 +67,7 @@ export const updateRouter = async (data: any) => {
       result = await checkUpdate(
         data,
         ApiSequence.UPDATE_SETTLEMENT_PART_CANCEL,
-        settlementDetatilSet,
+        settlementDetailSet,
         flow
       );
       break;
@@ -75,7 +75,7 @@ export const updateRouter = async (data: any) => {
       result = await checkUpdate(
         data,
         ApiSequence.UPDATE_LIQUIDATED,
-        settlementDetatilSet,
+        settlementDetailSet,
         flow
       );
       break;
@@ -83,7 +83,7 @@ export const updateRouter = async (data: any) => {
       result = await checkUpdate(
         data,
         ApiSequence.UPDATE_SETTLEMENT_LIQUIDATED,
-        settlementDetatilSet,
+        settlementDetailSet,
         flow
       );
       break;
@@ -101,9 +101,9 @@ export const onUpdateRouter = async (data: any) => {
   let flow = "";
 
   // Fetch Redis sets concurrently
-  const [fulfillmentsItemsSet, settlementDetatilSet, quoteTrailItemsSet] = await Promise.all([
+  const [fulfillmentsItemsSet, settlementDetailSet, quoteTrailItemsSet] = await Promise.all([
     fetchRedisSet(transaction_id, "fulfillmentsItemsSet"),
-    fetchRedisSet(transaction_id, "settlementDetatilSet"),
+    fetchRedisSet(transaction_id, "settlementDetailSet"),
     fetchRedisSet(transaction_id, "quoteTrailItemsSet")
   ]);
 
@@ -139,7 +139,7 @@ export const onUpdateRouter = async (data: any) => {
     result = await checkOnUpdate(
       data,
       apiSeq,
-      settlementDetatilSet,
+      settlementDetailSet,
       quoteTrailItemsSet,
       fulfillmentsItemsSet,
       flow,

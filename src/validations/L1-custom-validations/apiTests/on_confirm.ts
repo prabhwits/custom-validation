@@ -861,6 +861,24 @@ async function validatePayment(
       )
     );
   }
+  // Assuming settlementDetailSet is an array or object from order?.payment?.['@ondc/org/settlement_details']
+const settlementDetailSet = order?.payment?.['@ondc/org/settlement_details'];
+
+// Convert to a Set if settlementDetailSet exists and is an array
+const settlementDetailSetConverted = settlementDetailSet 
+  ? new Set(Array.isArray(settlementDetailSet) ? settlementDetailSet : [settlementDetailSet])
+  : new Set();
+
+// Store the Set in Redis as a JSON string
+if (settlementDetailSetConverted.size > 0) {
+  await RedisService.setKey(
+    `${transaction_id}_settlementDetailSet`,
+    JSON.stringify([...settlementDetailSetConverted]), // Convert Set to array for JSON serialization
+    TTL_IN_SECONDS
+  );
+}
+
+
 }
 
 async function validateQuote(

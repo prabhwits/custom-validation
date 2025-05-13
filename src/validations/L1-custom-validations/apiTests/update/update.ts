@@ -10,6 +10,7 @@ import {
   checkContext,
   isValidUrl,
   timeDiff,
+  isPresentInRedisSet,
 } from "../../../../utils/helper";
 import { condition_id } from "../../../../utils/constants/reasonCode";
 
@@ -54,7 +55,7 @@ const addError = (description: string, code: number): ValidationError => ({
 export const checkUpdate = async (
   data: any,
   apiSeq: any,
-  settlementDetatilSet: any,
+  settlementDetailSet: any,
   flow: any
 ) => {
   const result: ValidationError[] = [];
@@ -452,10 +453,11 @@ export const checkUpdate = async (
         const prevPayment = prevPaymentRaw ? JSON.parse(prevPaymentRaw) : null;
 
         const settlement_details = payment["@ondc/org/settlement_details"];
-        settlementDetatilSet.add(settlement_details[0]);
+        if(settlement_details[0] && !isPresentInRedisSet(settlementDetailSet, settlement_details[0])) {
+          settlementDetailSet.add(settlement_details[0]);
+        }
 
-        prevPayment["@ondc/org/settlement_details"] = [...settlementDetatilSet];
-        console.log("prevPayment", prevPayment);
+        prevPayment["@ondc/org/settlement_details"] = [...settlementDetailSet];
         
         await RedisService.setKey(
           `${context.transaction_id}_prevPayment`,
@@ -464,8 +466,8 @@ export const checkUpdate = async (
         );
 
         await RedisService.setKey(
-          `${context.transaction_id}_settlementDetatilSet`,
-          JSON.stringify([...settlementDetatilSet]),
+          `${context.transaction_id}_settlementDetailSet`,
+          JSON.stringify([...settlementDetailSet]),
           TTL_IN_SECONDS
         );
         const quoteTrailSum = await RedisService.getKey(`${context.transaction_id}_quoteTrailSum`);
