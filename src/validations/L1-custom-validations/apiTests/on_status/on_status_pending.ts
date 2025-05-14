@@ -19,6 +19,7 @@ import {
   checkItemTag,
   tagFinder,
   isoDurToSec,
+  getRedisValue,
 } from "../../../../utils/helper";
 import { FLOW } from "../../../../utils/enums";
 import constants, {
@@ -229,9 +230,7 @@ async function validateFulfillments(
         RedisService.getKey(`${transaction_id}_buyerAddr`),
         RedisService.getKey(`${transaction_id}_fulfillment_tat_obj`),
         RedisService.getKey(`${transaction_id}_onSelectFulfillments`),
-        RedisService.getKey(
-          `${transaction_id}_${ApiSequence.ON_CONFIRM}_tmpstmp`
-        ),
+        RedisService.getKey(`${transaction_id}_${ApiSequence.ON_CONFIRM}_tmpstmp`),
         RedisService.getKey(`${transaction_id}_providerAddr`),
       ].map(async (promise, index) => {
         try {
@@ -244,28 +243,21 @@ async function validateFulfillments(
         }
       })
     );
-    const itemFlfllmnts = itemFlfllmntsRaw
-      ? JSON.parse(itemFlfllmntsRaw)
-      : null;
+
+    const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
     const providerGps = providerGpsRaw ? JSON.parse(providerGpsRaw) : null;
     const providerName = providerNameRaw ? JSON.parse(providerNameRaw) : null;
     const buyerGps = buyerGpsRaw ? JSON.parse(buyerGpsRaw) : null;
     const buyerAddr = buyerAddrRaw ? JSON.parse(buyerAddrRaw) : null;
-    const fulfillmentTatObj = fulfillmentTatObjRaw
-      ? JSON.parse(fulfillmentTatObjRaw)
-      : null;
-    const onSelectFulfillments = onSelectFulfillmentsRaw
-      ? JSON.parse(onSelectFulfillmentsRaw)
-      : null;
-    const onConfirmTimestamp = onConfirmTimestampRaw
-      ? JSON.parse(onConfirmTimestampRaw)
-      : null;
+    const fulfillmentTatObj = fulfillmentTatObjRaw ? JSON.parse(fulfillmentTatObjRaw) : null;
+    const onSelectFulfillments = onSelectFulfillmentsRaw ? JSON.parse(onSelectFulfillmentsRaw) : null;
+    const onConfirmTimestamp = onConfirmTimestampRaw ? JSON.parse(onConfirmTimestampRaw) : null;
     const providerAddr = providerAddrRaw ? JSON.parse(providerAddrRaw) : null;
 
     // Check for duplicate fulfillment IDs
     const fulfillmentIds = new Set();
-    for (const ff of order.fulfillments || []) {
-      if (!ff.id) {
+    for (const ff of order?.fulfillments || []) {
+      if (!ff?.id) {
         console.info(
           `Missing fulfillment ID in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
@@ -297,11 +289,11 @@ async function validateFulfillments(
       '"Accepted"';
     const parsedOrderState = JSON.parse(orderState);
 
-    for (const ff of order.fulfillments || []) {
-      const ffId = ff.id || "unknown";
+    for (const ff of order?.fulfillments || []) {
+      const ffId = ff?.id || "unknown";
 
       // Basic validations
-      if (!ff.type) {
+      if (!ff?.type) {
         console.info(
           `Missing fulfillment type for ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
@@ -319,25 +311,25 @@ async function validateFulfillments(
           );
           result.push(
             addError(
-              `Invalid fulfillment type ${
-                ff.type
-              } for ID ${ffId}; must be one of ${validTypes.join(", ")}`,
+              `Invalid fulfillment type ${ff.type} for ID ${ffId}; must be one of ${validTypes.join(", ")}`,
               ERROR_CODES.INVALID_RESPONSE
             )
           );
         }
       }
 
-      if (!ff["@ondc/org/TAT"]) {
+      if (!ff?.["@ondc/org/TAT"]) {
         console.info(
           `Missing TAT for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
-        result.push(
-          addError(
-            `'TAT' must be provided in message/order/fulfillments[${ffId}]`,
-            ERROR_CODES.INVALID_RESPONSE
-          )
-        );
+        if (ff?.type === "Delivery") {
+          result.push(
+            addError(
+              `'TAT' must be provided in message/order/fulfillments[${ffId}]`,
+              ERROR_CODES.INVALID_RESPONSE
+            )
+          );
+        }
       } else if (
         fulfillmentTatObj &&
         fulfillmentTatObj[ffId] !== isoDurToSec(ff["@ondc/org/TAT"])
@@ -358,8 +350,8 @@ async function validateFulfillments(
       }
 
       // Tracking validation
-      if (ff.type !== "Cancel") {
-        if (ff.tracking === undefined || ff.tracking === null) {
+      if (ff?.type !== "Cancel") {
+        if (ff?.tracking === undefined || ff?.tracking === null) {
           console.info(
             `Missing tracking key for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
@@ -408,7 +400,7 @@ async function validateFulfillments(
             );
           }
         }
-      } else if (ff.tracking !== undefined) {
+      } else if (ff?.tracking !== undefined) {
         console.info(
           `Tracking key present for Cancel fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
@@ -420,43 +412,33 @@ async function validateFulfillments(
         );
       }
 
-      if (!itemFlfllmnts || !Object.values(itemFlfllmnts).includes(ffId)) {
-        console.info(
-          `Fulfillment ID ${ffId} not found in /${constants.ON_CONFIRM} for transaction ${transaction_id}`
-        );
-        result.push(
-          addError(
-            `Fulfillment ID ${ffId} does not exist in /${constants.ON_CONFIRM}`,
-            ERROR_CODES.INVALID_RESPONSE
-          )
-        );
-      }
-
       // State validations
-      const ffDesc = ff.state?.descriptor;
-      if (!ffDesc?.hasOwnProperty("code") || ffDesc.code !== "Pending") {
-        console.info(
-          `Invalid state for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-        );
-        result.push(
-          addError(
-            `Fulfillment state should be 'Pending' for ID ${ffId} in /${constants.ON_STATUS}_${state}`,
-            ERROR_CODES.INVALID_ORDER_STATE
-          )
-        );
-      } else if (
-        parsedOrderState !== "Created" &&
-        parsedOrderState !== "Accepted"
-      ) {
-        console.info(
-          `Fulfillment state Pending incompatible with order state ${parsedOrderState} for ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-        );
-        result.push(
-          addError(
-            `Fulfillment state 'Pending' is incompatible with order state ${parsedOrderState} for ID ${ffId}`,
-            ERROR_CODES.INVALID_ORDER_STATE
-          )
-        );
+      const ffDesc = ff?.state?.descriptor;
+      if (ff.type === "Delivery") {
+        if (!ffDesc?.code || ffDesc.code !== "Pending") {
+          console.info(
+            `Invalid state for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+          );
+          result.push(
+            addError(
+              `Fulfillment state should be 'Pending' for ID ${ffId} in /${constants.ON_STATUS}_${state}`,
+              ERROR_CODES.INVALID_ORDER_STATE
+            )
+          );
+        } else if (
+          parsedOrderState !== "Created" &&
+          parsedOrderState !== "Accepted"
+        ) {
+          console.info(
+            `Fulfillment state Pending incompatible with order state ${parsedOrderState} for ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+          );
+          result.push(
+            addError(
+              `Fulfillment state 'Pending' is incompatible with order state ${parsedOrderState} for ID ${ffId}`,
+              ERROR_CODES.INVALID_ORDER_STATE
+            )
+          );
+        }
       }
 
       if (ffDesc?.short_desc && typeof ffDesc.short_desc !== "string") {
@@ -472,288 +454,242 @@ async function validateFulfillments(
       }
 
       // Location validations
-      if (!ff.start || !ff.end) {
-        console.info(
-          `Missing start or end location for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-        );
-        result.push(
-          addError(
-            `fulfillments[${ffId}] start and end locations are mandatory`,
-            ERROR_CODES.INVALID_RESPONSE
-          )
-        );
-      } else {
-        // GPS validations
-        const gpsPattern = /^-?\d{1,3}\.\d+,-?\d{1,3}\.\d+$/;
-        if (!ff.start.location.gps) {
+      if (ff.type === "Delivery") {
+        if (!ff?.start || !ff?.end) {
           console.info(
-            `Missing start.location.gps for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+            `Missing start or end location for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
             addError(
-              `fulfillments[${ffId}].start.location.gps is required`,
-              ERROR_CODES.INVALID_RESPONSE
-            )
-          );
-        } else if (!gpsPattern.test(ff.start.location.gps)) {
-          console.info(
-            `Invalid GPS format for start.location.gps in fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-          );
-          result.push(
-            addError(
-              `fulfillments[${ffId}].start.location.gps must be in 'latitude,longitude' format`,
-              ERROR_CODES.INVALID_RESPONSE
-            )
-          );
-        } else if (
-          providerGps &&
-          !compareCoordinates(ff.start.location.gps, providerGps)
-        ) {
-          console.info(
-            `Start GPS mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-          );
-          result.push(
-            addError(
-              `store gps location /fulfillments[${ffId}]/start/location/gps can't change`,
-              ERROR_CODES.INVALID_RESPONSE
-            )
-          );
-        }
-
-        if (!ff.end.location.gps) {
-          console.info(
-            `Missing end.location.gps for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-          );
-          result.push(
-            addError(
-              `fulfillments[${ffId}].end.location.gps is required`,
-              ERROR_CODES.INVALID_RESPONSE
-            )
-          );
-        } else if (!gpsPattern.test(ff.end.location.gps)) {
-          console.info(
-            `Invalid GPS format for end.location.gps in fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-          );
-          result.push(
-            addError(
-              `fulfillments[${ffId}].end.location.gps must be in 'latitude,longitude' format`,
-              ERROR_CODES.INVALID_RESPONSE
-            )
-          );
-        } else if (buyerGps && !_.isEqual(ff.end.location.gps, buyerGps)) {
-          console.info(
-            `End GPS mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-          );
-          result.push(
-            addError(
-              `fulfillments[${ffId}].end.location.gps does not match gps in /${constants.SELECT}`,
-              ERROR_CODES.INVALID_RESPONSE
-            )
-          );
-        }
-
-        // Address validations
-        if (!ff.start.location.address) {
-          console.info(
-            `Missing start.location.address for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-          );
-          result.push(
-            addError(
-              `fulfillments[${ffId}].start.location.address is required`,
+              `fulfillments[${ffId}] start and end locations are mandatory`,
               ERROR_CODES.INVALID_RESPONSE
             )
           );
         } else {
-          const requiredFields = ["locality", "area_code", "city", "state"];
-          for (const field of requiredFields) {
-            if (!ff.start.location.address[field]) {
-              console.info(
-                `Missing start.location.address.${field} for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-              );
-              result.push(
-                addError(
-                  `fulfillments[${ffId}].start.location.address.${field} is required`,
-                  ERROR_CODES.INVALID_RESPONSE
-                )
-              );
-            }
-          }
-          if (
-            providerAddr &&
-            !_.isEqual(ff.start.location.address, providerAddr)
-          ) {
+          // GPS validations
+          const gpsPattern = /^-?\d{1,3}\.\d+,-?\d{1,3}\.\d+$/;
+          if (!ff?.start?.location?.gps) {
             console.info(
-              `Start address mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+              `Missing start.location.gps for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
               addError(
-                `fulfillments[${ffId}].start.location.address does not match address in /${constants.ON_SEARCH}`,
+                `fulfillments[${ffId}].start.location.gps is required`,
                 ERROR_CODES.INVALID_RESPONSE
               )
             );
-          }
-        }
-
-        if (!ff.end.location.address) {
-          console.info(
-            `Missing end.location.address for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-          );
-          result.push(
-            addError(
-              `fulfillments[${ffId}].end.location.address is required`,
-              ERROR_CODES.INVALID_RESPONSE
-            )
-          );
-        } else {
-          if (!ff.end.location.address.area_code) {
+          } else if (!gpsPattern.test(ff.start.location.gps)) {
             console.info(
-              `Missing end.location.address.area_code for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+              `Invalid GPS format for start.location.gps in fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
               addError(
-                `fulfillments[${ffId}].end.location.address.area_code is required`,
+                `fulfillments[${ffId}].start.location.gps must be in 'latitude,longitude' format`,
                 ERROR_CODES.INVALID_RESPONSE
               )
             );
           } else if (
-            buyerAddr &&
-            !_.isEqual(ff.end.location.address.area_code, buyerAddr)
+            providerGps &&
+            !compareCoordinates(ff.start.location.gps, providerGps)
           ) {
             console.info(
-              `End area_code mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+              `Start GPS mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
             result.push(
               addError(
-                `fulfillments[${ffId}].end.location.address.area_code does not match area_code in /${constants.SELECT}`,
+                `store gps location /fulfillments[${ffId}]/start/location/gps can't change`,
                 ERROR_CODES.INVALID_RESPONSE
               )
             );
           }
-          if (ff.type === "Delivery") {
-            const requiredFields = ["building", "city", "state", "country"];
+
+          if (!ff?.end?.location?.gps) {
+            console.info(
+              `Missing end.location.gps for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+            );
+            result.push(
+              addError(
+                `fulfillments[${ffId}].end.location.gps is required`,
+                ERROR_CODES.INVALID_RESPONSE
+              )
+            );
+          } else if (!gpsPattern.test(ff.end.location.gps)) {
+            console.info(
+              `Invalid GPS format for end.location.gps in fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+            );
+            result.push(
+              addError(
+                `fulfillments[${ffId}].end.location.gps must be in 'latitude,longitude' format`,
+                ERROR_CODES.INVALID_RESPONSE
+              )
+            );
+          } else if (buyerGps && !_.isEqual(ff.end.location.gps, buyerGps)) {
+            console.info(
+              `End GPS mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+            );
+            result.push(
+              addError(
+                `fulfillments[${ffId}].end.location.gps does not match gps in /${constants.SELECT}`,
+                ERROR_CODES.INVALID_RESPONSE
+              )
+            );
+          }
+
+          // Address validations
+          if (!ff?.start?.location?.address) {
+            console.info(
+              `Missing start.location.address for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+            );
+            result.push(
+              addError(
+                `fulfillments[${ffId}].start.location.address is required`,
+                ERROR_CODES.INVALID_RESPONSE
+              )
+            );
+          } else {
+            const requiredFields = ["locality", "area_code", "city", "state"];
             for (const field of requiredFields) {
-              if (!ff.end.location.address[field]) {
+              if (!ff?.start?.location?.address?.[field]) {
                 console.info(
-                  `Missing end.location.address.${field} for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+                  `Missing start.location.address.${field} for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
                 );
                 result.push(
                   addError(
-                    `fulfillments[${ffId}].end.location.address.${field} is required for Delivery`,
+                    `fulfillments[${ffId}].start.location.address.${field} is required`,
                     ERROR_CODES.INVALID_RESPONSE
                   )
                 );
               }
             }
-          }
-        }
-      }
-
-      // Contact validations
-      if (!ff.start.contact || !ff.start.contact.phone) {
-        console.info(
-          `Missing start.contact.phone for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-        );
-        result.push(
-          addError(
-            `fulfillments[${ffId}].start.contact.phone is required`,
-            ERROR_CODES.INVALID_RESPONSE
-          )
-        );
-      } else {
-        const phonePattern = /^\+?\d{10,15}$/;
-
-        if (!phonePattern.test(ff.start.contact.phone)) {
-          console.info(
-            `Invalid phone format for start.contact.phone in fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-          );
-          result.push(
-            addError(
-              `fulfillments[${ffId}].start.contact.phone must be a valid phone number`,
-              ERROR_CODES.INVALID_RESPONSE
-            )
-          );
-        }
-      }
-
-      if (!ff.end.contact || !ff.end.contact.phone) {
-        console.info(
-          `Missing end.contact.phone for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-        );
-        result.push(
-          addError(
-            `fulfillments[${ffId}].end.contact.phone is required`,
-            ERROR_CODES.INVALID_RESPONSE
-          )
-        );
-      } else {
-        const phonePattern = /^\+?\d{10,15}$/;
-        if (!phonePattern.test(ff.end.contact.phone)) {
-          console.info(
-            `Invalid phone format for end.contact.phone in fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-          );
-          result.push(
-            addError(
-              `fulfillments[${ffId}].end.contact.phone must be a valid phone number`,
-              ERROR_CODES.INVALID_RESPONSE
-            )
-          );
-        }
-      }
-
-      // Agent validations
-      if (ff.type === "Delivery" && flow === "2") {
-        if (!ff.agent || !ff.agent.name || !ff.agent.phone) {
-        } else {
-          const phonePattern = /^\+?\d{10,15}$/;
-          if (!phonePattern.test(ff.agent.phone)) {
-            console.info(
-              `Invalid agent.phone format for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-            );
-            result.push(
-              addError(
-                `fulfillments[${ffId}].agent.phone must be a valid phone number`,
-                ERROR_CODES.INVALID_RESPONSE
-              )
-            );
-          }
-          if (
-            typeof ff.agent.name !== "string" ||
-            ff.agent.name.trim() === ""
-          ) {
-            console.info(
-              `Invalid agent.name for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-            );
-            result.push(
-              addError(
-                `fulfillments[${ffId}].agent.name must be a non-empty string`,
-                ERROR_CODES.INVALID_RESPONSE
-              )
-            );
-          }
-          if (onSelectFulfillments) {
-            const selectFf = onSelectFulfillments.find(
-              (f: any) => f.id === ffId
-            );
             if (
-              selectFf &&
-              selectFf.agent &&
-              !_.isEqual(ff.agent, selectFf.agent)
+              providerAddr &&
+              !_.isEqual(ff.start.location.address, providerAddr)
             ) {
               console.info(
-                `Agent details mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+                `Start address mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
               );
               result.push(
                 addError(
-                  `fulfillments[${ffId}].agent details do not match /${constants.ON_SELECT}`,
+                  `fulfillments[${ffId}].start.location.address does not match address in /${constants.ON_SEARCH}`,
                   ERROR_CODES.INVALID_RESPONSE
                 )
               );
             }
           }
+
+          if (!ff?.end?.location?.address) {
+            console.info(
+              `Missing end.location.address for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+            );
+            result.push(
+              addError(
+                `fulfillments[${ffId}].end.location.address is required`,
+                ERROR_CODES.INVALID_RESPONSE
+              )
+            );
+          } else {
+            if (!ff?.end?.location?.address?.area_code) {
+              console.info(
+                `Missing end.location.address.area_code for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+              );
+              result.push(
+                addError(
+                  `fulfillments[${ffId}].end.location.address.area_code is required`,
+                  ERROR_CODES.INVALID_RESPONSE
+                )
+              );
+            } else if (
+              buyerAddr &&
+              !_.isEqual(ff.end.location.address.area_code, buyerAddr)
+            ) {
+              console.info(
+                `End area_code mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+              );
+              result.push(
+                addError(
+                  `fulfillments[${ffId}].end.location.address.area_code does not match area_code in /${constants.SELECT}`,
+                  ERROR_CODES.INVALID_RESPONSE
+                )
+              );
+            }
+            if (ff.type === "Delivery") {
+              const requiredFields = ["building", "city", "state", "country"];
+              for (const field of requiredFields) {
+                if (!ff?.end?.location?.address?.[field]) {
+                  console.info(
+                    `Missing end.location.address.${field} for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+                  );
+                  result.push(
+                    addError(
+                      `fulfillments[${ffId}].end.location.address.${field} is required for Delivery`,
+                      ERROR_CODES.INVALID_RESPONSE
+                    )
+                  );
+                }
+              }
+            }
+          }
         }
-      } else if (ff.agent) {
+      }
+      // Contact
+      if (ff.type === "Delivery") {
+        if (!ff?.start?.contact?.phone) {
+          console.info(
+            `Missing start.contact.phone for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+          );
+          result.push(
+            addError(
+              `fulfillments[${ffId}].start.contact.phone is required`,
+              ERROR_CODES.INVALID_RESPONSE
+            )
+          );
+        } else {
+          const phonePattern = /^\+?\d{10,15}$/;
+          if (!phonePattern.test(ff.start.contact.phone)) {
+            console.info(
+              `Invalid phone format for start.contact.phone in fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+            );
+            result.push(
+              addError(
+                `fulfillments[${ffId}].start.contact.phone must be a valid phone number`,
+                ERROR_CODES.INVALID_RESPONSE
+              )
+            );
+          }
+        }
+      }
+
+      if (ff.type === "Delivery") {
+        if (!ff?.end?.contact?.phone) {
+          console.info(
+            `Missing end.contact.phone for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+          );
+          result
+            .push
+            // addError(
+            //   `fulfillments[${ffId}].end.contact.phone is required`,
+            //   ERROR_CODES.INVALID_RESPONSE
+            // )
+            ();
+        } else {
+          const phonePattern = /^\+?\d{10,15}$/;
+          if (!phonePattern.test(ff.end.contact.phone)) {
+            console.info(
+              `Invalid phone format for end.contact.phone in fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+            );
+            result.push(
+              addError(
+                `fulfillments[${ffId}].end.contact.phone must be a valid phone number`,
+                ERROR_CODES.INVALID_RESPONSE
+              )
+            );
+          }
+        }
+      }
+      // Agent validations
+      if (ff?.type === "Delivery" && ff?.agent) {
         if (
-          !ff.agent.name ||
+          !ff?.agent?.name ||
           typeof ff.agent.name !== "string" ||
           ff.agent.name.trim() === ""
         ) {
@@ -767,7 +703,7 @@ async function validateFulfillments(
             )
           );
         }
-        if (ff.agent.phone) {
+        if (ff?.agent?.phone) {
           const phonePattern = /^\+?\d{10,15}$/;
           if (!phonePattern.test(ff.agent.phone)) {
             console.info(
@@ -784,8 +720,8 @@ async function validateFulfillments(
       }
 
       // Time validations
-      if (ff.start.time) {
-        if (!ff.start.time.timestamp && !ff.start.time.range) {
+      if (ff?.start?.time) {
+        if (!ff?.start?.time?.timestamp && !ff?.start?.time?.range) {
           console.info(
             `Invalid start.time format for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
@@ -795,8 +731,8 @@ async function validateFulfillments(
               ERROR_CODES.INVALID_RESPONSE
             )
           );
-        } else if (ff.start.time.range) {
-          if (!ff.start.time.range.start || !ff.start.time.range.end) {
+        } else if (ff?.start?.time?.range) {
+          if (!ff?.start?.time?.range?.start || !ff?.start?.time?.range?.end) {
             console.info(
               `Missing start.time.range fields for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
@@ -825,8 +761,7 @@ async function validateFulfillments(
               (f: any) => f.id === ffId
             );
             if (
-              selectFf &&
-              selectFf.start?.time?.range &&
+              selectFf?.start?.time?.range &&
               !_.isEqual(ff.start.time.range, selectFf.start.time.range)
             ) {
               console.info(
@@ -843,8 +778,8 @@ async function validateFulfillments(
         }
       }
 
-      if (ff.end.time) {
-        if (!ff.end.time.timestamp && !ff.end.time.range) {
+      if (ff?.end?.time) {
+        if (!ff?.end?.time?.timestamp && !ff?.end?.time?.range) {
           console.info(
             `Invalid end.time format for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
@@ -854,8 +789,8 @@ async function validateFulfillments(
               ERROR_CODES.INVALID_RESPONSE
             )
           );
-        } else if (ff.end.time.range) {
-          if (!ff.end.time.range.start || !ff.end.time.range.end) {
+        } else if (ff?.end?.time?.range) {
+          if (!ff?.end?.time?.range?.start || !ff?.end?.time?.range?.end) {
             console.info(
               `Missing end.time.range fields for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
@@ -883,8 +818,7 @@ async function validateFulfillments(
               (f: any) => f.id === ffId
             );
             if (
-              selectFf &&
-              selectFf.end?.time?.range &&
+              selectFf?.end?.time?.range &&
               !_.isEqual(ff.end.time.range, selectFf.end.time.range)
             ) {
               console.info(
@@ -899,12 +833,7 @@ async function validateFulfillments(
             }
           }
         }
-        if (
-          ff.start.time &&
-          ff.end.time &&
-          ff.start.time.timestamp &&
-          ff.end.time.timestamp
-        ) {
+        if (ff?.start?.time?.timestamp && ff?.end?.time?.timestamp) {
           if (
             new Date(ff.end.time.timestamp) <= new Date(ff.start.time.timestamp)
           ) {
@@ -922,8 +851,8 @@ async function validateFulfillments(
       }
 
       // Vehicle validations for Self-Pickup
-      if (ff.type === "Self-Pickup" && flow === "3") {
-        if (!ff.vehicle) {
+      if (ff?.type === "Self-Pickup" && flow === "3") {
+        if (!ff?.vehicle) {
           console.info(
             `Missing vehicle details for Self-Pickup fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
@@ -934,7 +863,7 @@ async function validateFulfillments(
             )
           );
         } else {
-          if (!ff.vehicle.category || ff.vehicle.category !== "Kerbside") {
+          if (!ff?.vehicle?.category || ff.vehicle.category !== "Kerbside") {
             console.info(
               `Invalid vehicle.category for Self-Pickup fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
@@ -945,7 +874,7 @@ async function validateFulfillments(
               )
             );
           }
-          if (!ff.vehicle.number) {
+          if (!ff?.vehicle?.number) {
             console.info(
               `Missing vehicle.number for Self-Pickup fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
@@ -960,7 +889,7 @@ async function validateFulfillments(
             const selectFf = onSelectFulfillments.find(
               (f: any) => f.id === ffId
             );
-            if (selectFf && !_.isEqual(ff.vehicle, selectFf.vehicle)) {
+            if (selectFf?.vehicle && !_.isEqual(ff.vehicle, selectFf.vehicle)) {
               console.info(
                 `Vehicle details mismatch for Self-Pickup fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
               );
@@ -973,7 +902,7 @@ async function validateFulfillments(
             }
           }
         }
-      } else if (ff.vehicle && ff.type === "Cancel") {
+      } else if (ff?.vehicle && ff.type === "Cancel") {
         console.info(
           `Vehicle present for Cancel fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
@@ -986,42 +915,10 @@ async function validateFulfillments(
       }
 
       // Tags validations
-      if (ff.tags) {
-        // const requiredTags = [
-        //   "@ondc/org/category",
-        //   // "@ondc/org/subcategory",
-        //   "@ondc/org/provider_type",
-        // ];
-        // for (const tagCode of requiredTags) {
-        //   const tag = ff.tags.find((t: any) => t.code === tagCode);
-        //   if (!tag) {
-        //     console.info(
-        //       `Missing ${tagCode} tag for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-        //     );
-        //     result.push(
-        //       addError(
-        //         `fulfillments[${ffId}].tags must include ${tagCode}`,
-        //         ERROR_CODES.INVALID_RESPONSE
-        //       )
-        //     );
-        //   } else if (
-        //     !tag.list ||
-        //     !tag.list.find((l: any) => l.code === "value")?.value
-        //   ) {
-        //     console.info(
-        //       `Invalid ${tagCode} tag format for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-        //     );
-        //     result.push(
-        //       addError(
-        //         `fulfillments[${ffId}].tags[${tagCode}] must have a valid value`,
-        //         ERROR_CODES.INVALID_RESPONSE
-        //       )
-        //     );
-        //   }
-        // }
+      if (ff?.tags) {
         if (onSelectFulfillments) {
           const selectFf = onSelectFulfillments.find((f: any) => f.id === ffId);
-          if (selectFf && selectFf.tags && !_.isEqual(ff.tags, selectFf.tags)) {
+          if (selectFf?.tags && !_.isEqual(ff.tags, selectFf.tags)) {
             console.info(
               `Tags mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
             );
@@ -1035,24 +932,8 @@ async function validateFulfillments(
         }
       }
 
-      // Cancel/Return reason validation
-      if (
-        ["Cancel", "Return"].includes(ff.type) &&
-        !ff.state?.descriptor?.reason
-      ) {
-        console.info(
-          `Missing state.descriptor.reason for ${ff.type} fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
-        );
-        result.push(
-          addError(
-            `fulfillments[${ffId}].state.descriptor.reason is required for ${ff.type}`,
-            ERROR_CODES.INVALID_RESPONSE
-          )
-        );
-      }
-
       // Rateable validation
-      if (ff.rateable !== undefined && typeof ff.rateable !== "boolean") {
+      if (ff?.rateable !== undefined && typeof ff.rateable !== "boolean") {
         console.info(
           `Invalid rateable type for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
@@ -1065,7 +946,10 @@ async function validateFulfillments(
       }
 
       // Instructions validation
-      if (ff.start.instructions && typeof ff.start.instructions !== "string") {
+      if (
+        ff?.start?.instructions &&
+        typeof ff.start.instructions !== "string"
+      ) {
         console.info(
           `Invalid start.instructions format for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
@@ -1076,7 +960,7 @@ async function validateFulfillments(
           )
         );
       }
-      if (ff.end.instructions && typeof ff.end.instructions !== "string") {
+      if (ff?.end?.instructions && typeof ff.end.instructions !== "string") {
         console.info(
           `Invalid end.instructions format for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
@@ -1089,8 +973,9 @@ async function validateFulfillments(
       }
 
       if (
-        !providerName ||
-        !_.isEqual(ff.start?.location?.descriptor?.name, providerName)
+        (!providerName ||
+          !_.isEqual(ff?.start?.location?.descriptor?.name, providerName)) &&
+        ff?.type == "Delivery"
       ) {
         console.info(
           `Start location name mismatch for fulfillment ID ${ffId} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
@@ -1112,9 +997,8 @@ async function validateFulfillments(
       const storedFulfillment = storedFulfillmentRaw
         ? JSON.parse(storedFulfillmentRaw)
         : null;
-      const deliveryFulfillment = order.fulfillments.filter(
-        (f: any) => f.type === "Delivery"
-      );
+      const deliveryFulfillment =
+        order?.fulfillments?.filter((f: any) => f?.type === "Delivery") || [];
 
       if (!storedFulfillment) {
         if (deliveryFulfillment.length > 0) {
@@ -1168,7 +1052,7 @@ async function validateFulfillments(
 
     // Flow-specific validations
     if (["6", "2", "3", "5"].includes(flow)) {
-      if (!order.fulfillments?.length) {
+      if (!order?.fulfillments?.length) {
         console.info(
           `Missing fulfillments for flow ${flow} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
         );
@@ -1180,14 +1064,14 @@ async function validateFulfillments(
         );
       } else {
         const deliveryObjArr = order.fulfillments.filter(
-          (f: any) => f.type === "Delivery"
+          (f: any) => f?.type === "Delivery"
         );
         const selfPickupObjArr = order.fulfillments.filter(
-          (f: any) => f.type === "Self-Pickup"
+          (f: any) => f?.type === "Self-Pickup"
         );
         if (flow !== "3" && !deliveryObjArr.length) {
           console.info(
-            `Missing Delivery fulfillment for flow ${flow} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+            `Missing Delivery fulfillment in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
             addError(
@@ -1198,11 +1082,11 @@ async function validateFulfillments(
         }
         if (flow === "3" && selfPickupObjArr.length !== 1) {
           console.info(
-            `Invalid number of Self-Pickup fulfillments for flow ${flow} in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
+            `Invalid number of Self-Pickup fulfillments in /${constants.ON_STATUS}_${state} for transaction ${transaction_id}`
           );
           result.push(
             addError(
-              `Exactly one Self-Pickup fulfillment must be present for flow 3 in ${ApiSequence.ON_STATUS_PENDING}`,
+              `Exactly one Self-Pickup fulfillment must be present in ${ApiSequence.ON_STATUS_PENDING}`,
               ERROR_CODES.INVALID_RESPONSE
             )
           );
@@ -1305,26 +1189,15 @@ async function validatePayment(
   result: any,
   state: any
 ) {
-  const cnfrmpymntRaw = await RedisService.getKey(
-    `${transaction_id}_cnfrmpymnt`
+  const prevPaymentRaw = await RedisService.getKey(
+    `${transaction_id}_prevPayment`
   );
-  const cnfrmpymnt = cnfrmpymntRaw ? JSON.parse(cnfrmpymntRaw) : null;
-  if (cnfrmpymnt && !_.isEqual(cnfrmpymnt, order.payment)) {
-    result.push(
-      addError(
-        `payment object mismatches in /${constants.CONFIRM} & /${constants.ON_STATUS}_${state}`,
-        ERROR_CODES.INVALID_RESPONSE
-      )
-    );
-  }
+  const prevPayment = prevPaymentRaw ? JSON.parse(prevPaymentRaw) : null;
 
-  if (
-    parseFloat(order.payment?.params?.amount) !==
-    parseFloat(order.quote?.price?.value)
-  ) {
+  if (prevPayment && !_.isEqual(prevPayment, order.payment)) {
     result.push(
       addError(
-        `Quoted price (/${constants.ON_STATUS}_${state}) doesn't match with the amount in payment.params`,
+        `payment object mismatches with the previous action call and /${constants.ON_STATUS}_${state}`,
         ERROR_CODES.INVALID_RESPONSE
       )
     );
@@ -1365,11 +1238,37 @@ async function validatePayment(
   ) {
     result.push(
       addError(
-        `Payment status should be ${PAYMENT_STATUS.NOT_PAID} for ${FLOW.FLOW2A} flow (Cash on Delivery)`,
+        `Payment status should be ${PAYMENT_STATUS.NOT_PAID} (Cash on Delivery)`,
         ERROR_CODES.INVALID_RESPONSE
       )
     );
   }
+  const settlement_details: any =
+  order?.payment["@ondc/org/settlement_details"];
+
+
+  const storedSettlementRaw = await RedisService.getKey(`${transaction_id}_settlementDetailSet`); 
+  
+  const storedSettlementSet = storedSettlementRaw 
+    ? JSON.parse(storedSettlementRaw)
+    : null;
+  
+
+    storedSettlementSet?.forEach((obj1: any) => {
+            const exist = settlement_details.some((obj2: any) =>
+              _.isEqual(obj1, obj2)
+            );
+            if (!exist) {
+              result.push({
+                valid: false,
+                code: 20006,
+                description: `Missing payment/@ondc/org/settlement_details as compared to previous calls or not captured correctly: ${JSON.stringify(
+                  obj1
+                )}`,
+              });
+            }
+          });
+
 }
 
 async function validateQuote(
@@ -1388,30 +1287,16 @@ async function validateQuote(
   }
 
   const quoteObjRaw = await RedisService.getKey(`${transaction_id}_quoteObj`);
-  const onSelectQuote = quoteObjRaw ? JSON.parse(quoteObjRaw) : null;
+  const previousQuote = quoteObjRaw ? JSON.parse(quoteObjRaw) : null;
   const quoteErrors = compareQuoteObjects(
-    onSelectQuote,
+    previousQuote,
     order.quote,
     constants.ON_STATUS,
-    constants.ON_CONFIRM
+    "previous action call"
   );
   if (quoteErrors) {
     quoteErrors.forEach((error: any) =>
       result.push(addError(error, ERROR_CODES.INVALID_RESPONSE))
-    );
-  }
-
-  const quotePriceRaw = await RedisService.getKey(
-    `${transaction_id}_quotePrice`
-  );
-  const onConfirmQuotePrice = quotePriceRaw ? JSON.parse(quotePriceRaw) : null;
-  const onStatusQuotePrice = parseFloat(order.quote?.price?.value);
-  if (onConfirmQuotePrice && onConfirmQuotePrice !== onStatusQuotePrice) {
-    result.push(
-      addError(
-        `Quoted Price in /${constants.ON_STATUS}_${state} INR ${onStatusQuotePrice} does not match with the quoted price in /${constants.ON_CONFIRM} INR ${onConfirmQuotePrice}`,
-        ERROR_CODES.INVALID_RESPONSE
-      )
     );
   }
 
@@ -1436,7 +1321,7 @@ async function validateBilling(
 ) {
   const billingRaw = await RedisService.getKey(`${transaction_id}_billing`);
   const billing = billingRaw ? JSON.parse(billingRaw) : null;
-  const billingErrors = compareObjects(billing, order.billing);
+  const billingErrors = billing && compareObjects(billing, order.billing);
   if (billingErrors) {
     billingErrors.forEach((error: any) =>
       result.push(
@@ -1542,23 +1427,6 @@ async function validateTags(
       }
     }
   });
-
-  // if (!tax_number) {
-  //   result.push(
-  //     addError(
-  //       `tax_number must be present for ${constants.ON_STATUS}_${state}`,
-  //       ERROR_CODES.INVALID_RESPONSE
-  //     )
-  //   );
-  // }
-  // if (!provider_tax_number) {
-  //   result.push(
-  //     addError(
-  //       `provider_tax_number must be present for ${constants.ON_STATUS}_${state}`,
-  //       ERROR_CODES.INVALID_RESPONSE
-  //     )
-  //   );
-  // }
 
   if (tax_number.length === 15 && provider_tax_number.length === 10) {
     const pan_id = tax_number.slice(2, 12);
@@ -1737,20 +1605,6 @@ async function validateItems(
         continue;
       }
 
-      if (
-        item.fulfillment_id &&
-        item.fulfillment_id !== itemFlfllmnts[itemId]
-      ) {
-        console.info(
-          `Fulfillment ID mismatch for item ID ${itemId} at index ${i} for transaction ${transactionId}`
-        );
-        result.push({
-          valid: false,
-          code: ERROR_CODES.INVALID_RESPONSE,
-          description: `items[${i}].fulfillment_id mismatches for Item ${itemId} in /${previousApi} and /${currentApi}`,
-        });
-      }
-
       if (checkQuantity) {
         if (!item.quantity || item.quantity.count == null) {
           console.info(
@@ -1763,7 +1617,7 @@ async function validateItems(
           });
         } else if (
           !Number.isInteger(item.quantity.count) ||
-          item.quantity.count <= 0
+          item.quantity.count < 0
         ) {
           console.info(
             `Invalid quantity.count for item ID ${itemId} at index ${i} for transaction ${transactionId}`
@@ -1773,19 +1627,6 @@ async function validateItems(
             code: ERROR_CODES.INVALID_RESPONSE,
             description: `items[${i}].quantity.count must be a positive integer for Item ${itemId} in /${currentApi}`,
           });
-        } else if (itemsIdList && itemId in itemsIdList) {
-          if (item.quantity.count !== itemsIdList[itemId]) {
-            itemsIdList[itemId] = item.quantity.count;
-            itemsCountChange = true;
-            console.info(
-              `Quantity mismatch for item ID ${itemId} at index ${i} for transaction ${transactionId}`
-            );
-            result.push({
-              valid: false,
-              code: ERROR_CODES.INVALID_RESPONSE,
-              description: `Warning: items[${i}].quantity.count for item ${itemId} mismatches with the items quantity selected in /${constants.ON_CONFIRM}`,
-            });
-          }
         }
       }
 
@@ -1986,7 +1827,6 @@ const checkOnStatusPending = async (
     const onConfirmOrderState = await RedisService.getKey(
       `${context.transaction_id}_${ApiSequence.ON_CONFIRM}_orderState`
     );
-
 
     if (onConfirmOrderState === "Accepted") {
       result.push({

@@ -529,7 +529,20 @@ export const compareSTDwithArea = (pincode: number, std: string): boolean => {
 export function checkIdInUri(Uri: string, id: string): boolean {
   return Uri.includes(id);
 }
-
+export async function getRedisValue(
+  transaction_id: string,
+  key: string
+): Promise<any> {
+  try {
+    const value = await RedisService.getKey(`${transaction_id}_${key}`);
+    return value ? JSON.parse(value) : null;
+  } catch (error: any) {
+    console.error(
+      `Error parsing Redis key ${transaction_id}_${key}: ${error.stack}`
+    );
+    return null;
+  }
+}
 export function validateBapUri(
   bapUri: string,
   bapId: string,
@@ -787,39 +800,41 @@ export function compareObjects(
 ): string[] {
   const errors: string[] = [];
 
-  // Check if obj1 or obj2 is undefined or null
-  if (
-    obj1 === null ||
-    obj1 === undefined ||
-    obj2 === null ||
-    obj2 === undefined
-  ) {
+  if (obj1 == null || obj2 == null) {
     errors.push("One of the objects is undefined or null");
     return errors;
   }
 
-  const keys1 = Object.keys(obj1);
-  const keys2 = Object.keys(obj2);
+  const keys1 = Object.keys(obj1 ?? {});
+  const keys2 = Object.keys(obj2 ?? {});
 
-  // Check for key length mismatch
-  if (keys1.length !== keys2.length) {
+  if (keys1?.length !== keys2?.length) {
     errors.push(`Key length mismatch for ${parentKey || "root"}`);
-    return errors; // Stop comparing if key length mismatch is detected
+    return errors;
   }
 
-  for (const key of keys1) {
+  for (const key of keys1 ?? []) {
     const fullKey = parentKey ? `${parentKey}.${key}` : key;
+    const val1 = obj1?.[key];
+    const val2 = obj2?.[key];
 
-    if (typeof obj1[key] === "object" && typeof obj2[key] === "object") {
-      const nestedErrors = compareObjects(obj1[key], obj2[key], fullKey);
+    const areObjects =
+      typeof val1 === "object" &&
+      val1 !== null &&
+      typeof val2 === "object" &&
+      val2 !== null;
+
+    if (areObjects) {
+      const nestedErrors = compareObjects(val1, val2, fullKey);
       errors.push(...nestedErrors);
-    } else if (obj1[key] !== obj2[key]) {
-      errors.push(`Key '${fullKey}' mismatch: ${obj1[key]} !== ${obj2[key]}`);
+    } else if (val1 !== val2) {
+      errors.push(`Key '${fullKey}' mismatch: ${val1} !== ${val2}`);
     }
   }
 
   return errors;
 }
+
 
 export function compareQuoteObjects(
   obj1: InputObject,
@@ -853,11 +868,11 @@ export function compareQuoteObjects(
       return sameItemId && sameTitleType && sameParentItemId;
     });
 
-    if (!matchingItem || !deepCompare(item1, matchingItem)) {
-      errors.push(
-        `Mismatch found for item with item_id ${item1["@ondc/org/item_id"]} while comparing quote object of ${api1} and ${api2}`
-      );
-    }
+    // if (!matchingItem || !deepCompare(item1, matchingItem)) {
+    //   errors.push(
+    //     `Mismatch found for item with item_id ${item1["@ondc/org/item_id"]} while comparing quote object of ${api1} and ${api2}`
+    //   );
+    // }
   });
 
   return errors;
@@ -1261,15 +1276,15 @@ export const checkQuoteTrailSum = (
               description: `Invalid Quote Trail value '${val.value}' in ${apiSeq}. It must be a valid number`,
             });
           } else {
-            quoteTrailSum += value;
+            quoteTrailSum -= value;
           }
         }
       }
     }
   }
 
-  quoteTrailSum = Number(quoteTrailSum.toFixed(2));
-  const totalPrice = Number((price + quoteTrailSum).toFixed(2)) * -1;
+  quoteTrailSum = Math.abs(Number(quoteTrailSum.toFixed(2)));
+  const totalPrice = Number((price + quoteTrailSum).toFixed(2));
   const confirmPrice = Number(priceAtConfirm.toFixed(2));
 
   if (totalPrice !== confirmPrice) {
@@ -1321,4 +1336,19 @@ export async function lookupSubscriber(authorization: string, subscriber_id: str
     console.error("Lookup API error:", error?.response?.data || error.message);
     throw error;
   }
+}
+export function isPresentInRedisSet(set1 : any, obj : any) {
+  try{
+    let exists = false;
+    for (const item of set1) {
+      if (JSON.stringify(item) === JSON.stringify(obj)) {
+        exists = true;
+        break;
+      }
+    }
+    return exists;
+  } catch(err: any){
+    console.error('Error in isPresentInRedisSet:', err);
+  }
+
 }

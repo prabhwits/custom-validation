@@ -748,26 +748,14 @@ async function validatePayment(
   state: string,
   result: ValidationError[]
 ): Promise<void> {
-  const cnfrmpymntRaw = await RedisService.getKey(
-    `${transaction_id}_cnfrmpymnt`
+  const prevPaymentRaw = await RedisService.getKey(
+    `${transaction_id}_prevPayment`
   );
-  const cnfrmpymnt = cnfrmpymntRaw ? JSON.parse(cnfrmpymntRaw) : null;
-  if (cnfrmpymnt && !_.isEqual(cnfrmpymnt, order.payment)) {
+  const prevPayment = prevPaymentRaw ? JSON.parse(prevPaymentRaw) : null;
+  if (prevPayment && !_.isEqual(prevPayment, order.payment)) {
     result.push(
       addError(
-        `payment object mismatches in /${constants.CONFIRM} & /${constants.ON_STATUS}_${state}`,
-        ERROR_CODES.INVALID_RESPONSE
-      )
-    );
-  }
-
-  if (
-    parseFloat(order.payment?.params?.amount) !==
-    parseFloat(order.quote?.price?.value)
-  ) {
-    result.push(
-      addError(
-        `Quoted price (/${constants.ON_STATUS}_${state}) doesn't match with the amount in payment.params`,
+        `payment object mismatches with the previous action call and /${constants.ON_STATUS}_${state}`,
         ERROR_CODES.INVALID_RESPONSE
       )
     );
@@ -791,6 +779,30 @@ async function validatePayment(
       )
     );
   }
+
+  const settlement_details: any =
+    order?.payment["@ondc/org/settlement_details"];
+
+  const storedSettlementRaw = await RedisService.getKey(
+    `${transaction_id}_settlementDetailSet`
+  );
+
+  const storedSettlementSet = storedSettlementRaw
+    ? JSON.parse(storedSettlementRaw)
+    : null;
+
+  storedSettlementSet?.forEach((obj1: any) => {
+    const exist = settlement_details.some((obj2: any) => _.isEqual(obj1, obj2));
+    if (!exist) {
+      result.push({
+        valid: false,
+        code: 20006,
+        description: `Missing payment/@ondc/org/settlement_details as compared to previous calls or not captured correctly: ${JSON.stringify(
+          obj1
+        )}`,
+      });
+    }
+  });
 }
 
 async function validateQuote(
@@ -809,30 +821,16 @@ async function validateQuote(
   }
 
   const quoteObjRaw = await RedisService.getKey(`${transaction_id}_quoteObj`);
-  const onSelectQuote = quoteObjRaw ? JSON.parse(quoteObjRaw) : null;
+  const previousQuote = quoteObjRaw ? JSON.parse(quoteObjRaw) : null;
   const quoteErrors = compareQuoteObjects(
-    onSelectQuote,
+    previousQuote,
     order.quote,
     constants.ON_STATUS,
-    constants.ON_SELECT
+    "previous action call"
   );
   if (quoteErrors) {
     quoteErrors.forEach((error: string) =>
       result.push(addError(error, ERROR_CODES.INVALID_RESPONSE))
-    );
-  }
-
-  const quotePriceRaw = await RedisService.getKey(
-    `${transaction_id}_quotePrice`
-  );
-  const onConfirmQuotePrice = quotePriceRaw ? JSON.parse(quotePriceRaw) : null;
-  const onStatusQuotePrice = parseFloat(order.quote?.price?.value);
-  if (onConfirmQuotePrice && onConfirmQuotePrice !== onStatusQuotePrice) {
-    result.push(
-      addError(
-        `Quoted Price in /${constants.ON_STATUS}_${state} INR ${onStatusQuotePrice} does not match with the quoted price in /${constants.ON_CONFIRM} INR ${onConfirmQuotePrice}`,
-        ERROR_CODES.INVALID_RESPONSE
-      )
     );
   }
 }
@@ -1067,29 +1065,6 @@ async function validateItems(
           description: `Item Id ${itemId} does not exist in /${previousApi}`,
         });
         continue;
-      }
-
-      // Validate fulfillment ID
-      if (
-        item.fulfillment_id &&
-        item.fulfillment_id !== itemFlfllmnts[itemId]
-      ) {
-        result.push({
-          valid: false,
-          code: 20000,
-          description: `items[${i}].fulfillment_id mismatches for Item ${itemId} in /${previousApi} and /${currentApi}`,
-        });
-      }
-
-      // Validate quantity
-      if (checkQuantity && itemsIdList && itemId in itemsIdList) {
-        if (item.quantity?.count !== itemsIdList[itemId]) {
-          result.push({
-            valid: false,
-            code: 20000,
-            description: `Warning: items[${i}].quantity.count for item ${itemId} mismatches with the items quantity selected in /${constants.SELECT}`,
-          });
-        }
       }
 
       // Validate parent item ID

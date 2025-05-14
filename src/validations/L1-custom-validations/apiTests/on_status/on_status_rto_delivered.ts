@@ -409,7 +409,9 @@ async function validateFulfillments(
 
     // Validate RTO Fulfillment
     if (!rtoObj.length) {
-      console.error(`RTO object is mandatory for ${constants.ON_STATUS_RTO_DELIVERED}`);
+      console.error(
+        `RTO object is mandatory for ${constants.ON_STATUS_RTO_DELIVERED}`
+      );
       result.push(
         addError(
           `RTO object is mandatory for ${constants.ON_STATUS_RTO_DELIVERED}`,
@@ -529,7 +531,9 @@ async function validateFulfillments(
 
     // Validate Delivery Fulfillment
     if (!deliveryObj.length) {
-      console.error(`Delivery object is mandatory for ${constants.ON_STATUS_RTO_DELIVERED}`);
+      console.error(
+        `Delivery object is mandatory for ${constants.ON_STATUS_RTO_DELIVERED}`
+      );
       result.push(
         addError(
           `Delivery object is mandatory for ${constants.ON_STATUS_RTO_DELIVERED}`,
@@ -542,7 +546,9 @@ async function validateFulfillments(
         if (!_.isEmpty(del_obj_start?.location)) {
           del_start_location = del_obj_start.location;
         } else {
-          console.error(`Delivery fulfillment start location is missing in ${constants.ON_STATUS_RTO_DELIVERED}`);
+          console.error(
+            `Delivery fulfillment start location is missing in ${constants.ON_STATUS_RTO_DELIVERED}`
+          );
           result.push(
             addError(
               `Delivery fulfillment start location object is missing in ${constants.ON_STATUS_RTO_DELIVERED}`,
@@ -602,7 +608,9 @@ async function validateFulfillments(
       let initiated_by_flag = 0;
       for (let item of deliveryObj) {
         if (item.state?.descriptor?.code !== "Cancelled") {
-          console.error(`Delivery state should be Cancelled for ${constants.ON_STATUS_RTO_DELIVERED}`);
+          console.error(
+            `Delivery state should be Cancelled for ${constants.ON_STATUS_RTO_DELIVERED}`
+          );
           result.push(
             addError(
               `Delivery state should be Cancelled for ${constants.ON_STATUS_RTO_DELIVERED}`,
@@ -610,8 +618,13 @@ async function validateFulfillments(
             )
           );
         }
-        if (item.state?.descriptor?.code === "Cancelled" && (!item.tags || !item.tags.length)) {
-          console.error(`Tags are mandatory for ${constants.ON_STATUS_RTO_DELIVERED} on cancelled state`);
+        if (
+          item.state?.descriptor?.code === "Cancelled" &&
+          (!item.tags || !item.tags.length)
+        ) {
+          console.error(
+            `Tags are mandatory for ${constants.ON_STATUS_RTO_DELIVERED} on cancelled state`
+          );
           result.push(
             addError(
               `Tags are mandatory for ${constants.ON_STATUS_RTO_DELIVERED} on cancelled state for fulfillment type delivery`,
@@ -621,7 +634,9 @@ async function validateFulfillments(
         }
         const cancel_request = _.filter(item.tags, { code: "cancel_request" });
         if (!cancel_request.length) {
-          console.error(`Cancel Request is mandatory for ${constants.ON_STATUS_RTO_DELIVERED}`);
+          console.error(
+            `Cancel Request is mandatory for ${constants.ON_STATUS_RTO_DELIVERED}`
+          );
           result.push(
             addError(
               `Cancel Request is mandatory for ${constants.ON_STATUS_RTO_DELIVERED} in fulfillment type delivery`,
@@ -648,7 +663,9 @@ async function validateFulfillments(
         }
         const preCancelObj = _.filter(item.tags, { code: "precancel_state" });
         if (!preCancelObj.length) {
-          console.error(`Pre Cancel is mandatory for ${constants.ON_STATUS_RTO_DELIVERED}`);
+          console.error(
+            `Pre Cancel is mandatory for ${constants.ON_STATUS_RTO_DELIVERED}`
+          );
           result.push(
             addError(
               `Pre Cancel is mandatory for ${constants.ON_STATUS_RTO_DELIVERED}`,
@@ -656,9 +673,13 @@ async function validateFulfillments(
             )
           );
         } else {
-          const timeStampObj = _.filter(preCancelObj[0]?.list, { code: "updated_at" });
+          const timeStampObj = _.filter(preCancelObj[0]?.list, {
+            code: "updated_at",
+          });
           if (!timeStampObj.length) {
-            console.error(`Pre Cancel timestamp is mandatory for ${constants.ON_STATUS_RTO_DELIVERED}`);
+            console.error(
+              `Pre Cancel timestamp is mandatory for ${constants.ON_STATUS_RTO_DELIVERED}`
+            );
             result.push(
               addError(
                 `Pre Cancel Updated at timeStamp is mandatory for ${constants.ON_STATUS_RTO_DELIVERED}`,
@@ -669,17 +690,27 @@ async function validateFulfillments(
             const previousTimestampRaw = await RedisService.getKey(
               `${transaction_id}_PreviousUpdatedTimestamp`
             );
-            const previousTimestamp = previousTimestampRaw ? JSON.parse(previousTimestampRaw) : null;
+            const previousTimestamp = previousTimestampRaw
+              ? JSON.parse(previousTimestampRaw)
+              : null;
             if (!_.isEqual(previousTimestamp, timeStampObj[0].value)) {
               console.error(
-                `precancel_state.updated_at of ${constants.ON_STATUS_RTO_DELIVERED} is not equal with the ${
-                  flow === "4" ? constants.ON_CONFIRM : constants.ON_STATUS_OUT_FOR_DELIVERY
+                `precancel_state.updated_at of ${
+                  constants.ON_STATUS_RTO_DELIVERED
+                } is not equal with the ${
+                  flow === "4"
+                    ? constants.ON_CONFIRM
+                    : constants.ON_STATUS_OUT_FOR_DELIVERY
                 } order.updated_at`
               );
               result.push(
                 addError(
-                  `precancel_state.updated_at of ${constants.ON_STATUS_RTO_DELIVERED} is not equal with the ${
-                    flow === "4" ? constants.ON_CONFIRM : constants.ON_STATUS_OUT_FOR_DELIVERY
+                  `precancel_state.updated_at of ${
+                    constants.ON_STATUS_RTO_DELIVERED
+                  } is not equal with the ${
+                    flow === "4"
+                      ? constants.ON_CONFIRM
+                      : constants.ON_STATUS_OUT_FOR_DELIVERY
                   } order.updated_at`,
                   ERROR_CODES.INVALID_RESPONSE
                 )
@@ -689,7 +720,9 @@ async function validateFulfillments(
         }
       }
       if (!reasonID_flag) {
-        console.error(`Reason ID is mandatory field for ${constants.ON_STATUS_RTO_DELIVERED}`);
+        console.error(
+          `Reason ID is mandatory field for ${constants.ON_STATUS_RTO_DELIVERED}`
+        );
         result.push(
           addError(
             `Reason ID is mandatory field for ${constants.ON_STATUS_RTO_DELIVERED}`,
@@ -698,7 +731,9 @@ async function validateFulfillments(
         );
       }
       if (!rto_id_flag && flow === "5") {
-        console.error(`RTO Id is mandatory field for ${constants.ON_STATUS_RTO_DELIVERED}`);
+        console.error(
+          `RTO Id is mandatory field for ${constants.ON_STATUS_RTO_DELIVERED}`
+        );
         result.push(
           addError(
             `RTO Id is mandatory field for ${constants.ON_STATUS_RTO_DELIVERED}`,
@@ -707,7 +742,9 @@ async function validateFulfillments(
         );
       }
       if (!initiated_by_flag) {
-        console.error(`Initiated_by is mandatory field for ${constants.ON_STATUS_RTO_DELIVERED}`);
+        console.error(
+          `Initiated_by is mandatory field for ${constants.ON_STATUS_RTO_DELIVERED}`
+        );
         result.push(
           addError(
             `Initiated_by is mandatory field for ${constants.ON_STATUS_RTO_DELIVERED}`,
@@ -997,7 +1034,7 @@ async function validatePayment(
     }
 
     await RedisService.setKey(
-      `${transaction_id}_cnfrmpymnt`,
+      `${transaction_id}_prevPayment`,
       JSON.stringify(order.payment),
       TTL_IN_SECONDS
     );

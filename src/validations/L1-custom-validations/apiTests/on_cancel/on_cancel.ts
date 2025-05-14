@@ -994,7 +994,7 @@ export const onCancel = async (
         });
       }
       await RedisService.setKey(
-        `${transaction_id}_cnfrmpymnt`,
+        `${transaction_id}_prevPayment`,
         JSON.stringify(payment),
         TTL_IN_SECONDS
       );
