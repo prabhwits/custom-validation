@@ -919,20 +919,7 @@ export function isTagsValid(tags: any[], entity: string): boolean {
 
   return false;
 }
-export const payment_status = (payment: any, flow: string) => {
-  const errorObj: any = {};
-  if (flow === FLOW.FLOW2A && payment.status === PAYMENT_STATUS.PAID) {
-    errorObj.message = `Cannot be ${payment.status} for ${FLOW.FLOW2A} flow (Cash on Delivery)`;
-    return errorObj;
-  }
-  if (payment.status === PAYMENT_STATUS.PAID) {
-    if (!payment.params.transaction_id) {
-      return false;
-    }
-  }
 
-  return true;
-};
 
 export const sumQuoteBreakUp = (quote: any) => {
   const totalPrice = Number(quote.price.value);
@@ -1352,3 +1339,17 @@ export function isPresentInRedisSet(set1 : any, obj : any) {
   }
 
 }
+export const payment_status = (payment: any, flow: string) => {
+  const errorObj: any = {};
+  if (flow === FLOW.FLOW2A && payment.status === PAYMENT_STATUS.PAID) {
+    errorObj.message = `Cannot be ${payment.status} for ${FLOW.FLOW2A} flow (Cash on Delivery)`;
+    return errorObj;
+  }
+  if (payment.status === PAYMENT_STATUS.PAID) {
+    if (!payment.params.transaction_id) {
+      return false;
+    }
+  }
+
+  return true;
+};

@@ -873,7 +873,9 @@ const onSelect = async (data: any) => {
     const parentItemIdsQuotes = on_select.quote.breakup
     .map((breakupItem: any) => breakupItem.item?.parent_item_id)
     .filter((id: any) => id); // Remove undefined/null values
-  
+    console.log('ParentItemIdsqweqwerqer124124124', parentItemIds);
+    console.log('ParentItemIdsQuotes2423423442', parentItemIdsQuotes);
+ 
   parentItemIdsQuotes.forEach((quoteParentId : any, index : any) => {
     if (!parentItemIds.includes(quoteParentId)) {
       const errorMsg = `parent_item_id '${quoteParentId}' in quote.breakup[${index}] is not present in items array`;
