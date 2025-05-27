@@ -435,21 +435,18 @@ const validateItems = async (
   result: any[]
 ): Promise<void> => {
   try {
-    const [itemFlfllmntsRaw, itemsIdListRaw, parentItemIdSetRaw, selectCustomIdArrayRaw, fulfillmentIdArrayRaw] = await Promise.all([
+    const [itemFlfllmntsRaw, itemsIdListRaw, parentItemIdSetRaw, fulfillmentIdArrayRaw] = await Promise.all([
       getRedisValue(`${txnId}_itemFlfllmnts`),
       getRedisValue(`${txnId}_itemsIdList`),
       getRedisValue(`${txnId}_parentItemIdSet`),
-      getRedisValue(`${txnId}_select_customIdArray`),
       getRedisValue(`${txnId}_fulfillmentIdArray`),
     ]);
 
     const itemFlfllmnts = itemFlfllmntsRaw 
     const itemsIdList = itemsIdListRaw 
     const parentItemIdSet = parentItemIdSetRaw 
-    const selectCustomIdArray = selectCustomIdArrayRaw 
     let itemsCountChange = false;
     const updatedItemsIdList = { ...itemsIdList };
-    const fulfillmentIdArray = fulfillmentIdArrayRaw 
 
 
     items.forEach((item: any, i: number) => {
@@ -473,19 +470,8 @@ const validateItems = async (
         addError(result, 21038, `items[${i}].parent_item_id ${item.parent_item_id} not found in /${constants.ON_SEARCH}`);
       }
 
-      const typeTag = item.tags?.find((tag: any) => tag.code === "type");
-      const typeValue = typeTag?.list?.find((listItem: any) => listItem.code === "type")?.value;
-      const isCustomizationType = typeValue === "customization";
 
-      if (isCustomizationType && selectCustomIdArray) {
-        const parentTag = item.tags?.find((tag: any) => tag.code === "parent");
-        if (parentTag) {
-          const parentId = parentTag.list?.find((listItem: any) => listItem.code === "id")?.value;
-          if (parentId && !selectCustomIdArray.includes(parentId)) {
-            addError(result, 21039, `items[${i}]: parent tag id ${parentId} not valid in select_customIdArray`);
-          }
-        }
-      }
+      
     });
 
     if (itemsCountChange) {

@@ -9,13 +9,7 @@ import {
   areTimestampsLessThanOrEqualTo,
   
 } from "../../../../utils/helper";
-import {
-  calculateDefaultSelectionPrice,
-  extractCustomGroups,
-  mapCustomItemToTreeNode,
-  mapCustomizationsToBaseItems,
-  mapItemToTreeNode,
-} from "../../../../utils/fb_calculation/default_selection/utils";
+
 import { fashion } from "../../../../utils/constants/fashion";
 
 interface ValidationError {
@@ -46,7 +40,6 @@ async function validateProviders(
   categoriesId: Set<string>;
   itemIdList: string[];
   itemsArray: any[];
-  providerOffers: any[];
   itemCategoriesId: Set<string>;
 }> {
   const prvdrsId = new Set<string>();
@@ -57,7 +50,6 @@ async function validateProviders(
   const itemIdList: string[] = [];
   const itemsArray: any[] = [];
   const itemCategoriesId = new Set<string>();
-  const providerOffers: any[] = [];
 
   for (const [index, provider] of providers.entries()) {
     if (prvdrsId.has(provider.id)) {
@@ -161,7 +153,6 @@ async function validateProviders(
         addError(result, 20006, `location_id in bpp/providers[${index}]/items[${itemIndex}] must map to a valid location id`);
       }
 
-      // Validate item timestamp
       if (item.time?.timestamp) {
         if (!areTimestampsLessThanOrEqualTo(item.time.timestamp, context.timestamp)) {
           addError(result, 20006, `item[${itemIndex}] timestamp can't be > context.timestamp`);
@@ -169,10 +160,7 @@ async function validateProviders(
       }
     });
 
-    // Collect offers
-    if (provider.offers?.length) {
-      providerOffers.push(...provider.offers);
-    }
+   
   }
 
   return {
@@ -183,7 +171,6 @@ async function validateProviders(
     categoriesId,
     itemIdList,
     itemsArray,
-    providerOffers,
     itemCategoriesId,
   };
 }
@@ -283,64 +270,9 @@ function validateServiceabilityAndTiming(
  
   });
 }
-// Validate offers
-function validateOffers(
-  providers: any[],
-  itemsId: Set<string>,
-  prvdrLocId: Set<string>,
-  categoriesId: Set<string>,
-  result: ValidationError[]
-) {
-  providers.forEach((provider: any, providerIdx: number) => {
-    const offers = provider.offers || [];
-    offers.forEach((offer: any, offerIdx: number) => {
-      if (!offer.id || !offer.descriptor?.code || !Array.isArray(offer.location_ids) || !Array.isArray(offer.item_ids)) {
-        addError(result, 20006, `Offer[${offerIdx}] in bpp/providers[${providerIdx}] missing required fields`);
-      }
-      offer.item_ids?.forEach((id: string) => {
-        if (!itemsId.has(id)) {
-          addError(result, 20006, `Item id ${id} in offer[${offerIdx}] is not in item list`);
-        }
-      });
-      offer.location_ids?.forEach((id: string) => {
-        if (!prvdrLocId.has(id)) {
-          addError(result, 20006, `Location id ${id} in offer[${offerIdx}] is not in location list`);
-        }
-      });
-      offer.category_ids?.forEach((id: string) => {
-        if (!categoriesId.has(id)) {
-          addError(result, 20006, `Category id ${id} in offer[${offerIdx}] is not in category list`);
-        }
-      });
-    });
-  });
-}
 
-// Validate default selection
-function validateDefaultSelection(providers: any[], result: ValidationError[]) {
-  providers.forEach((provider: any) => {
-    const customGroupCategories = extractCustomGroups(provider.categories || []);
-    const baseTreeNodes = mapItemToTreeNode(provider.items || []);
-    const customItems = mapCustomItemToTreeNode(provider.items || [], customGroupCategories);
-    const mapItems = mapCustomizationsToBaseItems(baseTreeNodes, customItems);
-    const defaultSelection = calculateDefaultSelectionPrice(mapItems);
 
-    defaultSelection.forEach(({ base_item, default_selection_calculated, default_selection_actual }) => {
-      if (
-        default_selection_calculated.min !== default_selection_actual.min ||
-        default_selection_calculated.max !== default_selection_actual.max
-      ) {
-        addError(
-          result,
-          20006,
-          `Incorrect default_selection for base_item ${base_item}: Calculated min=${default_selection_calculated.min}, max=${default_selection_calculated.max}; Given min=${default_selection_actual.min}, max=${default_selection_actual.max}`
-        );
-      }
-    });
-  });
-}
 
-// Store collected data in Redis
 async function storeData(
   transactionId: string,
   message: any,
@@ -351,7 +283,6 @@ async function storeData(
   categoriesId: Set<string>,
   itemIdList: string[],
   itemsArray: any[],
-  providerOffers: any[]
 ) {
   const itemProviderMap: Record<string, string[]> = {};
   message.catalog["bpp/providers"].forEach((provider: any) => {
@@ -380,11 +311,7 @@ async function storeData(
       JSON.stringify([...categoriesId]),
       TTL_IN_SECONDS
     ),
-    RedisService.setKey(
-      `${transactionId}_${ApiSequence.ON_SEARCH}_offers`,
-      JSON.stringify(providerOffers),
-      providerOffers.length ? undefined : TTL_IN_SECONDS
-    ),
+  
     RedisService.setKey(
       `${transactionId}_onSearchItems`,
       JSON.stringify(itemsArray),
@@ -441,15 +368,12 @@ export async function onSearch(data: any) {
       categoriesId,
       itemIdList,
       itemsArray,
-      providerOffers,
       itemCategoriesId
     } = await validateProviders(message.catalog["bpp/providers"] || [], context, result);
 
     validateServiceabilityAndTiming(message.catalog["bpp/providers"] || [], prvdrLocId, itemCategoriesId, result);
 
-    validateOffers(message.catalog["bpp/providers"] || [], itemsId, prvdrLocId, categoriesId, result);
 
-    validateDefaultSelection(message.catalog["bpp/providers"] || [], result);
 
     await storeData(
       txnId,
@@ -461,7 +385,6 @@ export async function onSearch(data: any) {
       categoriesId,
       itemIdList,
       itemsArray,
-      providerOffers
     );
 
     return result;

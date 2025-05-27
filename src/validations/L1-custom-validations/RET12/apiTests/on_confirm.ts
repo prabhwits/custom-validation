@@ -153,19 +153,17 @@ const validateBilling = async (txnId: string, billing: any, context: any, result
 // Validate items
 const validateItems = async (txnId: string, items: any[], context: any, result: any[]): Promise<void> => {
   try {
-    const [itemFlfllmntsRaw, itemsIdListRaw, fulfillmentIdArrayRaw, parentItemIdSetRaw, selectCustomIdArrayRaw] = await Promise.all([
+    const [itemFlfllmntsRaw, itemsIdListRaw, fulfillmentIdArrayRaw, parentItemIdSetRaw, ] = await Promise.all([
       getRedisValue(`${txnId}_itemFlfllmnts`),
       getRedisValue(`${txnId}_itemsIdList`),
       getRedisValue(`${txnId}_fulfillmentIdArray`),
       getRedisValue(`${txnId}_parentItemIdSet`),
-      getRedisValue(`${txnId}_select_customIdArray`),
     ]);
 
     const itemFlfllmnts = itemFlfllmntsRaw
     const itemsIdList = itemsIdListRaw 
     const fulfillmentIdArray = fulfillmentIdArrayRaw 
     const parentItemIdSet = parentItemIdSetRaw 
-    const selectCustomIdArray = selectCustomIdArrayRaw 
 
     let itemsCountChange = false;
     const updatedItemsIdList = { ...itemsIdList };
@@ -189,32 +187,16 @@ const validateItems = async (txnId: string, items: any[], context: any, result: 
 
       const typeTag = item.tags?.find((tag: any) => tag.code === "type");
       const typeValue = typeTag?.list?.find((listItem: any) => listItem.code === "type")?.value;
-      const isItemType = typeValue === "item";
-      const isCustomizationType = typeValue === "customization";
 
-      if ((isItemType || isCustomizationType) && !item.parent_item_id) {
-        addError(result, 20028, `items[${i}]: parent_item_id required for type 'item' or 'customization'`);
-      }
+     
 
-      if (item.parent_item_id && !(isItemType || isCustomizationType)) {
-        addError(result, 20029, `items[${i}]: items with parent_item_id must have type 'item' or 'customization'`);
-      }
+      
 
       if (parentItemIdSet && item.parent_item_id && !parentItemIdSet.includes(item.parent_item_id)) {
         addError(result, 20030, `items[${i}].parent_item_id mismatches for Item ${itemId} in /${constants.ON_SEARCH} and /${constants.ON_CONFIRM}`);
       }
 
-      if (isCustomizationType && selectCustomIdArray) {
-        const parentTag = item.tags?.find((tag: any) => tag.code === "parent");
-        if (!parentTag) {
-          addError(result, 20031, `items[${i}]: customization items must have a parent tag`);
-        } else {
-          const parentId = parentTag.list?.find((listItem: any) => listItem.code === "id")?.value;
-          if (parentId && checkItemTag(item, selectCustomIdArray)) {
-            addError(result, 20032, `items[${i}]: parent tag id ${parentId} must be in select_customIdArray`);
-          }
-        }
-      }
+      
     });
 
     if (itemsCountChange) {
