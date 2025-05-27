@@ -246,18 +246,19 @@ export const addActionToRedisSet = async (
 ): Promise<boolean> => {
   try {
     const key = `${transactionId}_previousCall`;
-    let existingSet: string[] = [];
+    let existingSet: any = [];
 
     const existing = await RedisService.getKey(key);
     if (existing) {
       existingSet = JSON.parse(existing);
     }
-
+    
     if (
       previousAction === presentAction ||
       (!_.isEmpty(existingSet) && existingSet.includes(previousAction))
     ) {
-      existingSet.push(presentAction);
+      console.log('existingSet4534', existingSet, 'type of existingset:34534', typeof existingSet);
+      existingSet?.push(presentAction);
       await RedisService.setKey(
         key,
         JSON.stringify(existingSet),
@@ -529,28 +530,18 @@ export const compareSTDwithArea = (pincode: number, std: string): boolean => {
 export function checkIdInUri(Uri: string, id: string): boolean {
   return Uri.includes(id);
 }
-export async function getRedisValue(
-  transaction_id: string,
-  key: string
-): Promise<any> {
-  try {
-    const value = await RedisService.getKey(`${transaction_id}_${key}`);
-    return value ? JSON.parse(value) : null;
-  } catch (error: any) {
-    console.error(
-      `Error parsing Redis key ${transaction_id}_${key}: ${error.stack}`
-    );
-    return null;
-  }
-}
+
 export function validateBapUri(
   bapUri: string,
   bapId: string,
-  result: ValidationOutput,
-  addError: (code: number, description: string) => void
+  result: ValidationOutput
 ): void {
   if (!checkIdInUri(bapUri, bapId)) {
-    addError(20006, `Bap_id ${bapId} is not found in BapUri ${bapUri}`);
+    result.push({
+      valid: false,
+      code: 20006,
+      description: `Bap_id ${bapId} is not found in BapUri ${bapUri}`
+    })
   }
 }
 
@@ -558,10 +549,13 @@ export function validateBppUri(
   bppUri: string,
   bppId: string,
   result: ValidationOutput,
-  addError: (code: number, description: string) => void
 ): void {
   if (!checkIdInUri(bppUri, bppId)) {
-    addError(20006, `Bpp_id ${bppId} is not found in BppUri ${bppUri}`);
+    result.push({
+      valid: false,
+      code: 20006,
+      description: `Bpp_id ${bppId} is not found in BppUri ${bppUri}`
+    })
   }
 }
 
@@ -807,6 +801,7 @@ export function compareObjects(
 
   const keys1 = Object.keys(obj1 ?? {});
   const keys2 = Object.keys(obj2 ?? {});
+  
 
   if (keys1?.length !== keys2?.length) {
     errors.push(`Key length mismatch for ${parentKey || "root"}`);
@@ -1352,4 +1347,27 @@ export const payment_status = (payment: any, flow: string) => {
   }
 
   return true;
+};
+export const setRedisValue = async (
+  key: string,
+  value: any,
+  ttlInSeconds: number = TTL_IN_SECONDS
+): Promise<boolean> => {
+  try {
+    await RedisService.setKey(key, JSON.stringify(value), ttlInSeconds);
+    return true;
+  } catch (err) {
+    console.error(`Failed to set key '${key}':`, err);
+    return false;
+  }
+};
+
+export const getRedisValue = async (key: string): Promise<any | null> => {
+  try {
+    const data = await RedisService.getKey(key);
+    return data ? JSON.parse(data) : null;
+  } catch (err) {
+    console.error(`Failed to get key '${key}':`, err);
+    return null;
+  }
 };

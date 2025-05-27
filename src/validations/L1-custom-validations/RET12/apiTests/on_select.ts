@@ -1,0 +1,914 @@
+import { RedisService } from "ondc-automation-cache-lib";
+import constants, { ApiSequence, ffCategory } from "../../../../utils/constants";
+import { contextChecker } from "../../../../utils/contextUtils";
+import { setRedisValue,  tagFinder, isoDurToSec, taxNotInlcusive } from "../../../../utils/helper";
+import _ from "lodash";
+
+interface ValidationError {
+  valid: boolean;
+  code: number;
+  description: string;
+}
+
+
+const retailPymntTtl: { [key: string]: string } = {
+  "delivery charges": "delivery",
+  "packing charges": "packing",
+  tax: "tax",
+  discount: "discount",
+  "convenience fee": "misc",
+  offer: "offer",
+};
+
+const TTL_IN_SECONDS: number = Number(process.env.TTL_IN_SECONDS) || 3600;
+
+const addError = (result: ValidationError[], code: number, description: string) => {
+  result.push({ valid: false, code, description });
+};
+
+async function validateProvider(
+  onSelect: any,
+  transaction_id: string,
+  result: ValidationError[]
+  
+) {
+
+  try {
+    console.info(`Checking provider in /${constants.ON_SELECT}`);
+    const providerIdRaw = await RedisService.getKey(`${transaction_id}_providerId`);
+    const providerId = providerIdRaw ? JSON.parse(providerIdRaw) : null;
+    const providerLocRaw = await RedisService.getKey(`${transaction_id}_providerLoc`);
+    const providerLoc = providerLocRaw ? JSON.parse(providerLocRaw) : null;
+
+    if (providerId != onSelect.provider.id) {
+      addError(result, 20000, `provider.id mismatches in /${constants.SELECT} and /${constants.ON_SELECT}`);
+    }
+
+    if (onSelect.provider.locations[0].id !== providerLoc) {
+      addError(result, 20000, `provider.locations[0].id mismatches in /${constants.SELECT} and /${constants.ON_SELECT}`);
+    }
+  } catch (error: any) {
+    console.error(`Error while checking provider in /${constants.ON_SELECT}, ${error.stack}`);
+    addError(result, 20000, `Error while checking provider: ${error.message}`);
+  }
+}
+
+// Validate item-related data
+async function validateItems(
+  onSelect: any,
+  transaction_id: string,
+  result: ValidationError[],
+) {
+  const itemFlfllmnts: { [key: string]: string } = {};
+
+  try {
+    console.info(`Checking item IDs in /${constants.ON_SELECT}`);
+    const itemsOnSelectRaw = await RedisService.getKey(`${transaction_id}_SelectItemList`);
+    const itemsOnSelect = itemsOnSelectRaw ? JSON.parse(itemsOnSelectRaw) : null;
+    const selectItems: string[] = [];
+
+    onSelect.items.forEach((item: any, index: number) => {
+      if (!itemsOnSelect?.includes(item.id)) {
+        
+        addError(result, 20000, `Invalid Item Id provided in /${constants.ON_SELECT}: ${item.id}`);
+      } else {
+        selectItems.push(item.id);
+      }
+
+      // Check fulfillment mapping
+      const found = onSelect.fulfillments.some((f: any) => f.id === item.fulfillment_id);
+      if (!found) {
+        addError(result, 20000, `fulfillment_id for item ${item.id} does not exist in order.fulfillments[]`);
+      }
+
+      itemFlfllmnts[item.id] = item.fulfillment_id;
+
+      // Check parent_item_id and type tags
+      const isItemType = tagFinder(item, "item");
+      const isCustomizationType = tagFinder(item, "customization");
+      if ((isItemType || isCustomizationType) && !item.parent_item_id) {
+        addError(result, 
+          20000,
+          `/message/order/items[${index}]: parent_item_id is required for items with type 'item' or 'customization'`
+        );
+      }
+      if (item.parent_item_id && !(isItemType || isCustomizationType)) {
+        addError(result, 
+          20000,
+          `/message/order/items[${index}]: items with parent_item_id must have a type tag of 'item' or 'customization'`
+        );
+      }
+    });
+
+    await Promise.all([
+      setRedisValue(`${transaction_id}_SelectItemList`, selectItems, TTL_IN_SECONDS),
+      RedisService.setKey(`${transaction_id}_itemFlfllmnts`, JSON.stringify(itemFlfllmnts), TTL_IN_SECONDS)
+      // setRedisValue(`${transaction_id}_itemFlfllmnts`, itemFlfllmnts, TTL_IN_SECONDS),
+    ]);
+  } catch (error: any) {
+    console.error(`Error while checking items in /${constants.ON_SELECT}, ${error.stack}`);
+    addError(result, 20000, `Error while checking items: ${error.message}`);
+  }
+}
+
+async function validateFulfillments(
+  onSelect: any,
+  transaction_id: string,
+  result: ValidationError[],
+  timestamp: any
+) {
+  const fulfillmentIdArray: string[] = [];
+  const fulfillment_tat_obj: { [key: string]: number } = {};
+  let nonServiceableFlag = 0;
+
+  try {
+    console.info(`Checking fulfillments in /${constants.ON_SELECT}`);
+    const ttsRaw = await RedisService.getKey(`${transaction_id}_timeToShip`);
+    const tts = ttsRaw ? JSON.parse(ttsRaw) : null;
+
+    onSelect.fulfillments.forEach((ff: any, index: number) => {
+      if (!ff.id) {
+        addError(result, 20000, `Fulfillment Id must be present in /${constants.ON_SELECT}`);
+        return;
+      }
+      fulfillmentIdArray.push(ff.id);
+
+      // Check TAT
+      if (!ff["@ondc/org/TAT"]) {
+        addError(result, 20000, `Fulfillment TAT must be present for fulfillment ID: ${ff.id}`);
+      } else {
+        const tat = isoDurToSec(ff["@ondc/org/TAT"]);
+        fulfillment_tat_obj[ff.id] = tat;
+        if (tat <= tts) {
+          addError(result, 
+            20000,
+            `/fulfillments[${index}]/@ondc/org/TAT (O2D) in /${constants.ON_SELECT} can't be less than or equal to @ondc/org/time_to_ship (O2S) in /${constants.ON_SEARCH}`
+          );
+        }
+      }
+
+      if (!ff.state || !ff.state.descriptor?.code) {
+        addError(result, 20000, `In Fulfillment${index}, descriptor code is mandatory in /${constants.ON_SELECT}`);
+      } else {
+        const code = ff.state.descriptor.code;
+        if (code === "Non-serviceable") {
+          nonServiceableFlag = 1;
+        }
+        if (!["Serviceable", "Non-serviceable"].includes(code)) {
+          addError(result, 
+            20000,
+            `Pre-order fulfillment state codes should be 'Serviceable' or 'Non-serviceable' in fulfillments[${index}].state.descriptor.code`
+          );
+        }
+      }
+
+      // Check category
+      if (ff.state?.descriptor?.code === "Serviceable" && ff.type === "Delivery") {
+        if (!ff["@ondc/org/category"] || !ffCategory[0].includes(ff["@ondc/org/category"])) {
+          addError(result, 
+            20000,
+            `In Fulfillment${index}, @ondc/org/category is not a valid value in /${constants.ON_SELECT} and should have one of these values [${ffCategory[0]}]`
+          );
+        }
+        
+      } else if (ff.type === "Self-Pickup") {
+        if (!ff["@ondc/org/category"] || !ffCategory[1].includes(ff["@ondc/org/category"])) {
+          addError(result, 
+            20000,
+            `In Fulfillment${index}, @ondc/org/category is not a valid value in /${constants.ON_SELECT} and should have one of these values [${ffCategory[1]}]`
+          );
+        }
+      }
+
+      // Check time range for Delivery/Self-Pickup
+      if (["Delivery", "Self-Pickup"].includes(ff.type)) {
+        const timeRange = ff.type === "Delivery" ? ff.end?.time?.range : ff.start?.time?.range;
+        const start = timeRange?.start ? new Date(timeRange.start) : null;
+        const end = timeRange?.end ? new Date(timeRange.end) : null;
+        const contextTime = new Date(timestamp);
+
+       
+          if (start && end && start >= end) {
+            addError(result, 20001, `Start time must be less than end time in ${ff.type} fulfillment`);
+          }
+          if (start && start <= contextTime) {
+            addError(result, 20001, `Start time must be after context.timestamp in ${ff.type} fulfillment`);
+          }
+        
+      }
+
+      // Check Buyer-Delivery tags
+      if (ff.type === "Buyer-Delivery") {
+        const orderDetailsTag = ff.tags?.find((tag: any) => tag.code === "order_details");
+        if (!orderDetailsTag) {
+          addError(result, 20007, `Missing 'order_details' tag in fulfillments when fulfillment.type is 'Buyer-Delivery'`);
+        } else {
+          const requiredFields = ["weight_unit", "weight_value", "dim_unit", "length", "breadth", "height"];
+          const list = orderDetailsTag.list || [];
+          for (const field of requiredFields) {
+            const item = list.find((i: any) => i.code === field);
+            if (!item || !item.value || item.value.toString().trim() === "") {
+              addError(result, 20008, `'${field}' is missing or empty in 'order_details' tag in fulfillments`);
+            }
+          }
+        }
+      }
+
+      // Check tracking
+      if (ff.tracking === undefined || typeof ff.tracking !== "boolean") {
+        addError(result, 20000, `Tracking must be present for fulfillment ID: ${ff.id} in boolean form`);
+      } else {
+        setRedisValue(`${transaction_id}_${ff.id}_tracking`, ff.tracking, TTL_IN_SECONDS);
+      }
+
+      // Check fulfillment ID vs provider ID
+      if (ff.id === onSelect.provider.id) {
+        addError(result, 20000, `Fulfillment ID can't be equal to Provider ID in /${constants.ON_SELECT}`);
+      }
+    });
+
+    // Check non-serviceable error
+    if (nonServiceableFlag && (!onSelect.error || onSelect.error.type !== "DOMAIN-ERROR" || onSelect.error.code !== "30009")) {
+      addError(result, 20000, `Non Serviceable Domain error should be provided when fulfillment is not serviceable`);
+    }
+
+    await Promise.all([
+      setRedisValue(`${transaction_id}_fulfillmentIdArray`, fulfillmentIdArray, TTL_IN_SECONDS),
+      setRedisValue(`${transaction_id}_fulfillment_tat_obj`, fulfillment_tat_obj, TTL_IN_SECONDS),
+    ]);
+  } catch (error: any) {
+    console.error(`Error while checking fulfillments in /${constants.ON_SELECT}, ${error.stack}`);
+    addError(result, 20000, `Error while checking fulfillments: ${error.message}`);
+  }
+
+  return { nonServiceableFlag };
+}
+
+// Validate quote-related data
+async function validateQuote(
+  onSelect: any,
+  transaction_id: string,
+  result: ValidationError[],
+  nonServiceableFlag: number
+) {
+  try {
+    console.info(`Checking quote in /${constants.ON_SELECT}`);
+ 
+    const itemsIdListRaw = await RedisService.getKey(`${transaction_id}_itemsIdList`);
+    const itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
+    const itemsCtgrsRaw = await RedisService.getKey(`${transaction_id}_itemsCtgrs`);
+    const itemsCtgrs = itemsCtgrsRaw ? JSON.parse(itemsCtgrsRaw) : null;
+    const selectedPriceRaw = await RedisService.getKey(`${transaction_id}_selectedPrice`);
+    const selectedPrice = selectedPriceRaw ? JSON.parse(selectedPriceRaw) : null;
+
+    let onSelectPrice = 0;
+    let onSelectItemsPrice = 0;
+    const itemPrices = new Map<string, number>();
+    const fulfillmentIdArrayRaw = await RedisService.getKey(`${transaction_id}_fulfillmentIdArray`);
+    const fulfillmentIdArray = fulfillmentIdArrayRaw ? JSON.parse(fulfillmentIdArrayRaw) : [];
+    // Parse itemFlfllmntsRaw into an object
+    let itemFlfllmntsRaw = await RedisService.getKey(`${transaction_id}_itemFlfllmnts`);
+    let itemFlfllmnts : any = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
+
+    // Check quote breakup
+    const deliveryItems = onSelect.quote.breakup.filter(
+      (item: any) => item["@ondc/org/title_type"] === "delivery"
+    );
+    const noOfDeliveries = deliveryItems.length;
+
+    if (noOfDeliveries && nonServiceableFlag) {
+      deliveryItems.forEach((e: any) => {
+        if (parseFloat(e.price.value) > 0) {
+          addError(result, 20000, `Delivery charges not applicable for non-serviceable locations`);
+        }
+      });
+    }
+
+    // Validate breakup elements
+    onSelect.quote.breakup.forEach((element: any, i: number) => {
+      const titleType: any = element["@ondc/org/title_type"];
+      const itemId = element["@ondc/org/item_id"];
+
+      // Check title type
+      if (titleType !== "item" && titleType !== "offer" && !Object.values(retailPymntTtl).includes(titleType)) {
+        addError(result, 20000, `Quote breakup Payment title type "${titleType}" is not as per the API contract`);
+      }
+
+      // Check title
+      if (titleType !== "item" && titleType !== "offer" && !(element.title.toLowerCase().trim() in retailPymntTtl)) {
+        addError(result, 20000, `Quote breakup Payment title "${element.title}" is not as per the API Contract`);
+      } else if (
+        titleType !== "item" &&
+        titleType !== "offer" &&
+        retailPymntTtl[element.title.toLowerCase().trim()] !== titleType
+      ) {
+        addError(result, 
+          20000,
+          `Quote breakup Payment title "${element.title}" comes under the title type "${retailPymntTtl[element.title.toLowerCase().trim()]}"`
+        );
+      }
+
+      // Check item-related validations
+      if (titleType === "item") {
+        console.log('ItemID', itemId, 'itemFlfllmnts', itemFlfllmnts, 'type of itemFlfllmnts', typeof itemFlfllmnts);
+        if (!(itemId in itemsIdList)) {
+          addError(result, 20000, `item with id: ${itemId} in quote.breakup[${i}] does not exist in items[]`);
+        }
+        if (!element.item) {
+          addError(result, 20000, `Item's unit price missing in quote.breakup for item id ${itemId}`);
+        } else if (
+          parseFloat(element.item.price.value) * parseInt(element["@ondc/org/item_quantity"].count) !=
+          parseFloat(element.price.value)
+        ) {
+          addError(result, 20000, `Item's unit and total price mismatch for id: ${itemId}`);
+        }
+        if (itemId in itemsIdList && element["@ondc/org/item_quantity"].count != itemsIdList[itemId]) {
+          addError(result, 
+            20000,
+            `Count of item with id: ${itemId} does not match in /${constants.SELECT} & /${constants.ON_SELECT}`
+          );
+        }
+        itemPrices.set(itemId, Math.abs(parseFloat(element.price.value)));
+      }
+
+      // Check tax/discount
+      if (["tax", "discount"].includes(titleType)) {
+        if (!(itemId in itemsIdList)) {
+          addError(result, 
+            20000,
+            `item with id: ${itemId} in quote.breakup[${i}] does not exist in items[] (should be a valid item id)`
+          );
+        }
+      }
+
+      // Check packing/delivery/misc
+      if (["packing", "delivery", "misc"].includes(titleType)) {
+        if (!fulfillmentIdArray.includes(itemId)) {
+          addError(result, 
+            20000,
+            `invalid id: ${itemId} in ${titleType} line item (should be a valid fulfillment_id)`
+          );
+        }
+      }
+
+      // Calculate prices
+      onSelectPrice += parseFloat(element.price.value);
+      if (
+        titleType === "item" ||
+        (titleType === "tax" && !taxNotInlcusive.includes(itemsCtgrs[itemId]))
+      ) {
+        onSelectItemsPrice += parseFloat(element.price.value);
+      }
+    });
+
+    // Check total price
+    onSelectPrice = parseFloat(onSelectPrice.toFixed(2));
+    const quotedPrice = parseFloat(onSelect.quote.price.value);
+    if (Math.round(onSelectPrice) !== Math.round(quotedPrice)) {
+      addError(result, 
+        20000,
+        `quote.price.value ${quotedPrice} does not match with the price breakup ${onSelectPrice}`
+      );
+    }
+
+    // Compare with SELECT price
+    if (typeof selectedPrice === "number" && onSelectItemsPrice !== selectedPrice) {
+      addError(result, 
+        20000,
+        `Quoted Price in /${constants.ON_SELECT} INR ${onSelectItemsPrice} does not match with the total price of items in /${constants.SELECT} INR ${selectedPrice}`
+      );
+    }
+
+    // Store quote and prices
+    const quoteObj = { ...onSelect.quote };
+    quoteObj.breakup.forEach((element: any) => {
+      if (element["@ondc/org/title_type"] === "item" && element.item?.quantity) {
+        delete element.item.quantity;
+      }
+    });
+
+    await Promise.all([
+      setRedisValue(`${transaction_id}_quoteObj`, quoteObj, TTL_IN_SECONDS),
+      setRedisValue(`${transaction_id}_onSelectPrice`, quotedPrice, TTL_IN_SECONDS),
+      setRedisValue(`${transaction_id}_selectPriceMap`, Array.from(itemPrices.entries()), TTL_IN_SECONDS),
+    ]);
+
+    // Check parent_item_id in quote vs items
+    const parentItemIds = onSelect.items
+      .map((item: any) => item.parent_item_id)
+      .filter((id: any) => id);
+    const parentItemIdsQuotes = onSelect.quote.breakup
+      .map((breakupItem: any) => breakupItem.item?.parent_item_id)
+      .filter((id: any) => id);
+
+    parentItemIdsQuotes.forEach((quoteParentId: string, index: number) => {
+      if (!parentItemIds.includes(quoteParentId)) {
+        addError(result, 
+          20000,
+          `parent_item_id '${quoteParentId}' in quote.breakup[${index}] is not present in items array`
+        );
+      }
+    });
+  } catch (error: any) {
+    console.error(`Error while checking quote in /${constants.ON_SELECT}, ${error.stack}`);
+    addError(result, 20000, `Error while checking quote: ${error.message}`);
+  }
+}
+
+// // Validate offer-related data
+// async function validateOffers(
+//   onSelect: any,
+//   transaction_id: string,
+//   result: ValidationError[],
+// ) {
+//   try {
+//     console.info(`Checking offers in /${constants.ON_SELECT}`);
+//     const providerOffersRaw = await RedisService.getKey(`${transaction_id}_${ApiSequence.ON_SEARCH}_offers`);
+//     const providerOffers = providerOffersRaw ? JSON.parse(providerOffersRaw) : [];
+//     const applicableOfferRaw = await RedisService.getKey(`${transaction_id}_selected_offers`);
+//     const applicableOffers = applicableOfferRaw ? JSON.parse(applicableOfferRaw) : [];
+//     const itemsOnSearchRaw = await RedisService.getKey(`${transaction_id}_onSearchItems`);
+//     const itemsOnSearch = itemsOnSearchRaw ? JSON.parse(itemsOnSearchRaw) : [];
+//     const orderItemIds = onSelect.items.map((item: any) => item.id) || [];
+//     const orderLocationIds = onSelect.provider.locations?.map((loc: any) => loc.id) || [];
+
+//     const offers = onSelect.quote.breakup.filter((item: any) => item["@ondc/org/title_type"] === "offer");
+//     if (offers.length > 0) {
+//       await setRedisValue(`${transaction_id}_on_select_offers`, JSON.stringify(offers), TTL_IN_SECONDS);
+
+//       const additiveOffers = offers.filter((offer: any) => {
+//         const metaTag = offer.item?.tags?.find((tag: any) => tag.code === "offer");
+//         return metaTag?.list?.some(
+//           (entry: any) => entry.code === "additive" && entry.value.toLowerCase() === "yes"
+//         );
+//       });
+
+//       const nonAdditiveOffers = offers.filter((offer: any) => {
+//         const metaTag = offer.item?.tags?.find((tag: any) => tag.code === "offer");
+//         return metaTag?.list?.some(
+//           (entry: any) => entry.code === "additive" && entry.value.toLowerCase() === "no"
+//         );
+//       });
+
+//       if (additiveOffers.length > 0) {
+//         offers.length = 0;
+//         additiveOffers.forEach((offer: any) => {
+//           const providerOffer = providerOffers.find((o: any) => o.id === offer.item?.tags?.find((tag: any) => tag.code === "offer")?.list?.find((entry: any) => entry.code === "id")?.value);
+//           if (providerOffer) {
+//             offers.push(providerOffer);
+//           }
+//         });
+//       } else if (nonAdditiveOffers.length === 1) {
+//         offers.length = 0;
+//         const offer = nonAdditiveOffers[0];
+//         const providerOffer = providerOffers.find((o: any) => o.id === offer.item?.tags?.find((tag: any) => tag.code === "offer")?.list?.find((entry: any) => entry.code === "id")?.value);
+//         if (providerOffer) {
+//           offers.push(providerOffer);
+//         }
+//       } else if (nonAdditiveOffers.length > 1) {
+//         nonAdditiveOffers.forEach((offer: any) => {
+//           addError(result, 20000, `Offer ${offer.id || 'unknown'} is non-additive and cannot be combined with other non-additive offers`);
+//         });
+//         return;
+//       }
+
+//       const totalWithoutOffers = onSelect.quote.breakup.reduce((sum: number, item: any) => {
+//         if (item["@ondc/org/title_type"] !== "offer") {
+//           return sum + parseFloat(item.price.value || "0");
+//         }
+//         return sum;
+//       }, 0);
+
+//       const deliveryCharges = Math.abs(
+//         parseFloat(
+//           onSelect.quote.breakup.find((item: any) => item["@ondc/org/title_type"] === "delivery")?.price.value || "0"
+//         )
+//       );
+
+//       offers.forEach((element: any, i: number) => {
+//         const priceValue = parseFloat(element.price.value);
+//         if (isNaN(priceValue) || priceValue >= 0) {
+//           addError(result, 20000, `Price for title type "offer" must be negative, but got ${priceValue}`);
+//         }
+
+//         const offerId = element.item?.tags?.find((tag: any) => tag.code === "offer")?.list?.find((entry: any) => entry.code === "id")?.value;
+//         if (!offerId) {
+//           addError(result, 20000, `Offer id cannot be null or empty in quote.breakup[${i}]`);
+//           return;
+//         }
+
+//         const providerOffer = providerOffers.find((p: any) => p.id === offerId);
+//         if (!providerOffer) {
+//           addError(result, 20000, `Offer with id '${offerId}' is not available for the provider`);
+//           return;
+//         }
+
+//         const offerLocationIds = providerOffer.location_ids || [];
+//         const locationMatch = offerLocationIds.some((id: string) => orderLocationIds.includes(id));
+//         if (!locationMatch) {
+//           addError(result, 
+//             20000,
+//             `Offer with id '${offerId}' is not applicable for any of the order's locations [${orderLocationIds.join(", ")}]`
+//           );
+//           return;
+//         }
+
+//         const offerItemIds = providerOffer.item_ids || [];
+//         const itemMatch = offerItemIds.some((id: string) => orderItemIds.includes(id));
+//         if (!itemMatch) {
+//           addError(result, 
+//             20000,
+//             `Offer with id '${offerId}' is not applicable for any of the ordered item(s) [${orderItemIds.join(", ")}]`
+//           );
+//           return;
+//         }
+
+//         const offerType = element.item?.tags?.find((tag: any) => tag.code === "offer")?.list?.find((entry: any) => entry.code === "type")?.value;
+//         const benefitTag = providerOffer.tags?.find((tag: any) => tag.code === "benefit");
+//         const qualifierTag = providerOffer.tags?.find((tag: any) => tag.code === "qualifier");
+//         const minValue = parseFloat(qualifierTag?.list?.find((l: any) => l.code === "min_value")?.value || "0");
+
+//         if (offerType === "discount") {
+//           if (minValue > 0 && totalWithoutOffers < minValue) {
+//             addError(result, 
+//               20000,
+//               `Offer with id '${offerId}' is not applicable for quote with actual quote value before discount is ₹${totalWithoutOffers} as required min_value for order is ₹${minValue}`
+//             );
+//             return;
+//           }
+
+//           const benefitList = benefitTag?.list || [];
+//           const valueType = benefitList.find((l: any) => l.code === "value_type")?.value;
+//           const valueCap = Math.abs(parseFloat(benefitList.find((l: any) => l.code === "value_cap")?.value || "0"));
+//           const benefitAmount = Math.abs(parseFloat(benefitList.find((l: any) => l.code === "value")?.value || "0"));
+//           const quotedPrice = parseFloat(onSelect.quote.price.value || "0");
+
+//           let benefitValue = 0;
+//           if (valueType === "percent") {
+//             if (valueCap > 0) {
+//               benefitValue = (benefitAmount / 100) * valueCap;
+//               if (Math.abs(priceValue) !== benefitValue) {
+//                 addError(result, 
+//                   20000,
+//                   `Discount mismatch: Expected discount is -₹${benefitValue.toFixed(2)} (i.e., ${benefitAmount}% of capped value ₹${valueCap}), but found -₹${Math.abs(priceValue).toFixed(2)}`
+//                 );
+//               }
+//               if (Math.abs(valueCap - benefitValue - quotedPrice) >= 0.01) {
+//                 addError(result, 
+//                   20000,
+//                   `Quoted price mismatch: After ${benefitAmount}% discount on ₹${valueCap}, expected price is ₹${(valueCap - benefitValue).toFixed(2)}, but got ₹${quotedPrice.toFixed(2)}`
+//                 );
+//               }
+//             } else {
+//               const quotePercentageAmount = (benefitAmount / 100) * totalWithoutOffers;
+//               if (Math.abs(priceValue) !== quotePercentageAmount) {
+//                 addError(result, 
+//                   20000,
+//                   `Discount mismatch: Expected discount is -₹${quotePercentageAmount.toFixed(2)} (i.e., ${benefitAmount}% of ₹${totalWithoutOffers}), but found -₹${Math.abs(priceValue).toFixed(2)}`
+//                 );
+//               }
+//               const quoteAfterBenefit = totalWithoutOffers - quotePercentageAmount;
+//               if (Math.abs(quoteAfterBenefit - quotedPrice) >= 0.01) {
+//                 addError(result, 
+//                   20000,
+//                   `Quoted price mismatch: After ${benefitAmount}% discount on ₹${totalWithoutOffers}, expected price is ₹${quoteAfterBenefit.toFixed(2)}, but got ₹${quotedPrice.toFixed(2)}`
+//                 );
+//               }
+//             }
+//           } else {
+//             if (valueCap > 0) {
+//               benefitValue = valueCap - benefitAmount;
+//               if (Math.abs(priceValue) !== benefitAmount) {
+//                 addError(result, 
+//                   20000,
+//                   `Discount mismatch: Expected discount is -₹${benefitAmount.toFixed(2)} (from capped value ₹${valueCap}), but found -₹${Math.abs(priceValue).toFixed(2)}`
+//                 );
+//               }
+//               if (Math.abs(benefitValue - quotedPrice) >= 0.01) {
+//                 addError(result, 
+//                   20000,
+//                   `Quoted price mismatch: After applying ₹${benefitAmount} on cap ₹${valueCap}, expected price is ₹${benefitValue.toFixed(2)}, but got ₹${quotedPrice.toFixed(2)}`
+//                 );
+//               }
+//             } else {
+//               if (Math.abs(priceValue) !== benefitAmount) {
+//                 addError(result, 
+//                   20000,
+//                   `Discount mismatch: Expected discount is -₹${benefitAmount.toFixed(2)} (from ₹${totalWithoutOffers}), but found -₹${Math.abs(priceValue).toFixed(2)}`
+//                 );
+//               }
+//               const quoteAfterBenefit = totalWithoutOffers - benefitAmount;
+//               if (Math.abs(quoteAfterBenefit - quotedPrice) >= 0.01) {
+//                 addError(result, 
+//                   20000,
+//                   `Quoted price mismatch: After applying ₹${benefitAmount} on ₹${totalWithoutOffers}, expected price is ₹${quoteAfterBenefit.toFixed(2)}, but got ₹${quotedPrice.toFixed(2)}`
+//                 );
+//               }
+//             }
+//           }
+//         } else if (["freebie", "buyXgetY"].includes(offerType)) {
+//           if (minValue > 0 && totalWithoutOffers < minValue) {
+//             addError(result, 
+//               20000,
+//               `Offer with id '${offerId}' is not applicable for quote with actual quote value before discount is ₹${totalWithoutOffers} as required min_value for order is ₹${minValue}`
+//             );
+//             return;
+//           }
+
+//           const benefitList = benefitTag?.list || [];
+//           const benefitItemId = benefitList.find((entry: any) => entry.code === "item_id")?.value || "";
+//           const benefitItemCount = parseInt(benefitList.find((entry: any) => entry.code === "item_count")?.value || "0");
+//           const offerTag = element.item?.tags?.find((tag: any) => tag.code === "offer");
+//           if (!offerTag) {
+//             addError(result, 20000, `tags are required in on_select /quote with @ondc/org/title_type:${offerType} and offerId:${offerId}`);
+//             return;
+//           }
+
+//           const offerItemId = offerTag.list?.find((entry: any) => entry.code === "item_id")?.value || "";
+//           const offerItemCount = parseInt(offerTag.list?.find((entry: any) => entry.code === "item_count")?.value || "0");
+//           if (!offerItemCount) {
+//             addError(result, 20000, `item_count is required in on_select /quote with @ondc/org/title_type:${offerType}`);
+//             return;
+//           }
+//           if (offerItemId !== benefitItemId) {
+//             addError(result, 
+//               20000,
+//               `Mismatch: item_id used in on_select quote.breakup (${offerItemId}) doesn't match with offer benefit item_id (${benefitItemId}) in on_search catalog for offer ID: ${offerId}`
+//             );
+//           }
+//           if (benefitItemCount !== offerItemCount) {
+//             addError(result, 
+//               20000,
+//               `Mismatch: item_id used in on_select quote.breakup (${offerItemCount}) quantity doesn't match with offer benefit item_id (${benefitItemCount}) in on_search catalog for offer ID: ${offerId}`
+//             );
+//           }
+//           if (!offerItemId) {
+//             addError(result, 20000, `item_id is required in on_select /quote with @ondc/org/title_type:${offerType} with offer_id:${offerId}`);
+//             return;
+//           }
+
+//           const itemIds = offerItemId.split(",").map((id: string) => id.trim());
+//           const matchedItems = itemsOnSearch.flat().filter((item: any) => itemIds.includes(item.id));
+//           let totalExpectedOfferValue = 0;
+//           const priceMismatchItems: string[] = [];
+//           let allItemsEligible = true;
+
+//           matchedItems.forEach((item: any) => {
+//             const itemPrice = Math.abs(parseFloat(item.price.value || "0"));
+//             const availableCount = parseInt(item.quantity?.available?.count || "0", 10);
+//             const expectedItemTotal = itemPrice * offerItemCount;
+//             totalExpectedOfferValue += expectedItemTotal;
+
+//             if (availableCount < offerItemCount) {
+//               addError(result, 
+//                 20000,
+//                 `Item ID: ${item.id} does not have sufficient stock. Required: ${offerItemCount}, Available: ${availableCount}`
+//               );
+//               allItemsEligible = false;
+//             }
+
+//             const quotedPrice = Math.abs(parseFloat(element.price.value || "0"));
+//             if (expectedItemTotal !== quotedPrice) {
+//               priceMismatchItems.push(`ID: ${item.id} (Expected Total: ₹${expectedItemTotal}, Quoted: ₹${quotedPrice})`);
+//               allItemsEligible = false;
+//             }
+//           });
+
+//           if (priceMismatchItems.length > 0) {
+//             addError(result, 20000, `Price mismatch found for item(s): ${priceMismatchItems.join("; ")}`);
+//           }
+
+//           if (!allItemsEligible) {
+//             const missingOrOutOfStock = itemIds.filter((id: string) => {
+//               const matchedItem = matchedItems.find((item: any) => item.id === id);
+//               if (!matchedItem) return true;
+//               const availableCount = parseInt(matchedItem.quantity?.available?.count || "0", 10);
+//               return availableCount < offerItemCount;
+//             });
+//             if (missingOrOutOfStock.length > 0) {
+//               addError(result, 
+//                 20000,
+//                 `Item(s) with ID(s) ${missingOrOutOfStock.join(", ")} not found in catalog or do not have enough stock for offer ID: ${offerId}`
+//               );
+//             }
+//           }
+
+//           if (offerType === "buyXgetY") {
+//             const offerMinItemCount = parseFloat(qualifierTag?.list?.find((l: any) => l.code === "item_count")?.value || "0");
+//             if (!offerMinItemCount || offerMinItemCount === 0) {
+//               addError(result, 
+//                 20000,
+//                 `Minimum Item Count required in catalog /offers/tags/qualifier/list/code:item_count or minimum item_count cannot be 0 for offer with id :${offerId}`
+//               );
+//             }
+//           }
+//         } else if (offerType === "delivery") {
+//           if (deliveryCharges === 0) {
+//             addError(result, 
+//               20000,
+//               `Delivery charges are required in on_select /quote with @ondc/org/title_type:${offerType} with offer_id:${offerId}`
+//             );
+//             return;
+//           }
+//           if (minValue > 0 && totalWithoutOffers < minValue) {
+//             addError(result, 
+//               20000,
+//               `Offer with id '${offerId}' is not applicable for quote with actual quote value before discount is ₹${totalWithoutOffers} as required min_value for order is ₹${minValue}`
+//             );
+//             return;
+//           }
+
+//           const benefitList = benefitTag?.list || [];
+//           const valueType = benefitList.find((l: any) => l.code === "value_type")?.value;
+//           const valueCap = Math.abs(parseFloat(benefitList.find((l: any) => l.code === "value_cap")?.value || "0"));
+//           const benefitValue = Math.abs(parseFloat(benefitList.find((l: any) => l.code === "value")?.value || "0"));
+//           const quotedPrice = parseFloat(onSelect.quote.price.value || "0");
+
+//           if (valueType === "percent") {
+//             if (valueCap === 0) {
+//               addError(result, 
+//                 20000,
+//                 `Offer with id '${offerId}' is not applicable due to missing value_cap`
+//               );
+//             } else {
+//               let expectedDiscount = (benefitValue / 100) * deliveryCharges;
+//               if (expectedDiscount > valueCap) {
+//                 expectedDiscount = valueCap;
+//               }
+//               if (expectedDiscount > deliveryCharges) {
+//                 addError(result, 
+//                   20000,
+//                   `Discount exceeds delivery charge. Discount: ₹${expectedDiscount.toFixed(2)}, Delivery Charge: ₹${deliveryCharges.toFixed(2)}`
+//                 );
+//               }
+//               if (Math.abs(priceValue) !== expectedDiscount) {
+//                 addError(result, 
+//                   20000,
+//                   `Discount mismatch: Expected discount is -₹${expectedDiscount.toFixed(2)} (i.e., ${benefitValue}% of capped value ₹${valueCap}), but found -₹${Math.abs(priceValue).toFixed(2)}`
+//                 );
+//               }
+//             }
+//           } else {
+//             if (Math.abs(priceValue) !== benefitValue) {
+//               addError(result, 
+//                 20000,
+//                 `Discount mismatch: Expected discount is -₹${benefitValue.toFixed(2)}, but found -₹${Math.abs(priceValue).toFixed(2)}`
+//               );
+//             }
+//             if (Math.abs(priceValue) !== deliveryCharges) {
+//               addError(result, 
+//                 20000,
+//                 `Discount mismatch: Expected discount is -₹${Math.abs(priceValue).toFixed(2)}, but delivery charges are -₹${deliveryCharges.toFixed(2)}`
+//               );
+//             }
+//             const quoteAfterBenefit = totalWithoutOffers - benefitValue;
+//             if (Math.abs(quoteAfterBenefit - quotedPrice) >= 0.01) {
+//               addError(result, 
+//                 20000,
+//                 `Quoted price mismatch: After applying ₹${benefitValue} on ₹${totalWithoutOffers}, expected price is ₹${quoteAfterBenefit.toFixed(2)}, but got ₹${quotedPrice.toFixed(2)}`
+//               );
+//             }
+//           }
+//         }
+//       });
+//     }
+//   } catch (error: any) {
+//     console.error(`Error while checking offers in /${constants.ON_SELECT}, ${error.stack}`);
+//     addError(result, 20000, `Error while checking offers: ${error.message}`);
+//   }
+// }
+
+// Handle error message for out-of-stock scenarios
+async function validateError(
+  onSelect: any,
+  transaction_id: string,
+  result: ValidationError[],
+) {
+  if (!onSelect.error) return;
+
+  try {
+    console.info(`Checking error message in /${constants.ON_SELECT}`);
+    const { error } = onSelect;
+    const itemsIdListRaw = await RedisService.getKey(`${transaction_id}_itemsIdList`);
+    const itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
+
+    if (error.code === "40002") {
+      let errorArray: any[] = [];
+      try {
+        errorArray = JSON.parse(error.message);
+      } catch (err: any) {
+        addError(result, 
+          20006,
+          `The error.message provided in ${ApiSequence.ON_SELECT_OUT_OF_STOCK} should be a valid JSON array`
+        );
+        return;
+      }
+
+      if (!Array.isArray(errorArray)) {
+        addError(result, 
+          20006,
+          `The error.message provided in ${ApiSequence.ON_SELECT_OUT_OF_STOCK} should be an array`
+        );
+        return;
+      }
+
+      const isValidErrorItem = (item: any): boolean =>
+        typeof item.dynamic_item_id === "string" &&
+        typeof item.error === "string" &&
+        (typeof item.item_id === "string" ||
+          (typeof item.customization_id === "string" && typeof item.customization_group_id === "string"));
+
+      if (!errorArray.every(isValidErrorItem)) {
+        addError(result, 
+          20006,
+          `The error.message provided in ${ApiSequence.ON_SELECT_OUT_OF_STOCK} should contain valid items with dynamic_item_id, error, and either item_id or customization_id/customization_group_id`
+        );
+        return;
+      }
+
+      const breakup_msg = onSelect.quote.breakup;
+      const parent_item_ids = breakup_msg.map((item: any) => item.item?.parent_item_id).filter((id: any) => id);
+      const dynamic_item_ids = errorArray.map((item: any) => item.dynamic_item_id);
+
+      _.difference(dynamic_item_ids, parent_item_ids).forEach((diff: string) => {
+        addError(result, 
+          20006,
+          `Dynamic_item_id: ${diff} doesn't exist in any quote.breakup.item.parent_item_ids`
+        );
+      });
+
+      const itemsReduced = breakup_msg.filter(
+        (item: any) =>
+          item["@ondc/org/item_quantity"] &&
+          item["@ondc/org/item_quantity"].count < itemsIdList[item["@ondc/org/item_id"]]
+      );
+
+      _.difference(_.map(itemsReduced, "item.parent_item_id"), dynamic_item_ids).forEach((diff: string) => {
+        addError(result, 
+          20006,
+          `Dynamic_item_id: ${diff} is missing from error payload`
+        );
+      });
+
+      errorArray.forEach((errorItem: any) => {
+        const isPresent = itemsReduced.some(
+          (item: any) => item["@ondc/org/item_id"] === errorItem.item_id
+        );
+        if (!isPresent && errorItem.item_id) {
+          addError(result, 
+            20006,
+            `Item isn't reduced ${errorItem.item_id} in error message is not present in fulfillments/items`
+          );
+        }
+      });
+
+      itemsReduced.forEach((item: any) => {
+        const isPresent = errorArray.some(
+          (errorItem: any) => errorItem.item_id === item["@ondc/org/item_id"]
+        );
+        if (!isPresent) {
+          addError(result, 
+            20006,
+            `message/order/items for item ${item["@ondc/org/item_id"]} does not match in error message`
+          );
+        }
+      });
+    }
+  } catch (error: any) {
+    console.error(`Error while checking error message in /${constants.ON_SELECT}, ${error.stack}`);
+    addError(result, 20006, `Error while checking error message: ${error.message}`);
+  }
+}
+
+export async function onSelect(data: any) {
+  const { context, message } = data;
+  const result: ValidationError[] = [];
+  const txnId = context?.transaction_id;
+
+  try {
+    await contextChecker(context, result, constants.ON_SELECT, constants.SELECT);
+  } catch (err: any) {
+    addError(result, 20000, err.message);
+    return result;
+  }
+
+  try {
+ 
+
+    const onSelect = message.order;
+    await setRedisValue(`${txnId}_${ApiSequence.ON_SELECT}`, data, TTL_IN_SECONDS);
+
+    await validateProvider(onSelect, txnId, result);
+    await validateItems(onSelect, txnId, result);
+    const { nonServiceableFlag } = await validateFulfillments(onSelect, txnId, result, context.timestamp);
+    await validateQuote(onSelect, txnId, result, nonServiceableFlag);
+    // await validateOffers(onSelect, txnId, result, );
+    await validateError(onSelect, txnId, result, );
+
+    return result;
+  } catch (error: any) {
+    console.error(`Error in /${constants.ON_SELECT}: ${error.stack}`);
+    addError(result, 20000, `Internal error: ${error.message}`);
+    return result;
+  }
+}
