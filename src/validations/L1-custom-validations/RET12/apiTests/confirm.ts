@@ -159,8 +159,6 @@ const validateItems = async (txnId: string, items: any[], context: any, result: 
     const itemsIdList = await getRedisValue(`${txnId}_itemsIdList`);
     const fulfillmentIdArray = await getRedisValue(`${txnId}_fulfillmentIdArray`);
     const parentItemIdSet = await getRedisValue(`${txnId}_parentItemIdSet`);
-    const selectCustomIdArray = await getRedisValue(`${txnId}_select_customIdArray`);
-    const onSearchItems = await getRedisValue(`${txnId}_onSearchItems`);
 
     let itemsCountChange = false;
     const updatedItemsIdList = { ...itemsIdList };
@@ -191,27 +189,11 @@ const validateItems = async (txnId: string, items: any[], context: any, result: 
       const typeTag = item.tags?.find((tag: any) => tag.code === "type");
       const typeValue = typeTag?.list?.find((listItem: any) => listItem.code === "type")?.value;
       const isItemType = typeValue === "item";
-      const isCustomizationType = typeValue === "customization";
 
-      if ((isItemType || isCustomizationType) && !item.parent_item_id) {
-        addError(result, 20025, `items[${i}]: parent_item_id required for type 'item' or 'customization'`);
-      }
+      
 
-      if (item.parent_item_id && !(isItemType || isCustomizationType)) {
-        addError(result, 20026, `items[${i}]: items with parent_item_id must have type 'item' or 'customization'`);
-      }
+    
 
-      if (isCustomizationType && selectCustomIdArray) {
-        const parentTag = item.tags?.find((tag: any) => tag.code === "parent");
-        if (!parentTag) {
-          addError(result, 20027, `items[${i}]: customization items must have a parent tag`);
-        } else {
-          const parentId = parentTag.list?.find((listItem: any) => listItem.code === "id")?.value;
-          if (parentId && checkItemTag(item, selectCustomIdArray)) {
-            addError(result, 20028, `items[${i}]: parent tag id ${parentId} must be in select_customIdArray`);
-          }
-        }
-      }
     });
 
     if (itemsCountChange) {
