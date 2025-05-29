@@ -14,7 +14,8 @@ export const contextChecker = async (
   context: any,
   result: any[],
   currentCall: string,
-  pastCall?: string
+  pastCall?: string,
+  ignoreMessageIdCheck: boolean = false
 ) => {
   try {
     const txnId = context?.transaction_id;
@@ -59,12 +60,12 @@ export const contextChecker = async (
         });
       }
       let existingSet: any = [];
-      existingSet.push(currentCall)
-       await RedisService.setKey(
-              `${txnId}_previousCall`,
-              JSON.stringify(existingSet),
-              TTL_IN_SECONDS
-            );
+      existingSet.push(currentCall);
+      await RedisService.setKey(
+        `${txnId}_previousCall`,
+        JSON.stringify(existingSet),
+        TTL_IN_SECONDS
+      );
 
       return;
     }
@@ -91,10 +92,13 @@ export const contextChecker = async (
 
       if (!previousCallPresent) {
         throw new Error(`previous call doesn't exist`);
-       
       }
 
-      if (context.action !== 'on_status' && context.action !== currentCall) {
+      if (
+        context.action !== "on_status" &&
+        context.action !== "on_update" &&
+        context.action !== currentCall
+      ) {
         result.push({
           valid: false,
           code: 20000,
@@ -103,7 +107,12 @@ export const contextChecker = async (
       }
 
       if (context.domain !== prevDomain) {
-        console.log('Context domain:', context.domain, 'Previous domain:', prevDomain);
+        console.log(
+          "Context domain:",
+          context.domain,
+          "Previous domain:",
+          prevDomain
+        );
         result.push({
           valid: false,
           code: 20000,
@@ -160,20 +169,20 @@ export const contextChecker = async (
       }
 
       if (!actionCall) {
-        if (context.message_id !== prevMessageId) {
-            console.log('messageID1 ', context.message_id, ' messageID2:', prevMessageId, 'typeof1', typeof context.message_id, 'typeof2: ', typeof prevMessageId);
-          result.push({
-            valid: false,
-            code: 20000,
-            description: `message_id mismatch between ${currentCall} and ${pastCall}`,
-          });
+        if (!ignoreMessageIdCheck) {
+          if (context.message_id !== prevMessageId) {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `message_id mismatch between ${currentCall} and ${pastCall}`,
+            });
+          }
         }
-        validateBapUri(context.bap_uri, context?.bap_id, result)
-        validateBppUri(context.bpp_uri, context.bpp_id, result)
+        validateBapUri(context.bap_uri, context?.bap_id, result);
+        validateBppUri(context.bpp_uri, context.bpp_id, result);
 
         await setRedisValue(`${txnId}_bapId`, context.bap_id);
         await setRedisValue(`${txnId}_bppId`, context.bpp_id);
-
       }
 
       await setRedisValue(

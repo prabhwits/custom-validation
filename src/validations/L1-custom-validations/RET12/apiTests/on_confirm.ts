@@ -42,6 +42,11 @@ const storeOrder = async (
         TTL_IN_SECONDS
       ),
       RedisService.setKey(
+        `${txnId}_PreviousUpdatedTimestamp`,
+        JSON.stringify(order.updated_at),
+        TTL_IN_SECONDS
+      ),
+      RedisService.setKey(
         `${txnId}_onCnfrmState`,
         JSON.stringify(order.state),
         TTL_IN_SECONDS
@@ -134,11 +139,23 @@ const validateOrder = async (
     const createdTime = new Date(order.created_at).getTime();
     const updatedTime = new Date(order.updated_at).getTime();
     const confirmCreatedTimeRaw = await getRedisValue(`${txnId}_ordrCrtd`);
-    const confirmCreatedTime = confirmCreatedTimeRaw ? new Date(confirmCreatedTimeRaw).getTime() : null;
+    const confirmCreatedTime = confirmCreatedTimeRaw
+      ? new Date(confirmCreatedTimeRaw).getTime()
+      : null;
 
     if (isNaN(createdTime) || createdTime != confirmCreatedTime) {
-      console.log('createdTime', createdTime, 'confirmCreatedTime', confirmCreatedTime, 'contextTime');
-      addError(result, 20013, `order.created_at must match context.timestamp in /${constants.ON_CONFIRM}`);
+      console.log(
+        "createdTime",
+        createdTime,
+        "confirmCreatedTime",
+        confirmCreatedTime,
+        "contextTime"
+      );
+      addError(
+        result,
+        20013,
+        `order.created_at must match context.timestamp in /${constants.ON_CONFIRM}`
+      );
     }
 
     if (isNaN(updatedTime) || updatedTime !== contextTime) {
@@ -442,7 +459,11 @@ const validateFulfillments = async (
       const address = fulfillment.end?.location?.address;
       const providerAddress = fulfillment.start;
       if (providerAddress && !_.isEqual(providerAddress, address)) {
-        await setRedisValue(`${txnId}_providerAddr`, providerAddress, TTL_IN_SECONDS);
+        await setRedisValue(
+          `${txnId}_providerAddr`,
+          providerAddress,
+          TTL_IN_SECONDS
+        );
       }
       if (address) {
         const lenName = address.name?.length || 0;
@@ -595,7 +616,7 @@ const validatePayment = async (
       confirmSettlementDetails &&
       !_.isEqual(
         payment["@ondc/org/settlement_details"][0],
-        JSON.parse(confirmSettlementDetails)
+        confirmSettlementDetails
       )
     ) {
       addError(

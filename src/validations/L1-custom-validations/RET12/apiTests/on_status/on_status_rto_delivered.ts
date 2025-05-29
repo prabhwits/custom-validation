@@ -78,16 +78,6 @@ async function validateContext(
       );
     }
 
-    const domain = await RedisService.getKey(`${transaction_id}_domain`);
-    if (!_.isEqual(context.domain?.split(":")[1], domain)) {
-      result.push(
-        addError(
-          "Domain should be same in each action",
-          ERROR_CODES.INVALID_RESPONSE
-        )
-      );
-    }
-
     const searchContextRaw = await RedisService.getKey(
       `${transaction_id}_${ApiSequence.SEARCH}_context`
     );
@@ -170,9 +160,9 @@ async function validateOrder(
   result: ValidationError[]
 ): Promise<void> {
   try {
-    const cnfrmOrdrId = await RedisService.getKey(
-      `${transaction_id}_cnfrmOrdrId`
-    );
+    let cnfrmOrdrId =
+      (await RedisService.getKey(`${transaction_id}_cnfrmOrdrId`)) || "";
+    cnfrmOrdrId = JSON.parse(cnfrmOrdrId);
     if (cnfrmOrdrId && order.id !== cnfrmOrdrId) {
       result.push(
         addError(

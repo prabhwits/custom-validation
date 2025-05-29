@@ -257,7 +257,6 @@ export const addActionToRedisSet = async (
       previousAction === presentAction ||
       (!_.isEmpty(existingSet) && existingSet.includes(previousAction))
     ) {
-      console.log('existingSet4534', existingSet, 'type of existingset:34534', typeof existingSet);
       existingSet?.push(presentAction);
       await RedisService.setKey(
         key,
