@@ -10,7 +10,11 @@ import {
   compareCoordinates,
   isoDurToSec,
 } from "../../../../../utils/helper";
-import constants, { ApiSequence, ROUTING_ENUMS } from "../../../../../utils/constants";
+import constants, {
+  ApiSequence,
+  ROUTING_ENUMS,
+} from "../../../../../utils/constants";
+import checkOnStatusRTODelivered from "./on_status_rto_delivered";
 
 const TTL_IN_SECONDS: number = Number(process.env.TTL_IN_SECONDS) || 3600;
 const ERROR_CODES = {
@@ -30,22 +34,49 @@ const addError = (result: any[], code: number, description: string): void => {
   });
 };
 
-const storeOrder = async (txnId: string, order: any, result: any[]): Promise<void> => {
+const storeOrder = async (
+  txnId: string,
+  order: any,
+  result: any[]
+): Promise<void> => {
   try {
     await Promise.all([
-      RedisService.setKey(`${txnId}_cnfrmOrdrId`, JSON.stringify(order.id), TTL_IN_SECONDS),
-      RedisService.setKey(`${txnId}_ordrCrtd`, JSON.stringify(order.created_at), TTL_IN_SECONDS),
-      RedisService.setKey(`${txnId}_ordrUpdtd`, JSON.stringify(order.updated_at), TTL_IN_SECONDS),
-      RedisService.setKey(`${txnId}_orderState`, JSON.stringify(order.state), TTL_IN_SECONDS),
+      RedisService.setKey(
+        `${txnId}_cnfrmOrdrId`,
+        JSON.stringify(order.id),
+        TTL_IN_SECONDS
+      ),
+      RedisService.setKey(
+        `${txnId}_ordrCrtd`,
+        JSON.stringify(order.created_at),
+        TTL_IN_SECONDS
+      ),
+      RedisService.setKey(
+        `${txnId}_ordrUpdtd`,
+        JSON.stringify(order.updated_at),
+        TTL_IN_SECONDS
+      ),
+      RedisService.setKey(
+        `${txnId}_orderState`,
+        JSON.stringify(order.state),
+        TTL_IN_SECONDS
+      ),
     ]);
   } catch (err: any) {
     addError(result, 21001, `Error storing order details: ${err.message}`);
   }
 };
 
-const storeFulfillments = async (txnId: string, fulfillments: any[], state: string, result: any[]): Promise<void> => {
+const storeFulfillments = async (
+  txnId: string,
+  fulfillments: any[],
+  state: string,
+  result: any[]
+): Promise<void> => {
   try {
-    const deliveryFulfillment = fulfillments.find((f: any) => f.type === "Delivery");
+    const deliveryFulfillment = fulfillments.find(
+      (f: any) => f.type === "Delivery"
+    );
     if (deliveryFulfillment) {
       await Promise.all([
         RedisService.setKey(
@@ -79,44 +110,82 @@ const storeFulfillments = async (txnId: string, fulfillments: any[], state: stri
   }
 };
 
-const storePayment = async (txnId: string, payment: any, result: any[]): Promise<void> => {
+const storePayment = async (
+  txnId: string,
+  payment: any,
+  result: any[]
+): Promise<void> => {
   try {
-    await RedisService.setKey(`${txnId}_prevPayment`, JSON.stringify(payment), TTL_IN_SECONDS);
+    await RedisService.setKey(
+      `${txnId}_prevPayment`,
+      JSON.stringify(payment),
+      TTL_IN_SECONDS
+    );
   } catch (err: any) {
     addError(result, 21003, `Error storing payment: ${err.message}`);
   }
 };
 
-const storeQuote = async (txnId: string, quote: any, result: any[]): Promise<void> => {
+const storeQuote = async (
+  txnId: string,
+  quote: any,
+  result: any[]
+): Promise<void> => {
   try {
-    await RedisService.setKey(`${txnId}_quotePrice`, JSON.stringify(parseFloat(quote.price.value)), TTL_IN_SECONDS);
+    await RedisService.setKey(
+      `${txnId}_quotePrice`,
+      JSON.stringify(parseFloat(quote.price.value)),
+      TTL_IN_SECONDS
+    );
   } catch (err: any) {
     addError(result, 21004, `Error storing quote: ${err.message}`);
   }
 };
 
-const validateOrder = async (txnId: string, order: any, context: any, currentCall: string, result: any[]): Promise<void> => {
+const validateOrder = async (
+  txnId: string,
+  order: any,
+  context: any,
+  currentCall: string,
+  result: any[]
+): Promise<void> => {
   try {
     const cnfrmOrdrId = await getRedisValue(`${txnId}_cnfrmOrdrId`);
     if (cnfrmOrdrId && cnfrmOrdrId !== order.id) {
-      addError(result, 21005, `Order Id mismatches in /${constants.CONFIRM} and /${currentCall}`);
+      addError(
+        result,
+        21005,
+        `Order Id mismatches in /${constants.CONFIRM} and /${currentCall}`
+      );
     }
 
     const providerId = await getRedisValue(`${txnId}_providerId`);
     if (providerId && order.provider?.id !== providerId) {
-      addError(result, 21006, `Provider Id mismatches in /${constants.ON_SEARCH} and /${currentCall}`);
+      addError(
+        result,
+        21006,
+        `Provider Id mismatches in /${constants.ON_SEARCH} and /${currentCall}`
+      );
     }
 
     const providerLoc = await getRedisValue(`${txnId}_providerLoc`);
     const locationId = order.provider?.locations?.[0]?.id;
     if (providerLoc && providerLoc !== locationId) {
-      addError(result, 21007, `provider.locations[0].id mismatches in /${constants.ON_SEARCH} and /${currentCall}`);
+      addError(
+        result,
+        21007,
+        `provider.locations[0].id mismatches in /${constants.ON_SEARCH} and /${currentCall}`
+      );
     }
 
     const contextTime = new Date(context.timestamp).getTime();
     const updatedTime = new Date(order.updated_at).getTime();
     if (isNaN(updatedTime) || updatedTime > contextTime) {
-      addError(result, 21008, `order.updated_at cannot be future dated in /${currentCall}`);
+      addError(
+        result,
+        21008,
+        `order.updated_at cannot be future dated in /${currentCall}`
+      );
     }
   } catch (err: any) {
     addError(result, 21009, `Error validating order: ${err.message}`);
@@ -150,45 +219,88 @@ const validateFulfillments = async (
       getRedisValue(`${txnId}_deliveryFulfillmentAction`),
     ]);
 
-    const itemFlfllmnts = itemFlfllmntsRaw 
-    const providerGps = providerGpsRaw 
-    const providerName = providerNameRaw
-    const buyerGps = buyerGpsRaw 
-    const buyerAddr = buyerAddrRaw 
-    const storedFulfillment = storedFulfillmentRaw 
-    const storedFulfillmentAction = storedFulfillmentActionRaw 
+    const itemFlfllmnts = itemFlfllmntsRaw;
+    const providerGps = providerGpsRaw;
+    const providerName = providerNameRaw;
+    const buyerGps = buyerGpsRaw;
+    const buyerAddr = buyerAddrRaw;
+    const storedFulfillment = storedFulfillmentRaw;
+    const storedFulfillmentAction = storedFulfillmentActionRaw;
 
     for (const ff of fulfillments) {
       if (!itemFlfllmnts || !Object.values(itemFlfllmnts).includes(ff.id)) {
-        addError(result, 21010, `Fulfillment id ${ff.id || "missing"} does not exist in /${constants.ON_SELECT}`);
+        addError(
+          result,
+          21010,
+          `Fulfillment id ${ff.id || "missing"} does not exist in /${
+            constants.ON_SELECT
+          }`
+        );
       }
 
       if (ff.type !== "Cancel") {
         const ffTrackingRaw = await getRedisValue(`${txnId}_${ff.id}_tracking`);
         const ffTracking = ffTrackingRaw ? JSON.parse(ffTrackingRaw) : null;
         if (ffTracking !== null && ffTracking !== ff.tracking) {
-          addError(result, 21011, `Fulfillment Tracking mismatch with /${constants.ON_SELECT} for ID ${ff.id}`);
+          addError(
+            result,
+            21011,
+            `Fulfillment Tracking mismatch with /${constants.ON_SELECT} for ID ${ff.id}`
+          );
         }
       }
 
-      if (ff.start?.location?.gps && providerGps && !compareCoordinates(ff.start.location.gps, providerGps)) {
-        addError(result, 21012, `store gps location /fulfillments[${ff.id}]/start/location/gps can't change`);
+      if (
+        ff.start?.location?.gps &&
+        providerGps &&
+        !compareCoordinates(ff.start.location.gps, providerGps)
+      ) {
+        addError(
+          result,
+          21012,
+          `store gps location /fulfillments[${ff.id}]/start/location/gps can't change`
+        );
       }
 
-      if (providerName && !_.isEqual(ff.start?.location?.descriptor?.name, providerName)) {
-        addError(result, 21013, `store name /fulfillments[${ff.id}]/start/location/descriptor/name can't change`);
+      if (
+        providerName &&
+        !_.isEqual(ff.start?.location?.descriptor?.name, providerName)
+      ) {
+        addError(
+          result,
+          21013,
+          `store name /fulfillments[${ff.id}]/start/location/descriptor/name can't change`
+        );
       }
 
-      if (ff.end?.location?.gps && buyerGps && !_.isEqual(ff.end.location.gps, buyerGps)) {
-        addError(result, 21014, `fulfillments[${ff.id}].end.location gps mismatches with /${constants.SELECT}`);
+      if (
+        ff.end?.location?.gps &&
+        buyerGps &&
+        !_.isEqual(ff.end.location.gps, buyerGps)
+      ) {
+        addError(
+          result,
+          21014,
+          `fulfillments[${ff.id}].end.location gps mismatches with /${constants.SELECT}`
+        );
       }
 
-      if (ff.end?.location?.address?.area_code && buyerAddr && !_.isEqual(ff.end.location.address.area_code, buyerAddr)) {
-        addError(result, 21015, `fulfillments[${ff.id}].end.location.address.area_code mismatches with /${constants.SELECT}`);
+      if (
+        ff.end?.location?.address?.area_code &&
+        buyerAddr &&
+        !_.isEqual(ff.end.location.address.area_code, buyerAddr)
+      ) {
+        addError(
+          result,
+          21015,
+          `fulfillments[${ff.id}].end.location.address.area_code mismatches with /${constants.SELECT}`
+        );
       }
     }
 
-    const deliveryFulfillment = fulfillments.find((f: any) => f.type === "Delivery");
+    const deliveryFulfillment = fulfillments.find(
+      (f: any) => f.type === "Delivery"
+    );
     if (deliveryFulfillment && storedFulfillment) {
       const fulfillmentRangeErrors = compareTimeRanges(
         storedFulfillment,
@@ -208,7 +320,7 @@ const validateFulfillments = async (
       let i = 0;
       for (const obj1 of fulfillmentsItemsSet) {
         const keys = Object.keys(obj1);
-        let obj2 : any = fulfillments.filter((f: any) => f.type === obj1.type);
+        let obj2: any = fulfillments.filter((f: any) => f.type === obj1.type);
         let apiSeq =
           obj1.type === "Cancel"
             ? ApiSequence.ON_UPDATE_PART_CANCEL
@@ -230,10 +342,18 @@ const validateFulfillments = async (
           }
           const errors = compareFulfillmentObject(obj1, obj2, keys, i, apiSeq);
           errors.forEach((item: any) => {
-            addError(result, 21017, `Fulfillment comparison error: ${item.errMsg}`);
+            addError(
+              result,
+              21017,
+              `Fulfillment comparison error: ${item.errMsg}`
+            );
           });
         } else {
-          addError(result, 21018, `Missing fulfillment type '${obj1.type}' in ${currentCall} compared to ${apiSeq}`);
+          addError(
+            result,
+            21018,
+            `Missing fulfillment type '${obj1.type}' in ${currentCall} compared to ${apiSeq}`
+          );
         }
         i++;
       }
@@ -253,7 +373,8 @@ const validateDeliveryTimestamps = async (
     const deliveryTimestamps: any = {};
     for (const fulfillment of order.fulfillments || []) {
       if (fulfillment.type !== "Delivery") continue;
-      if (fulfillment.state?.descriptor?.code !== constants.ORDER_DELIVERED) continue;
+      if (fulfillment.state?.descriptor?.code !== constants.ORDER_DELIVERED)
+        continue;
 
       const pickUpTime = fulfillment.start?.time?.timestamp;
       const deliveryTime = fulfillment.end?.time?.timestamp;
@@ -261,15 +382,34 @@ const validateDeliveryTimestamps = async (
 
       const contextTime = new Date(context.timestamp).getTime();
       if (deliveryTime && new Date(deliveryTime).getTime() > contextTime) {
-        addError(result, 21020, `delivery timestamp cannot be future dated in /${constants.ON_STATUS}`);
+        addError(
+          result,
+          21020,
+          `delivery timestamp cannot be future dated in /${constants.ON_STATUS}`
+        );
       }
 
-      if (pickUpTime && deliveryTime && new Date(pickUpTime).getTime() >= new Date(deliveryTime).getTime()) {
-        addError(result, 21021, `delivery timestamp cannot be less than or equal to pickup timestamp`);
+      if (
+        pickUpTime &&
+        deliveryTime &&
+        new Date(pickUpTime).getTime() >= new Date(deliveryTime).getTime()
+      ) {
+        addError(
+          result,
+          21021,
+          `delivery timestamp cannot be less than or equal to pickup timestamp`
+        );
       }
 
-      if (deliveryTime && new Date(order.updated_at).getTime() < new Date(deliveryTime).getTime()) {
-        addError(result, 21022, `order.updated_at cannot be less than delivery timestamp`);
+      if (
+        deliveryTime &&
+        new Date(order.updated_at).getTime() < new Date(deliveryTime).getTime()
+      ) {
+        addError(
+          result,
+          21022,
+          `order.updated_at cannot be less than delivery timestamp`
+        );
       }
     }
 
@@ -279,7 +419,11 @@ const validateDeliveryTimestamps = async (
       TTL_IN_SECONDS
     );
   } catch (err: any) {
-    addError(result, 21023, `Error validating delivery timestamps: ${err.message}`);
+    addError(
+      result,
+      21023,
+      `Error validating delivery timestamps: ${err.message}`
+    );
   }
 };
 
@@ -293,18 +437,30 @@ const validatePickupTimestamps = async (
     const pickupTimestamps: any = {};
     for (const fulfillment of order.fulfillments || []) {
       if (fulfillment.type !== "Delivery") continue;
-      if (fulfillment.state?.descriptor?.code !== constants.ORDER_PICKED) continue;
+      if (fulfillment.state?.descriptor?.code !== constants.ORDER_PICKED)
+        continue;
 
       const pickUpTime = fulfillment.start?.time?.timestamp;
       pickupTimestamps[fulfillment.id] = pickUpTime;
 
       const contextTime = new Date(context.timestamp).getTime();
       if (pickUpTime && new Date(pickUpTime).getTime() > contextTime) {
-        addError(result, 21024, `pickup timestamp cannot be future dated in /${constants.ON_STATUS}`);
+        addError(
+          result,
+          21024,
+          `pickup timestamp cannot be future dated in /${constants.ON_STATUS}`
+        );
       }
 
-      if (pickUpTime && new Date(order.updated_at).getTime() < new Date(pickUpTime).getTime()) {
-        addError(result, 21025, `order.updated_at cannot be less than pickup timestamp`);
+      if (
+        pickUpTime &&
+        new Date(order.updated_at).getTime() < new Date(pickUpTime).getTime()
+      ) {
+        addError(
+          result,
+          21025,
+          `order.updated_at cannot be less than pickup timestamp`
+        );
       }
     }
 
@@ -314,7 +470,11 @@ const validatePickupTimestamps = async (
       TTL_IN_SECONDS
     );
   } catch (err: any) {
-    addError(result, 21026, `Error validating pickup timestamps: ${err.message}`);
+    addError(
+      result,
+      21026,
+      `Error validating pickup timestamps: ${err.message}`
+    );
   }
 };
 
@@ -329,8 +489,11 @@ async function validateBilling(
   const billingErrors = billing && compareObjects(billing, order.billing);
   if (billingErrors) {
     billingErrors.forEach((error: any) =>
-      addError(result, ERROR_CODES.INVALID_RESPONSE, `${error} when compared with confirm billing object in /${currentCall}`)
-     
+      addError(
+        result,
+        ERROR_CODES.INVALID_RESPONSE,
+        `${error} when compared with confirm billing object in /${currentCall}`
+      )
     );
   }
 }
@@ -346,18 +509,36 @@ const validateOutForDeliveryTimestamps = async (
     const outforDeliveryTimestamps: any = {};
     for (const fulfillment of order.fulfillments || []) {
       if (fulfillment.type !== "Delivery") continue;
-      if (fulfillment.state?.descriptor?.code !== constants.ORDER_OUT_FOR_DELIVERY) continue;
+      if (
+        fulfillment.state?.descriptor?.code !== constants.ORDER_OUT_FOR_DELIVERY
+      )
+        continue;
 
       const outForDeliveryTime = fulfillment.start?.time?.timestamp;
       outforDeliveryTimestamps[fulfillment.id] = outForDeliveryTime;
 
       const contextTime = new Date(context.timestamp).getTime();
-      if (outForDeliveryTime && new Date(outForDeliveryTime).getTime() > contextTime) {
-        addError(result, 21027, `out-for-delivery timestamp cannot be future dated in /${constants.ON_STATUS}`);
+      if (
+        outForDeliveryTime &&
+        new Date(outForDeliveryTime).getTime() > contextTime
+      ) {
+        addError(
+          result,
+          21027,
+          `out-for-delivery timestamp cannot be future dated in /${constants.ON_STATUS}`
+        );
       }
 
-      if (outForDeliveryTime && new Date(order.updated_at).getTime() < new Date(outForDeliveryTime).getTime()) {
-        addError(result, 21028, `order.updated_at cannot be less than out-for-delivery timestamp`);
+      if (
+        outForDeliveryTime &&
+        new Date(order.updated_at).getTime() <
+          new Date(outForDeliveryTime).getTime()
+      ) {
+        addError(
+          result,
+          21028,
+          `order.updated_at cannot be less than out-for-delivery timestamp`
+        );
       }
     }
 
@@ -367,7 +548,11 @@ const validateOutForDeliveryTimestamps = async (
       TTL_IN_SECONDS
     );
   } catch (err: any) {
-    addError(result, 21029, `Error validating out-for-delivery timestamps: ${err.message}`);
+    addError(
+      result,
+      21029,
+      `Error validating out-for-delivery timestamps: ${err.message}`
+    );
   }
 };
 
@@ -382,13 +567,21 @@ const validatePayment = async (
   try {
     const quotePrice = parseFloat(quote.price.value);
     if (parseFloat(payment.params.amount) !== quotePrice) {
-      addError(result, 21030, `Payment amount ${payment.params.amount} does not match quote price ${quotePrice} in /${currentCall}`);
+      addError(
+        result,
+        21030,
+        `Payment amount ${payment.params.amount} does not match quote price ${quotePrice} in /${currentCall}`
+      );
     }
 
     const prevPaymentRaw = await getRedisValue(`${txnId}_prevPayment`);
-    const prevPayment = prevPaymentRaw
+    const prevPayment = prevPaymentRaw;
     if (prevPayment && !compareObjects(prevPayment, payment)) {
-      addError(result, 21031, `payment object mismatches with previous call in /${currentCall}`);
+      addError(
+        result,
+        21031,
+        `payment object mismatches with previous call in /${currentCall}`
+      );
     }
   } catch (err: any) {
     addError(result, 21032, `Error validating payment: ${err.message}`);
@@ -411,13 +604,22 @@ const validateQuote = async (
 
     const quotePrice = parseFloat(quote.price.value);
     if (Math.round(quotePrice) !== Math.round(breakupPrice)) {
-      addError(result, 21033, `Quoted Price ${quotePrice} does not match breakup price ${breakupPrice} in /${currentCall}`);
+      addError(
+        result,
+        21033,
+        `Quoted Price ${quotePrice} does not match breakup price ${breakupPrice} in /${currentCall}`
+      );
     }
 
     const prevQuoteRaw = await getRedisValue(`${txnId}_quoteObj`);
-    const prevQuote = prevQuoteRaw 
+    const prevQuote = prevQuoteRaw;
     if (prevQuote) {
-      const quoteErrors = compareQuoteObjects(prevQuote, quote, prevCall || constants.ON_CONFIRM, currentCall);
+      const quoteErrors = compareQuoteObjects(
+        prevQuote,
+        quote,
+        prevCall || constants.ON_CONFIRM,
+        currentCall
+      );
       quoteErrors?.forEach((error: string) => {
         addError(result, 21034, `quote: ${error}`);
       });
@@ -435,47 +637,78 @@ const validateItems = async (
   result: any[]
 ): Promise<void> => {
   try {
-    const [itemFlfllmntsRaw, itemsIdListRaw, parentItemIdSetRaw, fulfillmentIdArrayRaw] = await Promise.all([
+    const [
+      itemFlfllmntsRaw,
+      itemsIdListRaw,
+      parentItemIdSetRaw,
+      fulfillmentIdArrayRaw,
+    ] = await Promise.all([
       getRedisValue(`${txnId}_itemFlfllmnts`),
       getRedisValue(`${txnId}_itemsIdList`),
       getRedisValue(`${txnId}_parentItemIdSet`),
       getRedisValue(`${txnId}_fulfillmentIdArray`),
     ]);
 
-    const itemFlfllmnts = itemFlfllmntsRaw 
-    const itemsIdList = itemsIdListRaw 
-    const parentItemIdSet = parentItemIdSetRaw 
+    const itemFlfllmnts = itemFlfllmntsRaw;
+    const itemsIdList = itemsIdListRaw;
+    const parentItemIdSet = parentItemIdSetRaw;
     let itemsCountChange = false;
     const updatedItemsIdList = { ...itemsIdList };
-
 
     items.forEach((item: any, i: number) => {
       const itemId = item.id;
       console.log();
       if (!itemsIdList || !(itemId in itemsIdList)) {
-        addError(result, 21036, `Item Id ${itemId} does not exist in /${prevCall || constants.ON_SELECT}`);
+        addError(
+          result,
+          21036,
+          `Item Id ${itemId} does not exist in /${
+            prevCall || constants.ON_SELECT
+          }`
+        );
       }
 
-      if (itemsIdList && itemId in itemsIdList && item.quantity.count !== itemsIdList[itemId]) {
+      if (
+        itemsIdList &&
+        itemId in itemsIdList &&
+        item.quantity.count !== itemsIdList[itemId]
+      ) {
         updatedItemsIdList[itemId] = item.quantity.count;
         itemsCountChange = true;
-        addError(result, 21037, `Warning: items[${i}].quantity.count for item ${itemId} mismatches with /${constants.SELECT}`);
+        addError(
+          result,
+          21037,
+          `Warning: items[${i}].quantity.count for item ${itemId} mismatches with /${constants.SELECT}`
+        );
       }
-      console.log('Itemfuiffl2122', itemFlfllmnts);
-       if (item.fulfillment_id &&   itemFlfllmnts[itemId] != item.fulfillment_id) {
-              addError(result, 20026, `items[${i}].fulfillment_id mismatches for Item ${itemId} in /${constants.ON_SELECT} and /${constants.ON_CONFIRM}`);
-            }
-
-      if (parentItemIdSet && item.parent_item_id && !parentItemIdSet.includes(item.parent_item_id)) {
-        addError(result, 21038, `items[${i}].parent_item_id ${item.parent_item_id} not found in /${constants.ON_SEARCH}`);
+      console.log("Itemfuiffl2122", itemFlfllmnts);
+      if (item.fulfillment_id && itemFlfllmnts[itemId] != item.fulfillment_id) {
+        addError(
+          result,
+          20026,
+          `items[${i}].fulfillment_id mismatches for Item ${itemId} in /${constants.ON_SELECT} and /${constants.ON_CONFIRM}`
+        );
       }
 
-
-      
+      if (
+        parentItemIdSet &&
+        item.parent_item_id &&
+        !parentItemIdSet.includes(item.parent_item_id)
+      ) {
+        addError(
+          result,
+          21038,
+          `items[${i}].parent_item_id ${item.parent_item_id} not found in /${constants.ON_SEARCH}`
+        );
+      }
     });
 
     if (itemsCountChange) {
-      await RedisService.setKey(`${txnId}_itemsIdList`, JSON.stringify(updatedItemsIdList), TTL_IN_SECONDS);
+      await RedisService.setKey(
+        `${txnId}_itemsIdList`,
+        JSON.stringify(updatedItemsIdList),
+        TTL_IN_SECONDS
+      );
     }
   } catch (err: any) {
     addError(result, 21040, `Error validating items: ${err.message}`);
@@ -541,19 +774,24 @@ async function validateFulfillmentsPending(
       ? JSON.parse(onConfirmTimestampRaw)
       : null;
     const providerAddr = providerAddrRaw ? JSON.parse(providerAddrRaw) : null;
-     const fulfillmentIdArrayRaw : any = await RedisService.getKey(`${transaction_id}_fulfillmentIdArray`);
+    const fulfillmentIdArrayRaw: any = await RedisService.getKey(
+      `${transaction_id}_fulfillmentIdArray`
+    );
     const fulfillmentIdArray = fulfillmentIdArrayRaw
       ? JSON.parse(fulfillmentIdArrayRaw)
       : null;
     // Check for duplicate fulfillment IDs
     const fulfillmentIds = new Set();
     for (const ff of order?.fulfillments || []) {
-   
       if (fulfillmentIds.has(ff.id)) {
         console.info(
           `Duplicate fulfillment ID ${ff.id} in /${currCall} for transaction ${transaction_id}`
         );
-        addError(result, ERROR_CODES.INVALID_RESPONSE, `Duplicate fulfillment ID ${ff.id} in /${currCall}`);
+        addError(
+          result,
+          ERROR_CODES.INVALID_RESPONSE,
+          `Duplicate fulfillment ID ${ff.id} in /${currCall}`
+        );
       }
       fulfillmentIds.add(ff.id);
     }
@@ -566,10 +804,14 @@ async function validateFulfillmentsPending(
 
     for (const ff of order?.fulfillments || []) {
       const ffId = ff?.id || "unknown";
-       if (!fulfillmentIdArray?.includes(ffId)) {
-            addError(result, 20034, `fulfillment id ${ffId} does not exist in /${constants.ON_SELECT}`);
-            continue
-          }
+      if (!fulfillmentIdArray?.includes(ffId)) {
+        addError(
+          result,
+          20034,
+          `fulfillment id ${ffId} does not exist in /${constants.ON_SELECT}`
+        );
+        continue;
+      }
       // Basic validations
       if (!ff?.type) {
         console.info(
@@ -645,7 +887,6 @@ async function validateFulfillmentsPending(
             ERROR_CODES.INVALID_RESPONSE,
             `Tracking must be a boolean (true or false) for fulfillment ID ${ffId}`
           );
-
         } else {
           try {
             const ffTrackingRaw = await RedisService.getKey(
@@ -656,20 +897,32 @@ async function validateFulfillmentsPending(
               console.info(
                 `Tracking mismatch for fulfillment ID ${ffId} in /${currCall} for transaction ${transaction_id}`
               );
-              addError(result, ERROR_CODES.INVALID_RESPONSE, `Fulfillment Tracking mismatch with /${constants.ON_CONFIRM} for ID ${ffId} (expected ${ffTracking}, got ${ff.tracking})`);
+              addError(
+                result,
+                ERROR_CODES.INVALID_RESPONSE,
+                `Fulfillment Tracking mismatch with /${constants.ON_CONFIRM} for ID ${ffId} (expected ${ffTracking}, got ${ff.tracking})`
+              );
             }
           } catch (error: any) {
             console.error(
               `Error fetching tracking for fulfillment ID ${ffId} in /${currCall} for transaction ${transaction_id}: ${error.message}`
             );
-            addError(result, ERROR_CODES.INTERNAL_ERROR, `Error validating tracking for fulfillment ID ${ffId}`);
+            addError(
+              result,
+              ERROR_CODES.INTERNAL_ERROR,
+              `Error validating tracking for fulfillment ID ${ffId}`
+            );
           }
         }
       } else if (ff?.tracking !== undefined) {
         console.info(
           `Tracking key present for Cancel fulfillment ID ${ffId} in /${currCall} for transaction ${transaction_id}`
         );
-        addError(result, ERROR_CODES.INVALID_RESPONSE, `Tracking key must not be present for Cancel fulfillment ID ${ffId}`);
+        addError(
+          result,
+          ERROR_CODES.INVALID_RESPONSE,
+          `Tracking key must not be present for Cancel fulfillment ID ${ffId}`
+        );
       }
 
       // State validations
@@ -708,7 +961,6 @@ async function validateFulfillmentsPending(
           ERROR_CODES.INVALID_RESPONSE,
           `fulfillments[${ffId}].state.descriptor.short_desc must be a string`
         );
-
       }
 
       // Location validations
@@ -810,19 +1062,19 @@ async function validateFulfillmentsPending(
                 );
               }
             }
-            if(providerAddr){
-              const providerAddError = compareObjects(ff.start.location.address, providerAddr)
+            if (providerAddr) {
+              const providerAddError = compareObjects(
+                ff.start.location.address,
+                providerAddr
+              );
               providerAddError?.forEach((error: string) => {
                 addError(
                   result,
                   ERROR_CODES.INVALID_RESPONSE,
                   `fulfillments[${ffId}].start.location.address error:${error} `
                 );
-               
-              }
-              );
+              });
             }
-           
           }
 
           if (!ff?.end?.location?.address) {
@@ -1364,7 +1616,11 @@ async function validateFulfillmentsPacked(
 
   for (const ff of order.fulfillments || []) {
     if (!ff.id) {
-      addError(result, ERROR_CODES.INVALID_RESPONSE, `Fulfillment Id must be present`);
+      addError(
+        result,
+        ERROR_CODES.INVALID_RESPONSE,
+        `Fulfillment Id must be present`
+      );
     }
 
     if (!ff.type) {
@@ -1402,7 +1658,9 @@ async function validateFulfillmentsPacked(
         addError(
           result,
           ERROR_CODES.INVALID_RESPONSE,
-          `Fulfillment id ${ff.id || "missing"} does not exist in /${constants.ON_SELECT}`
+          `Fulfillment id ${ff.id || "missing"} does not exist in /${
+            constants.ON_SELECT
+          }`
         );
       }
 
@@ -1667,7 +1925,11 @@ async function validateFulfillmentsPicked(
 
   for (const ff of order.fulfillments || []) {
     if (!ff.id) {
-      addError(result, ERROR_CODES.INVALID_RESPONSE, `Fulfillment Id must be present`);
+      addError(
+        result,
+        ERROR_CODES.INVALID_RESPONSE,
+        `Fulfillment Id must be present`
+      );
     }
 
     if (!ff.type) {
@@ -1705,7 +1967,9 @@ async function validateFulfillmentsPicked(
         addError(
           result,
           ERROR_CODES.INVALID_RESPONSE,
-          `Fulfillment id ${ff.id || "missing"} does not exist in /${constants.ON_SELECT}`
+          `Fulfillment id ${ff.id || "missing"} does not exist in /${
+            constants.ON_SELECT
+          }`
         );
       }
 
@@ -2003,7 +2267,11 @@ async function validateFulfillmentsOutDelivery(
   for (const fulfillment of order.fulfillments || []) {
     const ff = fulfillment;
     if (!ff.id) {
-      addError(result, ERROR_CODES.INVALID_RESPONSE, `Fulfillment Id must be present`);
+      addError(
+        result,
+        ERROR_CODES.INVALID_RESPONSE,
+        `Fulfillment Id must be present`
+      );
     }
 
     if (!ff.type) {
@@ -2041,7 +2309,9 @@ async function validateFulfillmentsOutDelivery(
         addError(
           result,
           ERROR_CODES.INVALID_RESPONSE,
-          `Fulfillment id ${ff.id || "missing"} does not exist in /${constants.ON_SELECT}`
+          `Fulfillment id ${ff.id || "missing"} does not exist in /${
+            constants.ON_SELECT
+          }`
         );
       }
 
@@ -2338,7 +2608,11 @@ async function validateFulfillmentsDelivered(
 
   for (const ff of order.fulfillments || []) {
     if (!ff.id) {
-      addError(result, ERROR_CODES.INVALID_RESPONSE, `Fulfillment Id must be present`);
+      addError(
+        result,
+        ERROR_CODES.INVALID_RESPONSE,
+        `Fulfillment Id must be present`
+      );
     }
 
     if (!ff.type) {
@@ -2375,7 +2649,9 @@ async function validateFulfillmentsDelivered(
       addError(
         result,
         ERROR_CODES.INVALID_RESPONSE,
-        `Fulfillment id ${ff.id || "missing"} does not exist in /${constants.ON_SELECT}`
+        `Fulfillment id ${ff.id || "missing"} does not exist in /${
+          constants.ON_SELECT
+        }`
       );
     }
 
@@ -2592,18 +2868,23 @@ async function validateFulfillmentsDelivered(
   }
 }
 
-
 export const onStatus = async (data: any) => {
   const { context, message } = data;
-  const result: any[] = [];
+  let result: any[] = [];
   const txnId = context?.transaction_id;
   const order = message.order;
   const fulfillments = order.fulfillments;
 
-  let fulfillmentsItemsSetRaw = await getRedisValue(`${txnId}_fulfillmentsItemsSet`);
-  let fulfillmentsItemsSet = new Set(fulfillmentsItemsSetRaw ? fulfillmentsItemsSetRaw: []);
+  let fulfillmentsItemsSetRaw = await getRedisValue(
+    `${txnId}_fulfillmentsItemsSet`
+  );
+  let fulfillmentsItemsSet = new Set(
+    fulfillmentsItemsSetRaw ? fulfillmentsItemsSetRaw : []
+  );
 
-  const deliveryFulfillment = fulfillments.find((ff: any) => ff.type === "Delivery");
+  const deliveryFulfillment = fulfillments.find(
+    (ff: any) => ff.type === "Delivery"
+  );
   const rtoFulfillment = fulfillments.find((ff: any) => ff.type === "RTO");
   let state = "";
   if (!_.isEmpty(rtoFulfillment)) {
@@ -2611,8 +2892,6 @@ export const onStatus = async (data: any) => {
   } else {
     state = deliveryFulfillment?.state?.descriptor?.code;
   }
-
- 
 
   try {
     let currentCall: string;
@@ -2639,53 +2918,94 @@ export const onStatus = async (data: any) => {
         currentCall = ApiSequence.ON_STATUS_DELIVERED;
         prevCall = ApiSequence.ON_STATUS_OUT_FOR_DELIVERY;
         break;
-      // case "RTO-Disposed":
-    
+      case "RTO-Disposed":
+      case "RTO-Delivered":
+        result = await checkOnStatusRTODelivered(data);
+        return result;
       default:
         addError(result, 21041, `Invalid on_status state: ${state}`);
         return result;
     }
 
-     try {
-    await contextChecker(context, result, currentCall, prevCall);
-  } catch (err: any) {
-    addError(result, 21000, `Error checking context: ${err.message}`);
-    return result;
-  }
+    try {
+      await contextChecker(context, result, currentCall, prevCall);
+    } catch (err: any) {
+      addError(result, 21000, `Error checking context: ${err.message}`);
+      return result;
+    }
 
-   switch(state){
-     case "Pending":
-       await validateFulfillmentsPending(order, txnId, fulfillmentsItemsSet, result, currentCall);
-       break;
-     case "Packed":
-       await validateFulfillmentsPacked(order, txnId, state, fulfillmentsItemsSet, result);
-       break;
-     case "Order-picked-up":
-       await validateFulfillmentsPicked(order, txnId, state, fulfillmentsItemsSet, result);
-       break;
-     case "Out-for-delivery":
-       await validateFulfillmentsOutDelivery(order, txnId, state, fulfillmentsItemsSet, result);
-       break;
-     case "Order-delivered":
-       await validateFulfillmentsDelivered(order, txnId, state, fulfillmentsItemsSet, result);
-       break;
-
-   }
+    switch (state) {
+      case "Pending":
+        await validateFulfillmentsPending(
+          order,
+          txnId,
+          fulfillmentsItemsSet,
+          result,
+          currentCall
+        );
+        break;
+      case "Packed":
+        await validateFulfillmentsPacked(
+          order,
+          txnId,
+          state,
+          fulfillmentsItemsSet,
+          result
+        );
+        break;
+      case "Order-picked-up":
+        await validateFulfillmentsPicked(
+          order,
+          txnId,
+          state,
+          fulfillmentsItemsSet,
+          result
+        );
+        break;
+      case "Out-for-delivery":
+        await validateFulfillmentsOutDelivery(
+          order,
+          txnId,
+          state,
+          fulfillmentsItemsSet,
+          result
+        );
+        break;
+      case "Order-delivered":
+        await validateFulfillmentsDelivered(
+          order,
+          txnId,
+          state,
+          fulfillmentsItemsSet,
+          result
+        );
+        break;
+    }
 
     await Promise.all([
       validateOrder(txnId, order, context, currentCall, result),
       validatePayment(txnId, order.payment, order.quote, currentCall, result),
       validateQuote(txnId, order.quote, currentCall, prevCall, result),
       validateItems(txnId, order.items, currentCall, prevCall, result),
-      state === "Order-delivered" ? validateDeliveryTimestamps(txnId, order, context, result) : Promise.resolve(),
-      state === "Order-picked-up" ? validatePickupTimestamps(txnId, order, context, result) : Promise.resolve(),
-      state === "Out-for-delivery" ? validateOutForDeliveryTimestamps(txnId, order, context, result) : Promise.resolve(),
+      state === "Order-delivered"
+        ? validateDeliveryTimestamps(txnId, order, context, result)
+        : Promise.resolve(),
+      state === "Order-picked-up"
+        ? validatePickupTimestamps(txnId, order, context, result)
+        : Promise.resolve(),
+      state === "Out-for-delivery"
+        ? validateOutForDeliveryTimestamps(txnId, order, context, result)
+        : Promise.resolve(),
       storeOrder(txnId, order, result),
       storeFulfillments(txnId, fulfillments, currentCall, result),
       storePayment(txnId, order.payment, result),
       storeQuote(txnId, order.quote, result),
       validateBilling(order, txnId, currentCall, result),
-      RedisService.setKey(`${txnId}_${currentCall}`, JSON.stringify(data), TTL_IN_SECONDS),
+      RedisService.setKey(
+        `${txnId}_${currentCall}`,
+        JSON.stringify(data),
+        TTL_IN_SECONDS
+      ),
     ]);
 
     return result;

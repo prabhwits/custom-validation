@@ -273,7 +273,8 @@ export const checkOnUpdate = async (
     }
 
     // Check settlement details
-    try {context.timestamp, on_update.updated_at
+    try {
+      context.timestamp, on_update.updated_at;
       console.info(`Checking for settlement_details in /message/order/payment`);
       const settlement_details: any =
         on_update.payment["@ondc/org/settlement_details"];
@@ -517,7 +518,7 @@ export const checkOnUpdate = async (
       if (quoteTrailSum !== 0) {
         await RedisService.setKey(
           `${transaction_id}_quoteTrailSum`,
-          String(quoteTrailSum),
+          quoteTrailSum.toFixed(2),
           TTL_IN_SECONDS
         );
       }
@@ -589,58 +590,6 @@ export const checkOnUpdate = async (
 
     // Flow 6-b and 6-c checks
     if (flow === "6-b") {
-      try {
-        const timestampOnUpdatePartCancel = await getRedisValue(
-          transaction_id,
-          `${ApiSequence.ON_UPDATE_PART_CANCEL}_tmpstmp`
-        );
-
-        const timeDif = timeDiff(
-          context.timestamp,
-          timestampOnUpdatePartCancel
-        );
-        if (timeDif <= 0) {
-          result.push({
-            valid: false,
-            code: 20009,
-            description: `context/timestamp of /${apiSeq} should be greater than /${ApiSequence.ON_UPDATE_PART_CANCEL} context/timestamp`,
-          });
-        }
-
-        const timestamp = await getRedisValue(transaction_id, "timestamp_");
-
-        if (timestamp && timestamp.length !== 0) {
-          const timeDif2 = timeDiff(context.timestamp, timestamp[0]);
-          if (timeDif2 <= 0) {
-            result.push({
-              valid: false,
-              code: 20009,
-              description: `context/timestamp of /${apiSeq} should be greater than context/timestamp of /${timestamp[1]}`,
-            });
-          }
-        } else {
-          result.push({
-            valid: false,
-            code: 20009,
-            description: `context/timestamp of the previous call is missing or the previous action call itself is missing`,
-          });
-        }
-        await RedisService.setKey(
-          `${transaction_id}_timestamp_`,
-          JSON.stringify([context.timestamp, apiSeq]),
-          TTL_IN_SECONDS
-        );
-      } catch (e: any) {
-        console.error(
-          `Error while checking context/timestamp for the /${apiSeq} ${e.stack}`
-        );
-        result.push({
-          valid: false,
-          code: 23001,
-          description: `Error checking timestamp for /${apiSeq}: ${e}`,
-        });
-      }
-
       // Check order state for 6-b and 6-c
       try {
         if (on_update.state !== "Completed") {
