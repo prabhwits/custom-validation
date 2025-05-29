@@ -17,6 +17,7 @@ import {
   return_rejected_request_reasonCodes,
   return_request_reasonCodes,
 } from "../../../../../utils/reasonCode";
+import { contextChecker } from "../../../../../utils/contextUtils";
 
 const TTL_IN_SECONDS: number = Number(process.env.TTL_IN_SECONDS) || 3600;
 
@@ -25,6 +26,13 @@ interface ValidationError {
   code: number;
   description: string;
 }
+// addError function
+const addError = (description: string, code: number): ValidationError => ({
+  valid: false,
+  code,
+  description,
+});
+
 
 // Helper function to retrieve and parse Redis value
 async function getRedisValue(
@@ -52,35 +60,23 @@ export const checkOnUpdate = async (
   transaction_id: string
 ): Promise<ValidationError[]> => {
   const result: ValidationError[] = [];
-
+ const { message, context }: any = data;
   try {
-    // Check for empty or invalid JSON
-    if (!data || isObjectEmpty(data)) {
-      result.push({
-        valid: false,
-        code: 20006,
-        description: `${ApiSequence.ON_UPDATE}: JSON cannot be empty`,
-      });
-      return result;
-    }
+     try {
+        await contextChecker(context, result, constants.ON_CONFIRM, constants.CONFIRM);
+      } catch (err: any) {
+        result.push(
+    addError( `Error checking context: ${err.message}`, 20000)
+        )
+        
+        return result;
+      }
+   
 
-    const { message, context }: any = data;
+   
     const on_update = message.order;
 
-    // Check for missing fields
-    if (
-      !message ||
-      !context ||
-      isObjectEmpty(message) ||
-      isObjectEmpty(message.order)
-    ) {
-      result.push({
-        valid: false,
-        code: 20006,
-        description: "/context, /message, /message/order is missing or empty",
-      });
-      return result;
-    }
+   
 
     // Validate quote breakup
     try {
@@ -273,7 +269,8 @@ export const checkOnUpdate = async (
     }
 
     // Check settlement details
-    try {context.timestamp, on_update.updated_at
+    try {
+      context.timestamp, on_update.updated_at;
       console.info(`Checking for settlement_details in /message/order/payment`);
       const settlement_details: any =
         on_update.payment["@ondc/org/settlement_details"];
@@ -517,7 +514,7 @@ export const checkOnUpdate = async (
       if (quoteTrailSum !== 0) {
         await RedisService.setKey(
           `${transaction_id}_quoteTrailSum`,
-          String(quoteTrailSum),
+          quoteTrailSum.toFixed(2),
           TTL_IN_SECONDS
         );
       }
@@ -589,58 +586,6 @@ export const checkOnUpdate = async (
 
     // Flow 6-b and 6-c checks
     if (flow === "6-b") {
-      try {
-        const timestampOnUpdatePartCancel = await getRedisValue(
-          transaction_id,
-          `${ApiSequence.ON_UPDATE_PART_CANCEL}_tmpstmp`
-        );
-
-        const timeDif = timeDiff(
-          context.timestamp,
-          timestampOnUpdatePartCancel
-        );
-        if (timeDif <= 0) {
-          result.push({
-            valid: false,
-            code: 20009,
-            description: `context/timestamp of /${apiSeq} should be greater than /${ApiSequence.ON_UPDATE_PART_CANCEL} context/timestamp`,
-          });
-        }
-
-        const timestamp = await getRedisValue(transaction_id, "timestamp_");
-
-        if (timestamp && timestamp.length !== 0) {
-          const timeDif2 = timeDiff(context.timestamp, timestamp[0]);
-          if (timeDif2 <= 0) {
-            result.push({
-              valid: false,
-              code: 20009,
-              description: `context/timestamp of /${apiSeq} should be greater than context/timestamp of /${timestamp[1]}`,
-            });
-          }
-        } else {
-          result.push({
-            valid: false,
-            code: 20009,
-            description: `context/timestamp of the previous call is missing or the previous action call itself is missing`,
-          });
-        }
-        await RedisService.setKey(
-          `${transaction_id}_timestamp_`,
-          JSON.stringify([context.timestamp, apiSeq]),
-          TTL_IN_SECONDS
-        );
-      } catch (e: any) {
-        console.error(
-          `Error while checking context/timestamp for the /${apiSeq} ${e.stack}`
-        );
-        result.push({
-          valid: false,
-          code: 23001,
-          description: `Error checking timestamp for /${apiSeq}: ${e}`,
-        });
-      }
-
       // Check order state for 6-b and 6-c
       try {
         if (on_update.state !== "Completed") {

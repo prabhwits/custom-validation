@@ -6,6 +6,7 @@ import {
   isPresentInRedisSet,
 } from "../../../../../utils/helper";
 import { return_request_reasonCodes } from "../../../../../utils/constants/reasonCode";
+import { contextChecker } from "../../../../../utils/contextUtils";
 
 const TTL_IN_SECONDS: number = Number(process.env.TTL_IN_SECONDS) || 3600;
 
@@ -31,14 +32,12 @@ const ERROR_CODES = {
   FULFILLMENT_CANNOT_UPDATE: 50008, // Fulfillment cannot be updated (SNP)
 };
 
-// ValidationError interface
 interface ValidationError {
   valid: boolean;
   code: number;
   description: string;
 }
 
-// addError function
 const addError = (description: string, code: number): ValidationError => ({
   valid: false,
   code,
@@ -52,23 +51,22 @@ export const checkUpdate = async (
   targetFf: string
 ) => {
   const result: ValidationError[] = [];
+  const { message, context }: any = data;
   try {
-    if (!data || isObjectEmpty(data)) {
-      return [
-        addError("JSON cannot be empty", ERROR_CODES.FEATURE_NOT_SUPPORTED_BNP),
-      ];
-    }
+     try {
+        await contextChecker(context, result, constants.UPDATE, constants.ON_CONFIRM);
+      } catch (err: any) {
+        result.push(
+ addError(
+                `Error checking context: ${err.message}`,
+                ERROR_CODES.INVALID_ORDER
+              )
+        )
+        
+        return result;
+      }
 
-    const { message, context }: any = data;
-    if (!message || !context || isObjectEmpty(message)) {
-      return [
-        addError(
-          "/context, /message, is missing or empty",
-          ERROR_CODES.FEATURE_NOT_SUPPORTED_BNP
-        ),
-      ];
-    }
-
+  
     const update = message.order;
     if (targetFf === "payment") {
       try {

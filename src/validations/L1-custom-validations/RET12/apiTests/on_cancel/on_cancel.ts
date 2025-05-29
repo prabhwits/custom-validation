@@ -14,231 +14,42 @@ import {
   addMsgIdToRedisSet,
 } from "../../../../../utils/helper";
 import { RedisService } from "ondc-automation-cache-lib";
+import { contextChecker } from "../../../../../utils/contextUtils";
 
 interface ValidationResult {
   valid: boolean;
   code: number;
   description: string;
 }
-
+const addError = (result: any[], code: number, description: string): void => {
+  result.push({
+    valid: false,
+    code,
+    description,
+  });
+};
 export const onCancel = async (
   data: any,
   flow: string
 ): Promise<ValidationResult[]> => {
   const TTL_IN_SECONDS: number = Number(process.env.TTL_IN_SECONDS) || 3600;
   const results: ValidationResult[] = [];
-
+  const { message, context } = data;
   try {
-    // Check if data is empty or invalid
-    if (!data || isObjectEmpty(data)) {
-      return [
-        {
-          valid: false,
-          code: 20006,
-          description: `JSON cannot be empty in /${constants.ON_CANCEL}`,
-        },
-      ];
-    }
 
-    const { message, context } = data;
-    if (
-      !message ||
-      !context ||
-      !message.order ||
-      isObjectEmpty(message) ||
-      isObjectEmpty(message.order)
-    ) {
-      return [
-        {
-          valid: false,
-          code: 20006,
-          description: `/context, /message, /order or /message/order is missing or empty in /${constants.ON_CANCEL}`,
-        },
-      ];
-    }
-
+    try {
+          await contextChecker(context, results, constants.ON_CANCEL, constants.CANCEL);
+        } catch (err: any) {
+          addError(results, 20000, `Error checking context: ${err.message}`);
+          return results;
+        }
+      
     const transaction_id = context.transaction_id;
     const on_cancel = message.order;
 
-    // Validate context
-    try {
-      const contextRes = checkContext(context, constants.ON_CANCEL);
-      if (!contextRes?.valid) {
-        const errors = contextRes?.ERRORS;
+   
 
-        Object.keys(errors).forEach((key: any) => {
-          results.push({
-            valid: false,
-            code: 20006,
-            description: errors[key],
-          });
-        });
-      }
-    } catch (error: any) {
-      console.error(
-        `Error while checking context for /${constants.ON_CANCEL}: ${error.stack}`
-      );
-      results.push({
-        valid: false,
-        code: 23001,
-        description: `Internal Error - The response could not be processed due to an internal error. The SNP should retry the request. /${constants.ON_CANCEL}`,
-      });
-    }
-
-    // Validate BAP and BPP IDs
-    if (checkBppIdOrBapId(context.bap_id)) {
-      results.push({
-        valid: false,
-        code: 20006,
-        description: "context/bap_id should not be a URL",
-      });
-    }
-    if (checkBppIdOrBapId(context.bpp_id)) {
-      results.push({
-        valid: false,
-        code: 20006,
-        description: "context/bpp_id should not be a URL",
-      });
-    }
-
-    // Validate message ID
-    try {
-      console.info(`Checking Message Id for /${constants.ON_CANCEL}`);
-      if (flow === "4") {
-        const cancelMsgId = await RedisService.getKey(
-          `${transaction_id}_${ApiSequence.CANCEL}_msgId`
-        );
-
-        if (!_.isEqual(cancelMsgId, context.message_id)) {
-          results.push({
-            valid: false,
-            code: 20008,
-            description: `Message IDs for /${constants.CANCEL} and /${constants.ON_CANCEL} should be the same`,
-          });
-        }
-        console.info(`Adding Message Id /${constants.CANCEL}`);
-        await RedisService.setKey(
-          `${transaction_id}_${ApiSequence.ON_CANCEL}_msgId`,
-          data.context.message_id,
-          TTL_IN_SECONDS
-        );
-      }
-      // for flow === "5"
-      else {
-        await RedisService.setKey(
-          `${transaction_id}_${ApiSequence.ON_CANCEL}_msgId`,
-          data.context.message_id,
-          TTL_IN_SECONDS
-        );
-
-        const isMsgIdNotPresent = await addMsgIdToRedisSet(
-          context.transaction_id,
-          context.message_id,
-          ApiSequence.ON_CANCEL
-        );
-        if (!isMsgIdNotPresent) {
-          results.push({
-            valid: false,
-            code: 20000,
-            description: `Message id should not be same with previous calls`,
-          });
-        }
-      }
-    } catch (error: any) {
-      console.error(
-        `Error while checking message ID for /${constants.ON_CANCEL}: ${error.stack}`
-      );
-      results.push({
-        valid: false,
-        code: 23001,
-        description: `Internal error during message ID validation in /${constants.ON_CANCEL}`,
-      });
-    }
-
-    // Validate domain
-    try {
-      const domain = await RedisService.getKey(`${transaction_id}_domain`);
-      if (domain && !_.isEqual(context.domain.split(":")[1], domain)) {
-        results.push({
-          valid: false,
-          code: 20006,
-          description: `Domain must be the same across all actions in /${constants.ON_CANCEL}`,
-        });
-      }
-    } catch (error: any) {
-      console.error(
-        `Error while checking domain for /${constants.ON_CANCEL}: ${error.stack}`
-      );
-      results.push({
-        valid: false,
-        code: 23001,
-        description: `Internal error during domain validation in /${constants.ON_CANCEL}`,
-      });
-    }
-
-    // Validate city
-    try {
-      console.info(
-        `Comparing city of /${constants.SEARCH} and /${constants.ON_CANCEL}`
-      );
-      const searchContextRaw = await RedisService.getKey(
-        `${transaction_id}_${ApiSequence.SEARCH}_context`
-      );
-      const searchContext = searchContextRaw
-        ? JSON.parse(searchContextRaw)
-        : null;
-      if (searchContext && !_.isEqual(searchContext.city, context.city)) {
-        results.push({
-          valid: false,
-          code: 20006,
-          description: `City code mismatch between /${constants.SEARCH} and /${constants.ON_CANCEL}`,
-        });
-      }
-    } catch (error: any) {
-      console.error(
-        `Error while comparing city for /${constants.SEARCH} and /${constants.ON_CANCEL}: ${error.stack}`
-      );
-      results.push({
-        valid: false,
-        code: 23001,
-        description: `Internal error during city validation in /${constants.ON_CANCEL}`,
-      });
-    }
-
-    // Validate timestamp
-    try {
-      console.info(
-        `Comparing timestamp of /${constants.ON_CONFIRM} and /${constants.ON_CANCEL}`
-      );
-      const onConfirmTimestampRaw = await RedisService.getKey(
-        `${transaction_id}_${ApiSequence.ON_CONFIRM}_tmpstmp`
-      );
-      const onConfirmTimestamp = onConfirmTimestampRaw
-        ? JSON.parse(onConfirmTimestampRaw)
-        : null;
-
-      if (onConfirmTimestamp && _.gte(onConfirmTimestamp, context.timestamp)) {
-        results.push({
-          valid: false,
-          code: 20009,
-          description: `Timestamp for /${constants.ON_CONFIRM} must be earlier than /${constants.ON_CANCEL}`,
-        });
-      }
-      await RedisService.setKey(
-        `${transaction_id}_${ApiSequence.ON_CANCEL}_tmpstmp`,
-        JSON.stringify(context.timestamp),
-        TTL_IN_SECONDS
-      );
-    } catch (error: any) {
-      console.error(
-        `Error while comparing timestamp for /${constants.ON_CONFIRM} and /${constants.ON_CANCEL}: ${error.stack}`
-      );
-      results.push({
-        valid: false,
-        code: 23001,
-        description: `Internal error during timestamp validation in /${constants.ON_CANCEL}`,
-      });
-    }
+   
 
     // Store on_cancel data
     try {
@@ -369,7 +180,6 @@ export const onCancel = async (
       });
     }
 
-    // Validate fulfillment IDs and item count
     try {
       console.info(
         `Checking fulfillment IDs and item count in /${constants.ON_CANCEL}`

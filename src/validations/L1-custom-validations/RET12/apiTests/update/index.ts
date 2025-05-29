@@ -4,21 +4,18 @@ import { ApiSequence } from "../../../../../utils/constants";
 import { checkUpdate } from "./update";
 import { checkOnUpdate } from "./on_update";
 
-// Interface for validation errors
 interface ValidationError {
   valid: boolean;
   code: number;
   description: string;
 }
 
-// Helper to create validation errors
 const addError = (code: number, description: string): ValidationError => ({
   valid: false,
   code,
   description,
 });
 
-// Helper to fetch and parse Redis set
 async function fetchRedisSet(
   transaction_id: string,
   key: string

@@ -1,19 +1,7 @@
-// import {
-//   search,
-//   onSearch,
-//   select,
-//   onSelect,
-//   init,
-//   onInit,
-//   confirm,
-//   onConfirm,
-//   onStatusRouter,
-//   cancel,
-//   onCancelRouter,
-// } from "../L1-custom-validations/apiTests/index";
-// import { onUpdateRouter, updateRouter } from "./apiTests/updat";
+import { cancel } from "./RET12/apiTests/cancel";
 import confirm from "./RET12/apiTests/confirm";
 import init from "./RET12/apiTests/init";
+import { onCancelRouter } from "./RET12/apiTests/on_cancel";
 import on_confirm from "./RET12/apiTests/on_confirm";
 import onInit from "./RET12/apiTests/on_init";
 import { onSearch } from "./RET12/apiTests/on_search";
@@ -21,6 +9,7 @@ import { onSelect } from "./RET12/apiTests/on_select";
 import { onStatus } from "./RET12/apiTests/on_status/on_status";
 import { search } from "./RET12/apiTests/search";
 import { select } from "./RET12/apiTests/select";
+import { onUpdateRouter, updateRouter } from "./RET12/apiTests/update";
 import { validationOutput } from "./types";
 
 export async function performL1CustomValidations(
@@ -60,18 +49,18 @@ export async function performL1CustomValidations(
     case "on_status":
       result = await onStatus(payload);
       break;
-    // case "cancel":
-    //   result = await cancel(payload);
-    //   break;
-    // case "on_cancel":
-    //   result = await onCancelRouter(payload);
-    //   break;
-    // case "update":
-    //   result = await updateRouter(payload);
-    //   break;
-    // case "on_update":
-    //   result = await onUpdateRouter(payload);
-    //   break;
+    case "cancel":
+      result = await cancel(payload);
+      break;
+    case "on_cancel":
+      result = await onCancelRouter(payload);
+      break;
+    case "update":
+      result = await updateRouter(payload);
+      break;
+    case "on_update":
+      result = await onUpdateRouter(payload);
+      break;
     default:
       result = [
         {
