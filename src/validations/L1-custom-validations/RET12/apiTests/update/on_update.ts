@@ -2,19 +2,13 @@ import _, { isEmpty } from "lodash";
 import { RedisService } from "ondc-automation-cache-lib";
 import constants, { ApiSequence } from "../../../../../utils/constants";
 import {
-  isObjectEmpty,
-  checkBppIdOrBapId,
-  checkContext,
   sumQuoteBreakUp,
-  payment_status,
   checkQuoteTrailSum,
   timeDiff,
-  addMsgIdToRedisSet,
   isPresentInRedisSet,
 } from "../../../../../utils/helper";
 import {
   partcancel_return_reasonCodes,
-  return_rejected_request_reasonCodes,
   return_request_reasonCodes,
 } from "../../../../../utils/reasonCode";
 import { contextChecker } from "../../../../../utils/contextUtils";
@@ -32,7 +26,6 @@ const addError = (description: string, code: number): ValidationError => ({
   code,
   description,
 });
-
 
 // Helper function to retrieve and parse Redis value
 async function getRedisValue(
@@ -60,23 +53,23 @@ export const checkOnUpdate = async (
   transaction_id: string
 ): Promise<ValidationError[]> => {
   const result: ValidationError[] = [];
- const { message, context }: any = data;
+  const { message, context }: any = data;
   try {
-     try {
-        await contextChecker(context, result, constants.ON_CONFIRM, constants.CONFIRM);
-      } catch (err: any) {
-        result.push(
-    addError( `Error checking context: ${err.message}`, 20000)
-        )
-        
-        return result;
-      }
-   
+    try {
+      await contextChecker(
+        context,
+        result,
+        constants.ON_UPDATE,
+        constants.ON_CONFIRM,
+        true
+      );
+    } catch (err: any) {
+      result.push(addError(`Error checking context: ${err.message}`, 20000));
 
-   
+      return result;
+    }
+
     const on_update = message.order;
-
-   
 
     // Validate quote breakup
     try {

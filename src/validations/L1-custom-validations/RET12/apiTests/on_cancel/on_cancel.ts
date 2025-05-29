@@ -36,20 +36,34 @@ export const onCancel = async (
   const results: ValidationResult[] = [];
   const { message, context } = data;
   try {
-
-    try {
-          await contextChecker(context, results, constants.ON_CANCEL, constants.CANCEL);
-        } catch (err: any) {
-          addError(results, 20000, `Error checking context: ${err.message}`);
-          return results;
-        }
-      
+    if (flow == "4") {
+      try {
+        await contextChecker(
+          context,
+          results,
+          constants.ON_CANCEL,
+          constants.CANCEL
+        );
+      } catch (err: any) {
+        addError(results, 20000, `Error checking context: ${err.message}`);
+        return results;
+      }
+    } else {
+      try {
+        await contextChecker(
+          context,
+          results,
+          constants.ON_CANCEL,
+          constants.ON_STATUS_OUT_FOR_DELIVERY,
+          true
+        );
+      } catch (err: any) {
+        addError(results, 20000, `Error checking context: ${err.message}`);
+        return results;
+      }
+    }
     const transaction_id = context.transaction_id;
     const on_cancel = message.order;
-
-   
-
-   
 
     // Store on_cancel data
     try {
@@ -75,14 +89,15 @@ export const onCancel = async (
         `Comparing order IDs in /${constants.ON_CANCEL} and /${constants.ON_CONFIRM}`
       );
 
-      const confirmOrderId = await RedisService.getKey(
-        `${transaction_id}_cnfrmOrdrId`
-      );
-      if (confirmOrderId !== on_cancel.id) {
+      let confirmOrderId =
+        (await RedisService.getKey(`${transaction_id}_cnfrmOrdrId`)) || "";
+      confirmOrderId = JSON.parse(confirmOrderId);
+      console.log("12345", confirmOrderId, on_cancel.id);
+      if (confirmOrderId != on_cancel.id) {
         results.push({
           valid: false,
           code: 20007,
-          description: `Order ID provided in /${constants.ON_CANCEL} was not found`,
+          description: `Order ID provided in /${constants.ON_CANCEL}, mismatch found `,
         });
       }
     } catch (error: any) {
@@ -387,15 +402,10 @@ export const onCancel = async (
                   }`,
                 });
               }
-              if (!ffStartOrEnd.contact.email) {
-                results.push({
-                  valid: false,
-                  code: 20006,
-                  description: `Fulfillment type Delivery ${startOrEnd.toLowerCase()}/contact/email is missing in /${
-                    constants.ON_CANCEL
-                  }`,
-                });
-              } else if (typeof ffStartOrEnd.contact.email !== "string") {
+              if (
+                ffStartOrEnd.contact.email &&
+                typeof ffStartOrEnd.contact.email !== "string"
+              ) {
                 results.push({
                   valid: false,
                   code: 20006,

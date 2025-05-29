@@ -15,11 +15,6 @@ import constants, {
   ROUTING_ENUMS,
 } from "../../../../../utils/constants";
 import checkOnStatusRTODelivered from "./on_status_rto_delivered";
-import constants, {
-  ApiSequence,
-  ROUTING_ENUMS,
-} from "../../../../../utils/constants";
-import checkOnStatusRTODelivered from "./on_status_rto_delivered";
 
 const TTL_IN_SECONDS: number = Number(process.env.TTL_IN_SECONDS) || 3600;
 const ERROR_CODES = {
@@ -548,6 +543,11 @@ const validateOutForDeliveryTimestamps = async (
     }
 
     await RedisService.setKey(
+      `${txnId}_PreviousUpdatedTimestamp`,
+      JSON.stringify(order.updated_at),
+      TTL_IN_SECONDS
+    );
+    await RedisService.setKey(
       `${txnId}_outforDeliveryTimestamps`,
       JSON.stringify(outforDeliveryTimestamps),
       TTL_IN_SECONDS
@@ -1067,8 +1067,8 @@ async function validateFulfillmentsPending(
                 );
               }
             }
-            if(providerAddr){
-              const providerAddError = compareObjects(ff.start, providerAddr)
+            if (providerAddr) {
+              const providerAddError = compareObjects(ff.start, providerAddr);
               providerAddError?.forEach((error: string) => {
                 addError(
                   result,
@@ -1438,8 +1438,6 @@ async function validateFulfillmentsPending(
           `fulfillments[${ffId}].end.instructions must be a string`
         );
       }
-
-     
     }
 
     try {
@@ -1584,17 +1582,13 @@ async function validateFulfillmentsPacked(
   fulfillmentsItemsSet: any,
   result: any
 ): Promise<void> {
-  const [
-    itemFlfllmntsRaw,
-    providerAddrRaw,
-    buyerGpsRaw,
-    buyerAddrRaw,
-  ] = await Promise.all([
-    RedisService.getKey(`${transaction_id}_itemFlfllmnts`),
-    RedisService.getKey(`${transaction_id}_providerAddr`),
-    RedisService.getKey(`${transaction_id}_buyerGps`),
-    RedisService.getKey(`${transaction_id}_buyerAddr`),
-  ]);
+  const [itemFlfllmntsRaw, providerAddrRaw, buyerGpsRaw, buyerAddrRaw] =
+    await Promise.all([
+      RedisService.getKey(`${transaction_id}_itemFlfllmnts`),
+      RedisService.getKey(`${transaction_id}_providerAddr`),
+      RedisService.getKey(`${transaction_id}_buyerGps`),
+      RedisService.getKey(`${transaction_id}_buyerAddr`),
+    ]);
   const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
   const providerAddr = providerAddrRaw ? JSON.parse(providerAddrRaw) : null;
   const buyerGps = buyerGpsRaw ? JSON.parse(buyerGpsRaw) : null;
@@ -1674,7 +1668,11 @@ async function validateFulfillmentsPacked(
         ff.start?.location?.gps &&
         !compareCoordinates(ff.start.location.gps, providerAddr?.location?.gps)
       ) {
-        console.log('ff.start.location.gps', ff.start.location.gps, providerAddr?.location?.gps);
+        console.log(
+          "ff.start.location.gps",
+          ff.start.location.gps,
+          providerAddr?.location?.gps
+        );
         addError(
           result,
           ERROR_CODES.INVALID_RESPONSE,
@@ -1684,7 +1682,10 @@ async function validateFulfillmentsPacked(
 
       if (
         !providerAddr?.location?.descriptor?.name ||
-        !_.isEqual(ff.start?.location?.descriptor?.name, providerAddr?.location?.descriptor?.name)
+        !_.isEqual(
+          ff.start?.location?.descriptor?.name,
+          providerAddr?.location?.descriptor?.name
+        )
       ) {
         addError(
           result,
@@ -1830,18 +1831,14 @@ async function validateFulfillmentsPicked(
   fulfillmentsItemsSet: any,
   result: any
 ): Promise<void> {
-  const [
-    itemFlfllmntsRaw,
-    providerAddrRaw,
-    buyerGpsRaw,
-    buyerAddrRaw,
-  ] = await Promise.all([
-    RedisService.getKey(`${transaction_id}_itemFlfllmnts`),
-    RedisService.getKey(`${transaction_id}_providerAddr`),
-    RedisService.getKey(`${transaction_id}_buyerGps`),
-    RedisService.getKey(`${transaction_id}_buyerAddr`),
-  ]);
- const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
+  const [itemFlfllmntsRaw, providerAddrRaw, buyerGpsRaw, buyerAddrRaw] =
+    await Promise.all([
+      RedisService.getKey(`${transaction_id}_itemFlfllmnts`),
+      RedisService.getKey(`${transaction_id}_providerAddr`),
+      RedisService.getKey(`${transaction_id}_buyerGps`),
+      RedisService.getKey(`${transaction_id}_buyerAddr`),
+    ]);
+  const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
   const providerAddr = providerAddrRaw ? JSON.parse(providerAddrRaw) : null;
   const buyerGps = buyerGpsRaw ? JSON.parse(buyerGpsRaw) : null;
   const buyerAddr = buyerAddrRaw ? JSON.parse(buyerAddrRaw) : null;
@@ -1975,11 +1972,12 @@ async function validateFulfillmentsPicked(
         );
       }
 
-     
-
-     if (
+      if (
         !providerAddr?.location?.descriptor?.name ||
-        !_.isEqual(ff.start?.location?.descriptor?.name, providerAddr?.location?.descriptor?.name)
+        !_.isEqual(
+          ff.start?.location?.descriptor?.name,
+          providerAddr?.location?.descriptor?.name
+        )
       ) {
         addError(
           result,
@@ -1988,19 +1986,16 @@ async function validateFulfillmentsPicked(
         );
       }
 
-      if(providerAddr){
-              const providerAddError = compareObjects(ff.start, providerAddr)
-              providerAddError?.forEach((error: string) => {
-                addError(
-                  result,
-                  ERROR_CODES.INVALID_RESPONSE,
-                  `fulfillments[${ff.id}].start.location.address error:${error} `
-                );
-               
-              }
-              );
-            }
-           
+      if (providerAddr) {
+        const providerAddError = compareObjects(ff.start, providerAddr);
+        providerAddError?.forEach((error: string) => {
+          addError(
+            result,
+            ERROR_CODES.INVALID_RESPONSE,
+            `fulfillments[${ff.id}].start.location.address error:${error} `
+          );
+        });
+      }
 
       if (ff.end?.location?.gps && !_.isEqual(ff.end.location.gps, buyerGps)) {
         addError(
@@ -2009,7 +2004,6 @@ async function validateFulfillmentsPicked(
           `fulfillments[${ff.id}].end.location gps is not matching with gps in /${constants.SELECT}`
         );
       }
-
 
       if (
         ff.end?.location?.address?.area_code &&
@@ -2173,18 +2167,14 @@ async function validateFulfillmentsOutDelivery(
   fulfillmentsItemsSet: any,
   result: any
 ): Promise<void> {
- const [
-    itemFlfllmntsRaw,
-    providerAddrRaw,
-    buyerGpsRaw,
-    buyerAddrRaw,
-  ] = await Promise.all([
-    RedisService.getKey(`${transaction_id}_itemFlfllmnts`),
-    RedisService.getKey(`${transaction_id}_providerAddr`),
-    RedisService.getKey(`${transaction_id}_buyerGps`),
-    RedisService.getKey(`${transaction_id}_buyerAddr`),
-  ]);
-   const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
+  const [itemFlfllmntsRaw, providerAddrRaw, buyerGpsRaw, buyerAddrRaw] =
+    await Promise.all([
+      RedisService.getKey(`${transaction_id}_itemFlfllmnts`),
+      RedisService.getKey(`${transaction_id}_providerAddr`),
+      RedisService.getKey(`${transaction_id}_buyerGps`),
+      RedisService.getKey(`${transaction_id}_buyerAddr`),
+    ]);
+  const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
   const providerAddr = providerAddrRaw ? JSON.parse(providerAddrRaw) : null;
   const buyerGps = buyerGpsRaw ? JSON.parse(buyerGpsRaw) : null;
   const buyerAddr = buyerAddrRaw ? JSON.parse(buyerAddrRaw) : null;
@@ -2320,11 +2310,15 @@ async function validateFulfillmentsOutDelivery(
         );
       }
 
-        if (
+      if (
         ff.start?.location?.gps &&
         !compareCoordinates(ff.start.location.gps, providerAddr?.location?.gps)
       ) {
-        console.log('ff.start.location.gps', ff.start.location.gps, providerAddr?.location?.gps);
+        console.log(
+          "ff.start.location.gps",
+          ff.start.location.gps,
+          providerAddr?.location?.gps
+        );
         addError(
           result,
           ERROR_CODES.INVALID_RESPONSE,
@@ -2332,9 +2326,12 @@ async function validateFulfillmentsOutDelivery(
         );
       }
 
-    if (
+      if (
         !providerAddr?.location?.descriptor?.name ||
-        !_.isEqual(ff.start?.location?.descriptor?.name, providerAddr?.location?.descriptor?.name)
+        !_.isEqual(
+          ff.start?.location?.descriptor?.name,
+          providerAddr?.location?.descriptor?.name
+        )
       ) {
         addError(
           result,
@@ -2513,18 +2510,14 @@ async function validateFulfillmentsDelivered(
   fulfillmentsItemsSet: any,
   result: any
 ): Promise<void> {
-  const [
-    itemFlfllmntsRaw,
-    providerAddrRaw,
-    buyerGpsRaw,
-    buyerAddrRaw,
-  ] = await Promise.all([
-    RedisService.getKey(`${transaction_id}_itemFlfllmnts`),
-    RedisService.getKey(`${transaction_id}_providerAddr`),
-    RedisService.getKey(`${transaction_id}_buyerGps`),
-    RedisService.getKey(`${transaction_id}_buyerAddr`),
-  ]);
- const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
+  const [itemFlfllmntsRaw, providerAddrRaw, buyerGpsRaw, buyerAddrRaw] =
+    await Promise.all([
+      RedisService.getKey(`${transaction_id}_itemFlfllmnts`),
+      RedisService.getKey(`${transaction_id}_providerAddr`),
+      RedisService.getKey(`${transaction_id}_buyerGps`),
+      RedisService.getKey(`${transaction_id}_buyerAddr`),
+    ]);
+  const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
   const providerAddr = providerAddrRaw ? JSON.parse(providerAddrRaw) : null;
   const buyerGps = buyerGpsRaw ? JSON.parse(buyerGpsRaw) : null;
   const buyerAddr = buyerAddrRaw ? JSON.parse(buyerAddrRaw) : null;
@@ -2659,27 +2652,34 @@ async function validateFulfillmentsDelivered(
     }
 
     if (
-        ff.start?.location?.gps &&
-        !compareCoordinates(ff.start.location.gps, providerAddr?.location?.gps)
-      ) {
-        console.log('ff.start.location.gps', ff.start.location.gps, providerAddr?.location?.gps);
-        addError(
-          result,
-          ERROR_CODES.INVALID_RESPONSE,
-          `store gps location /fulfillments[${ff.id}]/start/location/gps can't change`
-        );
-      }
+      ff.start?.location?.gps &&
+      !compareCoordinates(ff.start.location.gps, providerAddr?.location?.gps)
+    ) {
+      console.log(
+        "ff.start.location.gps",
+        ff.start.location.gps,
+        providerAddr?.location?.gps
+      );
+      addError(
+        result,
+        ERROR_CODES.INVALID_RESPONSE,
+        `store gps location /fulfillments[${ff.id}]/start/location/gps can't change`
+      );
+    }
 
     if (
-        !providerAddr?.location?.descriptor?.name ||
-        !_.isEqual(ff.start?.location?.descriptor?.name, providerAddr?.location?.descriptor?.name)
-      ) {
-        addError(
-          result,
-          ERROR_CODES.INVALID_RESPONSE,
-          `store name /fulfillments[${ff.id}]/start/location/descriptor/name can't change`
-        );
-      }
+      !providerAddr?.location?.descriptor?.name ||
+      !_.isEqual(
+        ff.start?.location?.descriptor?.name,
+        providerAddr?.location?.descriptor?.name
+      )
+    ) {
+      addError(
+        result,
+        ERROR_CODES.INVALID_RESPONSE,
+        `store name /fulfillments[${ff.id}]/start/location/descriptor/name can't change`
+      );
+    }
 
     if (ff.end?.location?.gps && !_.isEqual(ff.end.location.gps, buyerGps)) {
       addError(
@@ -2913,10 +2913,10 @@ export const onStatus = async (data: any) => {
     }
 
     try {
-      await contextChecker(context, result, currentCall, prevCall);
+      await contextChecker(context, result, currentCall, prevCall, true);
     } catch (err: any) {
       addError(result, 21000, `Error checking context: ${err.message}`);
-      return result;
+      // return result;
     }
 
     switch (state) {
