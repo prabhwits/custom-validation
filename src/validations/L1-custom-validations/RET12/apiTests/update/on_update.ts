@@ -6,6 +6,7 @@ import {
   checkQuoteTrailSum,
   timeDiff,
   isPresentInRedisSet,
+  setRedisValue,
 } from "../../../../../utils/helper";
 import {
   partcancel_return_reasonCodes,
@@ -530,6 +531,7 @@ export const checkOnUpdate = async (
     }
 
     // Check fulfillment id, type, and tracking
+    const fulfillmentIdArray: string[] = [];
     try {
       console.info("Checking fulfillment.id, fulfillment.type and tracking");
       on_update.fulfillments.forEach(async (ff: any) => {
@@ -540,6 +542,7 @@ export const checkOnUpdate = async (
             description: `Fulfillment Id must be present`,
           });
         }
+        fulfillmentIdArray.push(ff.id);
         if (!ff.type) {
           result.push({
             valid: false,
@@ -573,6 +576,8 @@ export const checkOnUpdate = async (
           }
         }
       });
+
+      await setRedisValue(`${context.transaction_id}_fulfillmentIdArray`, fulfillmentIdArray);
     } catch (error: any) {
       console.error(
         `Error while checking fulfillments id, type and tracking in /${constants.ON_STATUS}`
@@ -583,6 +588,7 @@ export const checkOnUpdate = async (
         description: `Error checking fulfillments id, type, and tracking in /${apiSeq}: ${error.message}`,
       });
     }
+
 
     // Flow 6-b and 6-c checks
     if (flow === "6-b") {

@@ -109,7 +109,6 @@ async function validateProviders(
       }
     
     });
-
     
     provider.items?.forEach((item: any, itemIndex: number) => {
       if (itemsId.has(item.id)) {

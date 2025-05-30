@@ -192,176 +192,6 @@ const validateOrder = async (
   }
 };
 
-const validateFulfillments = async (
-  txnId: string,
-  fulfillments: any[],
-  state: string,
-  fulfillmentsItemsSet: Set<any>,
-  currentCall: string,
-  result: any[]
-): Promise<void> => {
-  try {
-    const [
-      itemFlfllmntsRaw,
-      providerGpsRaw,
-      providerNameRaw,
-      buyerGpsRaw,
-      buyerAddrRaw,
-      storedFulfillmentRaw,
-      storedFulfillmentActionRaw,
-    ] = await Promise.all([
-      getRedisValue(`${txnId}_itemFlfllmnts`),
-      getRedisValue(`${txnId}_providerGps`),
-      getRedisValue(`${txnId}_providerName`),
-      getRedisValue(`${txnId}_buyerGps`),
-      getRedisValue(`${txnId}_buyerAddr`),
-      getRedisValue(`${txnId}_deliveryFulfillment`),
-      getRedisValue(`${txnId}_deliveryFulfillmentAction`),
-    ]);
-
-    const itemFlfllmnts = itemFlfllmntsRaw;
-    const providerGps = providerGpsRaw;
-    const providerName = providerNameRaw;
-    const buyerGps = buyerGpsRaw;
-    const buyerAddr = buyerAddrRaw;
-    const storedFulfillment = storedFulfillmentRaw;
-    const storedFulfillmentAction = storedFulfillmentActionRaw;
-
-    for (const ff of fulfillments) {
-      if (!itemFlfllmnts || !Object.values(itemFlfllmnts).includes(ff.id)) {
-        addError(
-          result,
-          21010,
-          `Fulfillment id ${ff.id || "missing"} does not exist in /${
-            constants.ON_SELECT
-          }`
-        );
-      }
-
-      if (ff.type !== "Cancel") {
-        const ffTrackingRaw = await getRedisValue(`${txnId}_${ff.id}_tracking`);
-        const ffTracking = ffTrackingRaw ? JSON.parse(ffTrackingRaw) : null;
-        if (ffTracking !== null && ffTracking !== ff.tracking) {
-          addError(
-            result,
-            21011,
-            `Fulfillment Tracking mismatch with /${constants.ON_SELECT} for ID ${ff.id}`
-          );
-        }
-      }
-
-      if (
-        ff.start?.location?.gps &&
-        providerGps &&
-        !compareCoordinates(ff.start.location.gps, providerGps)
-      ) {
-        addError(
-          result,
-          21012,
-          `store gps location /fulfillments[${ff.id}]/start/location/gps can't change`
-        );
-      }
-
-      if (
-        providerName &&
-        !_.isEqual(ff.start?.location?.descriptor?.name, providerName)
-      ) {
-        addError(
-          result,
-          21013,
-          `store name /fulfillments[${ff.id}]/start/location/descriptor/name can't change`
-        );
-      }
-
-      if (
-        ff.end?.location?.gps &&
-        buyerGps &&
-        !_.isEqual(ff.end.location.gps, buyerGps)
-      ) {
-        addError(
-          result,
-          21014,
-          `fulfillments[${ff.id}].end.location gps mismatches with /${constants.SELECT}`
-        );
-      }
-
-      if (
-        ff.end?.location?.address?.area_code &&
-        buyerAddr &&
-        !_.isEqual(ff.end.location.address.area_code, buyerAddr)
-      ) {
-        addError(
-          result,
-          21015,
-          `fulfillments[${ff.id}].end.location.address.area_code mismatches with /${constants.SELECT}`
-        );
-      }
-    }
-
-    const deliveryFulfillment = fulfillments.find(
-      (f: any) => f.type === "Delivery"
-    );
-    if (deliveryFulfillment && storedFulfillment) {
-      const fulfillmentRangeErrors = compareTimeRanges(
-        storedFulfillment,
-        storedFulfillmentAction,
-        deliveryFulfillment,
-        currentCall
-      );
-      if (fulfillmentRangeErrors) {
-        fulfillmentRangeErrors.forEach((error: string) => {
-          addError(result, 21016, `Fulfillment time range error: ${error}`);
-        });
-      }
-    }
-
-    const flow = (await getRedisValue("flow")) || "2";
-    if (["6", "2", "3", "5"].includes(flow)) {
-      let i = 0;
-      for (const obj1 of fulfillmentsItemsSet) {
-        const keys = Object.keys(obj1);
-        let obj2: any = fulfillments.filter((f: any) => f.type === obj1.type);
-        let apiSeq =
-          obj1.type === "Cancel"
-            ? ApiSequence.ON_UPDATE_PART_CANCEL
-            : (await getRedisValue(`${txnId}_onCnfrmState`)) === "Accepted"
-            ? ApiSequence.ON_CONFIRM
-            : ApiSequence.ON_STATUS_PENDING;
-
-        if (obj2.length > 0) {
-          obj2 = obj2[0];
-          if (obj2.type === "Delivery") {
-            delete obj2?.tags;
-            delete obj2?.agent;
-            delete obj2?.start?.instructions;
-            delete obj2?.end?.instructions;
-            delete obj2?.start?.time?.timestamp;
-            delete obj2?.end?.time?.timestamp;
-            delete obj2?.state;
-            delete obj1?.state;
-          }
-          const errors = compareFulfillmentObject(obj1, obj2, keys, i, apiSeq);
-          errors.forEach((item: any) => {
-            addError(
-              result,
-              21017,
-              `Fulfillment comparison error: ${item.errMsg}`
-            );
-          });
-        } else {
-          addError(
-            result,
-            21018,
-            `Missing fulfillment type '${obj1.type}' in ${currentCall} compared to ${apiSeq}`
-          );
-        }
-        i++;
-      }
-    }
-  } catch (err: any) {
-    addError(result, 21019, `Error validating fulfillments: ${err.message}`);
-  }
-};
 
 const validateDeliveryTimestamps = async (
   txnId: string,
@@ -588,6 +418,7 @@ const validatePayment = async (
         `payment object mismatches with previous call in /${currentCall}`
       );
     }
+    
   } catch (err: any) {
     addError(result, 21032, `Error validating payment: ${err.message}`);
   }
@@ -706,8 +537,7 @@ async function validateFulfillmentsPending(
   try {
     const [
       itemFlfllmntsRaw,
-      providerGpsRaw,
-      providerNameRaw,
+     
       buyerGpsRaw,
       buyerAddrRaw,
       fulfillmentTatObjRaw,
@@ -717,8 +547,7 @@ async function validateFulfillmentsPending(
     ] = await Promise.all(
       [
         RedisService.getKey(`${transaction_id}_itemFlfllmnts`),
-        RedisService.getKey(`${transaction_id}_providerGps`),
-        RedisService.getKey(`${transaction_id}_providerName`),
+
         RedisService.getKey(`${transaction_id}_buyerGps`),
         RedisService.getKey(`${transaction_id}_buyerAddr`),
         RedisService.getKey(`${transaction_id}_fulfillment_tat_obj`),
@@ -742,8 +571,7 @@ async function validateFulfillmentsPending(
     const itemFlfllmnts = itemFlfllmntsRaw
       ? JSON.parse(itemFlfllmntsRaw)
       : null;
-    const providerGps = providerGpsRaw ? JSON.parse(providerGpsRaw) : null;
-    const providerName = providerNameRaw ? JSON.parse(providerNameRaw) : null;
+  
     const buyerGps = buyerGpsRaw ? JSON.parse(buyerGpsRaw) : null;
     const buyerAddr = buyerAddrRaw ? JSON.parse(buyerAddrRaw) : null;
     const fulfillmentTatObj = fulfillmentTatObjRaw
@@ -762,7 +590,6 @@ async function validateFulfillmentsPending(
     const fulfillmentIdArray = fulfillmentIdArrayRaw
       ? JSON.parse(fulfillmentIdArrayRaw)
       : null;
-    // Check for duplicate fulfillment IDs
     const fulfillmentIds = new Set();
     for (const ff of order?.fulfillments || []) {
       if (fulfillmentIds.has(ff.id)) {
@@ -978,8 +805,8 @@ async function validateFulfillmentsPending(
               `fulfillments[${ffId}].start.location.gps must be in 'latitude,longitude' format`
             );
           } else if (
-            providerGps &&
-            !compareCoordinates(ff.start.location.gps, providerGps)
+            providerAddr?.location?.gps &&
+            !compareCoordinates(ff.start.location.gps, providerAddr?.location?.gps)
           ) {
             console.info(
               `Start GPS mismatch for fulfillment ID ${ffId} in /${currCall} for transaction ${transaction_id}`
@@ -1044,8 +871,8 @@ async function validateFulfillmentsPending(
                 );
               }
             }
-            if (providerAddr) {
-              const providerAddError = compareObjects(ff.start, providerAddr);
+            if(providerAddr){
+              const providerAddError = compareObjects(ff.start.location.address, providerAddr.location.address);
               providerAddError?.forEach((error: string) => {
                 addError(
                   result,
@@ -1767,6 +1594,7 @@ async function validateFulfillmentsPacked(
             delete obj2?.state;
             delete obj1?.state;
           }
+
           const errors = compareFulfillmentObject(obj1, obj2, keys, i, apiSeq);
           errors.forEach((item: any) => {
             addError(result, ERROR_CODES.INVALID_RESPONSE, item.errMsg);
@@ -1963,16 +1791,18 @@ async function validateFulfillmentsPicked(
         );
       }
 
-      if (providerAddr) {
-        const providerAddError = compareObjects(ff.start, providerAddr);
-        providerAddError?.forEach((error: string) => {
-          addError(
-            result,
-            ERROR_CODES.INVALID_RESPONSE,
-            `fulfillments[${ff.id}].start.location.address error:${error} `
-          );
-        });
-      }
+      if(providerAddr){
+              const providerAddError = compareObjects(ff.start.location.address, providerAddr.location.address)
+              providerAddError?.forEach((error: string) => {
+                addError(
+                  result,
+                  ERROR_CODES.INVALID_RESPONSE,
+                  `fulfillments[${ff.id}].start.location.address error:${error} `
+                );
+
+              });
+            }
+
 
       if (ff.end?.location?.gps && !_.isEqual(ff.end.location.gps, buyerGps)) {
         addError(
@@ -2324,6 +2154,17 @@ async function validateFulfillmentsOutDelivery(
           `fulfillments[${ff.id}].end.location gps is not matching with gps in /${constants.SELECT}`
         );
       }
+       if(providerAddr){
+              const providerAddError = compareObjects(ff.start.location.address, providerAddr.location.address)
+              providerAddError?.forEach((error: string) => {
+                addError(
+                  result,
+                  ERROR_CODES.INVALID_RESPONSE,
+                  `fulfillments[${ff.id}].start.location.address error:${error} `
+                );
+
+              });
+            }
 
       if (
         ff.end?.location?.address?.area_code &&
@@ -2645,18 +2486,26 @@ async function validateFulfillmentsDelivered(
     }
 
     if (
-      !providerAddr?.location?.descriptor?.name ||
-      !_.isEqual(
-        ff.start?.location?.descriptor?.name,
-        providerAddr?.location?.descriptor?.name
-      )
-    ) {
-      addError(
-        result,
-        ERROR_CODES.INVALID_RESPONSE,
-        `store name /fulfillments[${ff.id}]/start/location/descriptor/name can't change`
-      );
-    }
+        !providerAddr?.location?.descriptor?.name ||
+        !_.isEqual(ff.start?.location?.descriptor?.name, providerAddr?.location?.descriptor?.name)
+      ) {
+        addError(
+          result,
+          ERROR_CODES.INVALID_RESPONSE,
+          `store name /fulfillments[${ff.id}]/start/location/descriptor/name can't change`
+        );
+      }
+       if(providerAddr){
+              const providerAddError = compareObjects(ff.start.location.address, providerAddr.location.address)
+              providerAddError?.forEach((error: string) => {
+                addError(
+                  result,
+                  ERROR_CODES.INVALID_RESPONSE,
+                  `fulfillments[${ff.id}].start.location.address error:${error} `
+                );
+
+              });
+            }
 
     if (ff.end?.location?.gps && !_.isEqual(ff.end.location.gps, buyerGps)) {
       addError(
