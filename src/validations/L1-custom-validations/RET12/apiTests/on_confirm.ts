@@ -737,7 +737,28 @@ const validatePayment = async (
         }
       }
     }
+       if(payment.type === "ON-FULFILLMENT") {
+          if(!payment.status || payment.status == 'NOT_PAID'){
+            addError(result, 20069, `payment.status must be 'NOT_PAID' when payment.type is 'ON-FULFILLMENT' in /${constants.CONFIRM}`);
+          }
+          if (!payment.uri || !/^https?:\/\/[^\s/$.?#].[^\s]*$/.test(payment.uri)) {
+            addError(result, 20065, `payment.uri must be a valid URL in /${constants.CONFIRM}`);
+          }
+          if (!payment.tl_method || payment.tl_method !== "http/get") {
+            addError(result, 20066, `payment.tl_method must be 'http/get' when collected_by is 'BAP' in /${constants.CONFIRM}`);
+          }
+          if (payment.params) {
+            if (!payment.params.currency || !/^[A-Z]{3}$/.test(payment.params.currency)) {
+              addError(result, 20067, `payment.params.currency must be a valid ISO 4217 code in /${constants.CONFIRM}`);
+            }
+            if (!payment.params.transaction_id || typeof payment.params.transaction_id !== "string" || payment.params.transaction_id === "") {
+              addError(result, 20068, `payment.params.transaction_id must be a non-empty string in /${constants.CONFIRM}`);
+            }
+          }
+        }
+    
   } catch (err: any) {
+    console.log(`Error validating payment: ${err.stack}`);
     addError(result, 20066, `Error validating payment: ${err.message}`);
   }
 };
