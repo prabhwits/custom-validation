@@ -6,7 +6,7 @@ import { statutory_reqs } from "./enums";
 import { data } from "./constants/AreacodeMap";
 import { InputObject } from "./interface";
 import { reasonCodes } from "./reasonCode";
-import { createAuthorizationHeader as createAuthHeader } from "ondc-crypto-sdk-nodejs"
+import { createAuthorizationHeader as createAuthHeader } from "ondc-crypto-sdk-nodejs";
 import { envVariables } from "../server";
 import axios from "axios";
 
@@ -252,7 +252,7 @@ export const addActionToRedisSet = async (
     if (existing) {
       existingSet = JSON.parse(existing);
     }
-    
+
     if (
       previousAction === presentAction ||
       (!_.isEmpty(existingSet) && existingSet.includes(previousAction))
@@ -539,22 +539,22 @@ export function validateBapUri(
     result.push({
       valid: false,
       code: 20006,
-      description: `Bap_id ${bapId} is not found in BapUri ${bapUri}`
-    })
+      description: `Bap_id ${bapId} is not found in BapUri ${bapUri}`,
+    });
   }
 }
 
 export function validateBppUri(
   bppUri: string,
   bppId: string,
-  result: ValidationOutput,
+  result: ValidationOutput
 ): void {
   if (!checkIdInUri(bppUri, bppId)) {
     result.push({
       valid: false,
       code: 20006,
-      description: `Bpp_id ${bppId} is not found in BppUri ${bppUri}`
-    })
+      description: `Bpp_id ${bppId} is not found in BppUri ${bppUri}`,
+    });
   }
 }
 
@@ -630,15 +630,12 @@ export const checkGpsPrecision = (coordinates: string) => {
     const isLatValid = latPrecision >= minPrecision;
     const isLongValid = longPrecision >= minPrecision;
 
-    return isLatValid && isLongValid
-      ? true
-      : { latPrecision, longPrecision };
+    return isLatValid && isLongValid ? true : { latPrecision, longPrecision };
   } catch (error) {
     console.error(error);
     return error;
   }
 };
-
 
 export function findItemByItemType(item: any) {
   const tags = item.tags;
@@ -800,7 +797,6 @@ export function compareObjects(
 
   const keys1 = Object.keys(obj1 ?? {});
   const keys2 = Object.keys(obj2 ?? {});
-  
 
   if (keys1?.length !== keys2?.length) {
     errors.push(`Key length mismatch for ${parentKey || "root"}`);
@@ -828,7 +824,6 @@ export function compareObjects(
 
   return errors;
 }
-
 
 export function compareQuoteObjects(
   obj1: InputObject,
@@ -913,7 +908,6 @@ export function isTagsValid(tags: any[], entity: string): boolean {
 
   return false;
 }
-
 
 export const sumQuoteBreakUp = (quote: any) => {
   const totalPrice = Number(quote.price.value);
@@ -1267,6 +1261,7 @@ export const checkQuoteTrailSum = (
   quoteTrailSum = Math.abs(Number(quoteTrailSum.toFixed(2)));
   const totalPrice = Number((price + quoteTrailSum).toFixed(2));
   const confirmPrice = Number(priceAtConfirm.toFixed(2));
+  console.log("12345", price, quoteTrailSum, confirmPrice);
 
   if (totalPrice !== confirmPrice) {
     const description = `quote_trail price and item quote price sum (${totalPrice}) for ${apiSeq} should equal the price in ${constants.ON_CONFIRM} (${confirmPrice})`;
@@ -1280,46 +1275,48 @@ export const checkQuoteTrailSum = (
 };
 
 export const createAuthorizationHeader = async (payload: any) => {
-
   try {
     const header = await createAuthHeader({
       body: payload,
-      privateKey: envVariables.SIGN_PRIVATE_KEY ,
-      subscriberId: envVariables.SUBSCRIBER_ID ,
-      subscriberUniqueKeyId: envVariables.UKID 
+      privateKey: envVariables.SIGN_PRIVATE_KEY,
+      subscriberId: envVariables.SUBSCRIBER_ID,
+      subscriberUniqueKeyId: envVariables.UKID,
     });
-    return header
-  } catch (error:any) {
-    console.error("createAuthorizationHeader - Error",error);
-    throw new Error(`createAuthorizationHeader - Error ${error.message}`)
+    return header;
+  } catch (error: any) {
+    console.error("createAuthorizationHeader - Error", error);
+    throw new Error(`createAuthorizationHeader - Error ${error.message}`);
   }
-}
+};
 
-
-export async function lookupSubscriber(authorization: string, subscriber_id: string, type: string) {
+export async function lookupSubscriber(
+  authorization: string,
+  subscriber_id: string,
+  type: string
+) {
   try {
     const response = await axios.post(
       "https://preprod.registry.ondc.org/v2.0/lookup",
       JSON.stringify({
         type,
-        subscriber_id
-      }), 
+        subscriber_id,
+      }),
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: authorization
-        }
+          Authorization: authorization,
+        },
       }
     );
 
     return response.data;
-  } catch (error : any) {
+  } catch (error: any) {
     console.error("Lookup API error:", error?.response?.data || error.message);
     throw error;
   }
 }
-export function isPresentInRedisSet(set1 : any, obj : any) {
-  try{
+export function isPresentInRedisSet(set1: any, obj: any) {
+  try {
     let exists = false;
     for (const item of set1) {
       if (JSON.stringify(item) === JSON.stringify(obj)) {
@@ -1328,10 +1325,9 @@ export function isPresentInRedisSet(set1 : any, obj : any) {
       }
     }
     return exists;
-  } catch(err: any){
-    console.error('Error in isPresentInRedisSet:', err);
+  } catch (err: any) {
+    console.error("Error in isPresentInRedisSet:", err);
   }
-
 }
 export const payment_status = (payment: any, flow: string) => {
   const errorObj: any = {};
