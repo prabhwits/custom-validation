@@ -716,7 +716,6 @@ async function validateItems(
   options = {
     currentApi: ApiSequence.INIT,
     previousApi: ApiSequence.ON_SELECT,
-    checkParentItemId: true,
     checkQuantity: true,
     checkTags: true,
   }
@@ -724,7 +723,6 @@ async function validateItems(
   const {
     currentApi,
     previousApi = ApiSequence.ON_CONFIRM,
-    checkParentItemId = true,
     checkQuantity = true,
     checkTags = true,
   } = options;
@@ -735,32 +733,18 @@ async function validateItems(
       RedisService.getKey(`${transactionId}_itemFlfllmnts`),
       RedisService.getKey(`${transactionId}_itemsIdList`),
     ];
-    if (checkParentItemId) {
-      redisKeys.push(RedisService.getKey(`${transactionId}_parentItemIdSet`));
-    }
-    if (checkTags) {
-      redisKeys.push(
-        RedisService.getKey(`${transactionId}_select_customIdArray`)
-      );
-    }
+   
 
     const [
       itemFlfllmntsRaw,
       itemsIdListRaw,
-      parentItemIdSetRaw,
-      customIdArrayRaw,
     ] = await Promise.all(redisKeys);
 
     const itemFlfllmnts = itemFlfllmntsRaw
       ? JSON.parse(itemFlfllmntsRaw)
       : null;
     const itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
-    const parentItemIdSet = parentItemIdSetRaw
-      ? JSON.parse(parentItemIdSetRaw)
-      : null;
-    const select_customIdArray = customIdArrayRaw
-      ? JSON.parse(customIdArrayRaw)
-      : null;
+  
 
     // Validate each item
     for (let i = 0; i < items.length; i++) {
@@ -787,29 +771,9 @@ async function validateItems(
         continue;
       }
 
-      // Validate parent item ID
-      if (checkParentItemId && parentItemIdSet && item.parent_item_id) {
-        if (!parentItemIdSet.includes(item.parent_item_id)) {
-          result.push({
-            valid: false,
-            code: 20000,
-            description: `items[${i}].parent_item_id mismatches for Item ${itemId} in /${constants.ON_SEARCH} and /${currentApi}`,
-          });
-        }
-      }
+    
 
-      // Validate custom ID tags
-      if (
-        checkTags &&
-        select_customIdArray &&
-        checkItemTag(item, select_customIdArray)
-      ) {
-        result.push({
-          valid: false,
-          code: 20000,
-          description: `items[${i}].tags.parent_id mismatches for Item ${itemId} in /${constants.ON_SEARCH} and /${currentApi}`,
-        });
-      }
+      
     }
 
     return result;

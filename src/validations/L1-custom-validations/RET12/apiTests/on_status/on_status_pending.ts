@@ -1151,7 +1151,6 @@ async function validateItems(
   options: any = {
     currentApi: ApiSequence.ON_STATUS_PENDING,
     previousApi: ApiSequence.ON_CONFIRM,
-    checkParentItemId: true,
     checkQuantity: true,
     checkTags: true,
     checkLocationId: true,
@@ -1160,7 +1159,6 @@ async function validateItems(
   const {
     currentApi = ApiSequence.ON_STATUS_PENDING,
     previousApi = ApiSequence.ON_CONFIRM,
-    checkParentItemId = true,
     checkQuantity = true,
     checkTags = true,
     checkLocationId = true,
@@ -1180,14 +1178,8 @@ async function validateItems(
       RedisService.getKey(`${transactionId}_itemFlfllmnts`),
       RedisService.getKey(`${transactionId}_itemsIdList`),
     ];
-    if (checkParentItemId) {
-      redisKeys.push(RedisService.getKey(`${transactionId}_parentItemIdSet`));
-    }
-    if (checkTags) {
-      redisKeys.push(
-        RedisService.getKey(`${transactionId}_select_customIdArray`)
-      );
-    }
+  
+   
     if (checkLocationId) {
       redisKeys.push(RedisService.getKey(`${transactionId}_onSearchItems`));
     }
@@ -1208,8 +1200,6 @@ async function validateItems(
     const [
       itemFlfllmntsRaw,
       itemsIdListRaw,
-      parentItemIdSetRaw,
-      customIdArrayRaw,
       onSearchItemsRaw,
     ] = redisResults;
 
@@ -1217,12 +1207,8 @@ async function validateItems(
       ? JSON.parse(itemFlfllmntsRaw)
       : null;
     let itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
-    const parentItemIdSet = parentItemIdSetRaw
-      ? JSON.parse(parentItemIdSetRaw)
-      : null;
-    const select_customIdArray = customIdArrayRaw
-      ? JSON.parse(customIdArrayRaw)
-      : null;
+    
+
     const allOnSearchItems = onSearchItemsRaw
       ? JSON.parse(onSearchItemsRaw)
       : [];
@@ -1279,70 +1265,7 @@ async function validateItems(
         }
       }
 
-      if (checkParentItemId) {
-        const tags = Array.isArray(item.tags) ? item.tags : [];
-        const typeTag = tags.find((tag: any) => tag.code === "type");
-        const typeValue = typeTag?.list?.find(
-          (listItem: any) => listItem.code === "type"
-        )?.value;
-        const isItemType = typeValue === "item";
-        const isCustomizationType = typeValue === "customization";
-
-        if (
-          (isItemType || isCustomizationType) &&
-          (!item.parent_item_id || item.parent_item_id.trim() === "")
-        ) {
-          result.push({
-            valid: false,
-            code: ERROR_CODES.INVALID_RESPONSE,
-            description: `items[${i}]: parent_item_id is required and must be non-empty for items with type 'item' or 'customization' in /${currentApi}`,
-          });
-        }
-
-        if (item.parent_item_id && !(isItemType || isCustomizationType)) {
-          result.push({
-            valid: false,
-            code: ERROR_CODES.INVALID_RESPONSE,
-            description: `items[${i}]: items with parent_item_id must have a type tag of 'item' or 'customization' in /${currentApi}`,
-          });
-        }
-
-        if (
-          item.parent_item_id &&
-          parentItemIdSet &&
-          !parentItemIdSet.includes(item.parent_item_id)
-        ) {
-          result.push({
-            valid: false,
-            code: ERROR_CODES.INVALID_RESPONSE,
-            description: `items[${i}].parent_item_id ${item.parent_item_id} not found in parentItemIdSet for Item ${itemId} in /${currentApi}`,
-          });
-        }
-
-        if (checkTags && isCustomizationType && select_customIdArray) {
-          const parentTag = tags.find((tag: any) => tag.code === "parent");
-          if (!parentTag) {
-            result.push({
-              valid: false,
-              code: ERROR_CODES.INVALID_RESPONSE,
-              description: `items[${i}]: customization items must have a parent tag in /${currentApi}`,
-            });
-          } else {
-            const parentId = parentTag.list?.find(
-              (listItem: any) => listItem.code === "id"
-            )?.value;
-            if (!parentId || !select_customIdArray.includes(parentId)) {
-              result.push({
-                valid: false,
-                code: ERROR_CODES.INVALID_RESPONSE,
-                description: `items[${i}]: parent tag id ${
-                  parentId || "missing"
-                } must be valid and present in select_customIdArray for customization item ${itemId} in /${currentApi}`,
-              });
-            }
-          }
-        }
-      }
+    
 
       if (checkLocationId) {
         if (
@@ -1356,47 +1279,10 @@ async function validateItems(
           //   code: ERROR_CODES.INVALID_RESPONSE,
           //   description: `items[${i}]: location_id is required and must be a non-empty string in /${currentApi}`,
           // });
-        } else if (onSearchItems.length > 0) {
-          const matchingSearchItem = onSearchItems.find(
-            (searchItem: any) => searchItem.id === itemId
-          );
-          if (matchingSearchItem) {
-            const isCustomization = tagFinder(
-              matchingSearchItem,
-              "customization"
-            );
-            const isNotCustomization = !isCustomization;
-            if (
-              isNotCustomization &&
-              matchingSearchItem.location_id !== item.location_id
-            ) {
-              result.push({
-                valid: false,
-                code: ERROR_CODES.INVALID_RESPONSE,
-                description: `items[${i}]: location_id ${item.location_id} for item ${itemId} does not match location_id in /${constants.ON_SEARCH}`,
-              });
-            }
-          } else {
-            result.push({
-              valid: false,
-              code: ERROR_CODES.INVALID_RESPONSE,
-              description: `items[${i}]: item ${itemId} not found in /${constants.ON_SEARCH} for location_id validation`,
-            });
-          }
-        }
+        } 
       }
 
-      if (
-        checkTags &&
-        select_customIdArray &&
-        checkItemTag(item, select_customIdArray)
-      ) {
-        result.push({
-          valid: false,
-          code: ERROR_CODES.INVALID_RESPONSE,
-          description: `items[${i}].tags.parent_id mismatches for Item ${itemId} in /${previousApi} and /${currentApi}`,
-        });
-      }
+      
     }
 
     if (checkQuantity && itemsCountChange) {
@@ -1477,7 +1363,6 @@ const checkOnStatusPending = async (
       validateItems(transaction_id, order.items, result, {
         currentApi: ApiSequence.ON_STATUS_PENDING,
         previousApi: ApiSequence.ON_CONFIRM,
-        checkParentItemId: true,
         checkQuantity: true,
         checkTags: true,
         checkLocationId: true,
