@@ -159,12 +159,14 @@ export const contextChecker = async (
           context.message_id,
           currentCall
         );
-        if (!isMsgIdNotPresent) {
-          result.push({
-            valid: false,
-            code: 20000,
-            description: `Message id should not be same with previous calls`,
-          });
+        if (!ignoreMessageIdCheck) {
+          if (!isMsgIdNotPresent) {
+            result.push({
+              valid: false,
+              code: 20000,
+              description: `Message id should not be same with previous calls`,
+            });
+          }
         }
       }
 

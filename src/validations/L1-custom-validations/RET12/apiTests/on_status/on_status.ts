@@ -126,21 +126,6 @@ const storePayment = async (
   }
 };
 
-const storeQuote = async (
-  txnId: string,
-  quote: any,
-  result: any[]
-): Promise<void> => {
-  try {
-    await RedisService.setKey(
-      `${txnId}_quotePrice`,
-      JSON.stringify(parseFloat(quote.price.value)),
-      TTL_IN_SECONDS
-    );
-  } catch (err: any) {
-    addError(result, 21004, `Error storing quote: ${err.message}`);
-  }
-};
 
 const validateOrder = async (
   txnId: string,
@@ -400,13 +385,19 @@ const validatePayment = async (
   result: any[]
 ): Promise<void> => {
   try {
-    const quotePrice = parseFloat(quote.price.value);
-    if (parseFloat(payment.params.amount) !== quotePrice) {
-      addError(
-        result,
-        21030,
-        `Payment amount ${payment.params.amount} does not match quote price ${quotePrice} in /${currentCall}`
-      );
+    const quotePriceRaw = await RedisService.getKey(`${txnId}_quotePrice`);
+    const quotePrice = parseFloat(
+      JSON.parse(quotePriceRaw || "0") || quote.price.value
+    );
+
+    if (payment.type == "ON-ORDER") {
+      if (parseFloat(payment.params.amount) !== quotePrice) {
+        addError(
+          result,
+          21030,
+          `Payment amount ${payment.params.amount} does not match quote price ${quotePrice} in /${currentCall}`
+        );
+      }
     }
 
     const prevPaymentRaw = await getRedisValue(`${txnId}_prevPayment`);
@@ -473,15 +464,12 @@ const validateItems = async (
   result: any[]
 ): Promise<void> => {
   try {
-    const [
-      itemFlfllmntsRaw,
-      itemsIdListRaw,
-      parentItemIdSetRaw,
-    ] = await Promise.all([
-      getRedisValue(`${txnId}_itemFlfllmnts`),
-      getRedisValue(`${txnId}_itemsIdList`),
-      getRedisValue(`${txnId}_parentItemIdSet`),
-    ]);
+    const [itemFlfllmntsRaw, itemsIdListRaw, parentItemIdSetRaw] =
+      await Promise.all([
+        getRedisValue(`${txnId}_itemFlfllmnts`),
+        getRedisValue(`${txnId}_itemsIdList`),
+        getRedisValue(`${txnId}_parentItemIdSet`),
+      ]);
 
     const itemFlfllmnts = itemFlfllmntsRaw;
     const itemsIdList = itemsIdListRaw;
@@ -501,7 +489,6 @@ const validateItems = async (
           }`
         );
       }
-
 
       if (
         parentItemIdSet &&
@@ -2810,7 +2797,6 @@ export const onStatus = async (data: any) => {
       storeOrder(txnId, order, result),
       storeFulfillments(txnId, fulfillments, currentCall, result),
       storePayment(txnId, order.payment, result),
-      storeQuote(txnId, order.quote, result),
       validateBilling(order, txnId, currentCall, result),
       RedisService.setKey(
         `${txnId}_${currentCall}`,

@@ -53,20 +53,25 @@ export const checkUpdate = async (
   const result: ValidationError[] = [];
   const { message, context }: any = data;
   try {
-     try {
-        await contextChecker(context, result, constants.UPDATE, constants.ON_CONFIRM);
-      } catch (err: any) {
-        result.push(
- addError(
-                `Error checking context: ${err.message}`,
-                ERROR_CODES.INVALID_ORDER
-              )
+    try {
+      await contextChecker(
+        context,
+        result,
+        constants.UPDATE,
+        constants.ON_CONFIRM,
+        true
+      );
+    } catch (err: any) {
+      result.push(
+        addError(
+          `Error checking context: ${err.message}`,
+          ERROR_CODES.INVALID_ORDER
         )
-        
-        return result;
-      }
+      );
 
-  
+      return result;
+    }
+
     const update = message.order;
     if (targetFf === "payment") {
       try {

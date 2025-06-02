@@ -612,14 +612,19 @@ const validatePayment = async (
 ): Promise<void> => {
   try {
     const quotePrice = parseFloat(quote.price.value);
-    if (parseFloat(payment.params.amount) !== quotePrice) {
-      addError(
-        result,
-        20053,
-        `Payment amount ${payment.params.amount} does not match quote price ${quotePrice} in /${constants.ON_CONFIRM}`
+    if (payment.type == "ON-ORDER") {
+      await RedisService.setKey(
+        `${txnId}_quotePrice`,
+        JSON.stringify(quotePrice)
       );
+      if (parseFloat(payment.params.amount) !== quotePrice) {
+        addError(
+          result,
+          20053,
+          `Payment amount ${payment.params.amount} does not match quote price ${quotePrice} in /${constants.ON_CONFIRM}`
+        );
+      }
     }
-
     const buyerFF = await getRedisValue(`${txnId}_buyerFFAmount`);
     if (
       buyerFF &&
