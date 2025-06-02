@@ -88,6 +88,7 @@ async function validateProviders(
       }
     });
 
+
     provider.items?.forEach((item: any, itemIndex: number) => {
       if (itemsId.has(item.id)) {
         addError(result, 20005, `Duplicate item id: ${item.id} in bpp/providers[${index}]`);
@@ -159,6 +160,119 @@ async function validateProviders(
         }
       }
     });
+    let credsDescriptor: any[] = [];
+
+  
+    const creds = provider.creds;
+    if(creds){
+       creds?.forEach((cred: any, credIndex: number) => {
+      let isValid = true;
+
+      
+
+      
+
+      try {
+        if (cred.url) new URL(cred.url);
+      } catch {
+        addError(
+          result,
+          20005,
+          `Invalid URL format in credential at index ${credIndex} in provider ${index}: ${cred.url} in /ON_SEARCH`
+        );
+        isValid = false;
+      }
+
+      const verificationTag =
+        cred.tags?.find((tag: any) => tag.code === "verification");
+
+      if (!verificationTag || !verificationTag.list) {
+        addError(
+          result,
+          20006,
+          `Verification tag missing or invalid in credential at index ${credIndex} in provider ${index} in /ON_SEARCH`
+        );
+        isValid = false;
+      }
+
+      const verifyUrl = verificationTag?.list?.find(
+        (item: any) => item.code === "verify_url"
+      )?.value;
+      const validFrom = verificationTag?.list?.find(
+        (item: any) => item.code === "valid_from"
+      )?.value;
+      const validTo = verificationTag?.list?.find(
+        (item: any) => item.code === "valid_to"
+      )?.value;
+
+      if (!verifyUrl || !validFrom || !validTo) {
+        addError(
+          result,
+          20007,
+          `Verification details missing in credential at index ${credIndex} in provider ${index} in /ON_SEARCH`
+        );
+        isValid = false;
+      }
+
+      try {
+        if (verifyUrl) new URL(verifyUrl);
+      } catch {
+        addError(
+          result,
+          20008,
+          `Invalid verify_url format in credential at index ${credIndex} in provider ${index}: ${verifyUrl} in /ON_SEARCH`
+        );
+        isValid = false;
+      }
+
+      const fromDate = validFrom && new Date(validFrom);
+      const toDate = validTo && new Date(validTo);
+      const currentDate = new Date();
+      if (fromDate && isNaN(fromDate.getTime())) {
+        addError(
+          result,
+          20009,
+          `Invalid valid_from date in credential at index ${credIndex} in provider ${index}: ${validFrom} in /ON_SEARCH`
+        );
+        isValid = false;
+      }
+
+      if (toDate && isNaN(toDate.getTime())) {
+        addError(
+          result,
+          20010,
+          `Invalid valid_to date in credential at index ${credIndex} in provider ${index}: ${validTo} in /ON_SEARCH`
+        );
+        isValid = false;
+      }
+
+      if (fromDate && toDate && toDate <= fromDate) {
+        addError(
+          result,
+          20011,
+          `valid_to must be after valid_from in credential at index ${credIndex} in provider ${index} in /ON_SEARCH`
+        );
+        isValid = false;
+      }
+
+      if (isValid && cred.descriptor && cred.id) {
+        credsDescriptor.push({
+          id: cred.id,
+          descriptor: cred.descriptor
+        });
+        console.info(
+          `Credential at index ${credIndex} in provider ${index} is valid`
+        );
+      }
+    });
+     await RedisService.setKey(
+    `${context?.transaction_id}_${ApiSequence.ON_SEARCH}_credsDescriptor`,
+    JSON.stringify(credsDescriptor),
+    TTL_IN_SECONDS
+  );
+
+  }
+
   }
 
   return {

@@ -95,6 +95,30 @@ async function validateOrder(
       )
     );
   }
+  const provider = order?.provider || {};
+  if (Array.isArray(provider.creds) && provider.creds.length > 0) {
+      const currentCred = provider.creds[0];
+      const { id, descriptor } = currentCred;
+
+      if (id && descriptor?.code && descriptor?.short_desc) {
+        const stored = await RedisService.getKey(`${transaction_id}_${constants.ON_SEARCH}_credsDescriptor`);
+        const storedCreds = stored ? JSON.parse(stored) : [];
+
+        const isMatchFound = storedCreds.some((storedCred: any) =>
+          storedCred.id === id &&
+          storedCred.descriptor?.code === descriptor.code &&
+          storedCred.descriptor?.short_desc === descriptor.short_desc
+        );
+
+        if (!isMatchFound) {
+          addError(
+      
+            23003,
+            `Order validation failure: Credential (id + descriptor) in /${constants.ON_CONFIRM} does not match /${constants.ON_SEARCH}`
+          );
+        }
+      }
+    }
   await RedisService.setKey(
     `${transaction_id}_orderState`,
     JSON.stringify(order.state),

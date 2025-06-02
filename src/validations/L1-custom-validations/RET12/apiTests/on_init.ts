@@ -1,4 +1,3 @@
-import _ from "lodash";
 import { RedisService } from "ondc-automation-cache-lib";
 import { contextChecker } from "../../../../utils/contextUtils";
 import {
@@ -11,6 +10,7 @@ import {
   tagFinder,
 } from "../../../../utils/helper";
 import constants, { ApiSequence } from "../../../../utils/constants";
+import _ from "lodash";
 
 const TTL_IN_SECONDS: number = Number(process.env.TTL_IN_SECONDS) || 3600;
 
@@ -21,7 +21,7 @@ interface ValidationError {
 }
 
 // Helper to add error to result array
-const addError = (result: any[], code: number, description: string): void => {
+const addError = (result: ValidationError[], code: number, description: string): void => {
   result.push({
     valid: false,
     code,
@@ -33,7 +33,7 @@ const addError = (result: any[], code: number, description: string): void => {
 const storeBilling = async (
   txnId: string,
   billing: any,
-  result: any[]
+  result: ValidationError[]
 ): Promise<void> => {
   try {
     await RedisService.setKey(
@@ -42,7 +42,7 @@ const storeBilling = async (
       TTL_IN_SECONDS
     );
   } catch (err: any) {
-    addError(result, 20001, `Error storing billing: ${err.message}`);
+    addError(result, 20006, `Invalid response: Error storing billing: ${err.message}`);
   }
 };
 
@@ -50,7 +50,7 @@ const storeBilling = async (
 const storeQuote = async (
   txnId: string,
   quote: any,
-  result: any[]
+  result: ValidationError[]
 ): Promise<void> => {
   try {
     await RedisService.setKey(
@@ -59,7 +59,7 @@ const storeQuote = async (
       TTL_IN_SECONDS
     );
   } catch (err: any) {
-    addError(result, 20002, `Error storing quote: ${err.message}`);
+    addError(result, 20006, `Invalid response: Error storing quote: ${err.message}`);
   }
 };
 
@@ -67,7 +67,7 @@ const storeQuote = async (
 const storePayment = async (
   txnId: string,
   payment: any,
-  result: any[]
+  result: ValidationError[]
 ): Promise<void> => {
   try {
     await RedisService.setKey(
@@ -76,7 +76,7 @@ const storePayment = async (
       TTL_IN_SECONDS
     );
   } catch (err: any) {
-    addError(result, 20003, `Error storing payment: ${err.message}`);
+    addError(result, 20006, `Invalid response: Error storing payment: ${err.message}`);
   }
 };
 
@@ -84,7 +84,7 @@ const storePayment = async (
 const storeApplicableOffers = async (
   txnId: string,
   offers: any[],
-  result: any[]
+  result: ValidationError[]
 ): Promise<void> => {
   try {
     await RedisService.setKey(
@@ -93,7 +93,7 @@ const storeApplicableOffers = async (
       TTL_IN_SECONDS
     );
   } catch (err: any) {
-    addError(result, 20004, `Error storing applicable offers: ${err.message}`);
+    addError(result, 20006, `Invalid response: Error storing applicable offers: ${err.message}`);
   }
 };
 
@@ -101,15 +101,15 @@ const storeApplicableOffers = async (
 const validateProvider = async (
   txnId: string,
   provider: any,
-  result: any[]
+  result: ValidationError[]
 ): Promise<void> => {
   try {
     const providerId = await getRedisValue(`${txnId}_providerId`);
     if (providerId && providerId !== provider.id) {
       addError(
         result,
-        20005,
-        `Provider Id mismatches in /${constants.ON_SEARCH} and /${constants.ON_INIT}`
+        20006,
+        `Invalid response: Provider Id mismatches in /${constants.ON_SEARCH} and /${constants.ON_INIT}`
       );
     }
 
@@ -119,11 +119,11 @@ const validateProvider = async (
       addError(
         result,
         20006,
-        `provider.locations[0].id mismatches in /${constants.ON_SEARCH} and /${constants.ON_INIT}`
+        `Invalid response: provider.locations[0].id mismatches in /${constants.ON_SEARCH} and /${constants.ON_INIT}`
       );
     }
   } catch (err: any) {
-    addError(result, 20007, `Error validating provider: ${err.message}`);
+    addError(result, 20006, `Invalid response: Error validating provider: ${err.message}`);
   }
 };
 
@@ -132,7 +132,7 @@ const validateBilling = async (
   txnId: string,
   billing: any,
   context: any,
-  result: any[]
+  result: ValidationError[]
 ): Promise<void> => {
   try {
     const contextTime = new Date(context.timestamp).getTime();
@@ -142,8 +142,8 @@ const validateBilling = async (
       if (isNaN(billingTime) || billingTime > contextTime) {
         addError(
           result,
-          20008,
-          `billing.created_at should not be greater than context.timestamp in /${constants.ON_INIT}`
+          20007,
+          `Invalid order state: billing.created_at should not be greater than context.timestamp in /${constants.ON_INIT}`
         );
       }
     }
@@ -153,8 +153,8 @@ const validateBilling = async (
       if (isNaN(billingTime) || billingTime > contextTime) {
         addError(
           result,
-          20009,
-          `billing.updated_at should not be greater than context.timestamp in /${constants.ON_INIT}`
+          20007,
+          `Invalid order state: billing.updated_at should not be greater than context.timestamp in /${constants.ON_INIT}`
         );
       }
     }
@@ -166,8 +166,8 @@ const validateBilling = async (
     ) {
       addError(
         result,
-        20010,
-        `billing.updated_at cannot be less than billing.created_at in /${constants.ON_INIT}`
+        20007,
+        `Invalid order state: billing.updated_at cannot be less than billing.created_at in /${constants.ON_INIT}`
       );
     }
 
@@ -177,13 +177,13 @@ const validateBilling = async (
       billingErrors?.forEach((error: string) => {
         addError(
           result,
-          20011,
-          `billing: ${error} when compared with /${constants.ON_SELECT} billing object`
+          20006,
+          `Invalid response: billing: ${error} when compared with /${constants.ON_SELECT} billing object`
         );
       });
     }
   } catch (err: any) {
-    addError(result, 20012, `Error validating billing: ${err.message}`);
+    addError(result, 20006, `Invalid response: Error validating billing: ${err.message}`);
   }
 };
 
@@ -192,7 +192,7 @@ const validateItems = async (
   txnId: string,
   items: any[],
   context: any,
-  result: any[]
+  result: ValidationError[]
 ): Promise<void> => {
   try {
     const itemFlfllmnts = await getRedisValue(`${txnId}_itemFlfllmnts`);
@@ -210,8 +210,8 @@ const validateItems = async (
       if (!(itemId in itemsIdList)) {
         addError(
           result,
-          20013,
-          `Item not found - Item Id ${itemId} does not exist in /${constants.ON_SELECT}`
+          30004,
+          `Item not found: Item Id ${itemId} does not exist in /${constants.ON_SELECT}`
         );
       }
 
@@ -219,8 +219,8 @@ const validateItems = async (
       if (!fulfillmentIdArray?.includes(item.fulfillment_id)) {
         addError(
           result,
-          20014,
-          `items[${i}].fulfillment_id mismatches for Item ${itemId} in /${constants.ON_SELECT} and /${constants.ON_INIT}`
+          20006,
+          `Invalid response: items[${i}].fulfillment_id mismatches for Item ${itemId} in /${constants.ON_SELECT} and /${constants.ON_INIT}`
         );
       }
 
@@ -232,8 +232,8 @@ const validateItems = async (
       ) {
         addError(
           result,
-          20015,
-          `Warning: items[${i}].quantity.count for item ${itemId} mismatches with /${constants.SELECT}`
+          20006,
+          `Invalid response: items[${i}].quantity.count for item ${itemId} mismatches with /${constants.SELECT}`
         );
       }
 
@@ -245,8 +245,8 @@ const validateItems = async (
       ) {
         addError(
           result,
-          20016,
-          `items[${i}].parent_item_id mismatches for Item ${itemId} in /${constants.ON_SEARCH} and /${constants.ON_INIT}`
+          20006,
+          `Invalid response: items[${i}].parent_item_id mismatches for Item ${itemId} in /${constants.ON_SEARCH} and /${constants.ON_INIT}`
         );
       }
 
@@ -270,14 +270,14 @@ const validateItems = async (
         if (!returnToOrigin || returnToOrigin.value?.toLowerCase() !== "yes") {
           addError(
             result,
-            20023,
-            `'return_to_origin' must be 'yes' in 'rto_action' tag of items[${i}]`
+            20006,
+            `Invalid response: 'return_to_origin' must be 'yes' in 'rto_action' tag of items[${i}]`
           );
         }
       }
     });
   } catch (err: any) {
-    addError(result, 20024, `Error validating items: ${err.message}`);
+    addError(result, 20006, `Invalid response: Error validating items: ${err.message}`);
   }
 };
 
@@ -285,7 +285,7 @@ const validateItems = async (
 const validateFulfillments = async (
   txnId: string,
   fulfillments: any[],
-  result: any[]
+  result: ValidationError[]
 ): Promise<void> => {
   try {
     const fulfillmentIdArray = await getRedisValue(
@@ -299,16 +299,16 @@ const validateFulfillments = async (
       if (!fulfillmentIdArray?.includes(id)) {
         addError(
           result,
-          20025,
-          `fulfillment id ${id} does not exist in /${constants.ON_SELECT}`
+          20006,
+          `Invalid response: fulfillment id ${id} does not exist in /${constants.ON_SELECT}`
         );
       }
 
       if (fulfillment.type !== "Delivery") {
         addError(
           result,
-          20026,
-          `Fulfillment type should be 'Delivery' (case-sensitive)`
+          20006,
+          `Invalid response: Fulfillment type should be 'Delivery' (case-sensitive)`
         );
       } else if (
         fulfillment.tags?.length > 0 &&
@@ -316,8 +316,8 @@ const validateFulfillments = async (
       ) {
         addError(
           result,
-          20027,
-          `/message/order/fulfillment of type 'Delivery' should not have tags`
+          20006,
+          `Invalid response: /message/order/fulfillment of type 'Delivery' should not have tags`
         );
       }
 
@@ -326,8 +326,8 @@ const validateFulfillments = async (
         console.log(`buyerGps: ${buyerGps}, gps: ${gps}`);
         addError(
           result,
-          20028,
-          `gps coordinates in fulfillments[${i}].end.location mismatch in /${constants.ON_SELECT} & /${constants.ON_INIT}`
+          20006,
+          `Invalid response: gps coordinates in fulfillments[${i}].end.location mismatch in /${constants.ON_SELECT} & /${constants.ON_INIT}`
         );
       }
 
@@ -335,8 +335,8 @@ const validateFulfillments = async (
       if (buyerAddr && !_.isEqual(areaCode, buyerAddr)) {
         addError(
           result,
-          20029,
-          `address.area_code in fulfillments[${i}].end.location mismatch in /${constants.ON_SELECT} & /${constants.ON_INIT}`
+          20006,
+          `Invalid response: address.area_code in fulfillments[${i}].end.location mismatch in /${constants.ON_SELECT} & /${constants.ON_INIT}`
         );
       }
 
@@ -349,19 +349,19 @@ const validateFulfillments = async (
         if (lenName + lenBuilding + lenLocality >= 190) {
           addError(
             result,
-            20030,
-            `address.name + address.building + address.locality should be < 190 chars`
+            20006,
+            `Invalid response: address.name + address.building + address.locality should be < 190 chars`
           );
         }
 
         if (lenBuilding <= 3) {
-          addError(result, 20031, `address.building should be > 3 chars`);
+          addError(result, 20006, `Invalid response: address.building should be > 3 chars`);
         }
         if (lenName <= 3) {
-          addError(result, 20032, `address.name should be > 3 chars`);
+          addError(result, 20006, `Invalid response: address.name should be > 3 chars`);
         }
         if (lenLocality <= 3) {
-          addError(result, 20033, `address.locality should be > 3 chars`);
+          addError(result, 20006, `Invalid response: address.locality should be > 3 chars`);
         }
 
         if (
@@ -371,8 +371,8 @@ const validateFulfillments = async (
         ) {
           addError(
             result,
-            20034,
-            `address.name, address.building, and address.locality should be unique`
+            20006,
+            `Invalid response: address.name, address.building, and address.locality should be unique`
           );
         }
       }
@@ -397,8 +397,8 @@ const validateFulfillments = async (
           ) {
             addError(
               result,
-              20036,
-              `'${item.code}' is missing or empty in 'order_details' tag in fulfillments`
+              20006,
+              `Invalid response: '${item.code}' is missing or empty in 'order_details' tag in fulfillments`
             );
           }
         });
@@ -413,8 +413,8 @@ const validateFulfillments = async (
         if (!returnToOrigin || returnToOrigin.value?.toLowerCase() !== "yes") {
           addError(
             result,
-            20038,
-            `'return_to_origin' must be 'yes' in 'rto_action' tag in fulfillments`
+            20006,
+            `Invalid response: 'return_to_origin' must be 'yes' in 'rto_action' tag in fulfillments`
           );
         }
       }
@@ -424,14 +424,14 @@ const validateFulfillments = async (
         if (tracking !== fulfillment.tracking) {
           addError(
             result,
-            20040,
-            `Fulfillment Tracking mismatch with the ${constants.ON_SELECT} call`
+            20006,
+            `Invalid response: Fulfillment Tracking mismatch with the ${constants.ON_SELECT} call`
           );
         }
       }
     });
   } catch (err: any) {
-    addError(result, 20041, `Error validating fulfillments: ${err.message}`);
+    addError(result, 20006, `Invalid response: Error validating fulfillments: ${err.message}`);
   }
 };
 
@@ -440,7 +440,7 @@ const validateQuote = async (
   txnId: string,
   quote: any,
   context: any,
-  result: any[]
+  result: ValidationError[]
 ): Promise<void> => {
   try {
     let initBreakupPrice = 0;
@@ -452,8 +452,8 @@ const validateQuote = async (
     if (Math.round(initQuotePrice) !== Math.round(initBreakupPrice)) {
       addError(
         result,
-        20042,
-        `Quoted Price ${initQuotePrice} does not match with Net Breakup Price ${initBreakupPrice} in /${constants.ON_INIT}`
+        20006,
+        `Invalid response: Quoted Price ${initQuotePrice} does not match with Net Breakup Price ${initBreakupPrice} in /${constants.ON_INIT}`
       );
     }
 
@@ -466,7 +466,7 @@ const validateQuote = async (
         constants.ON_INIT
       );
       quoteErrors?.forEach((error: string) => {
-        addError(result, 20043, `quote: ${error}`);
+        addError(result, 20006, `Invalid response: quote: ${error}`);
       });
     }
 
@@ -477,20 +477,20 @@ const validateQuote = async (
     ) {
       addError(
         result,
-        20044,
-        `Quoted Price in /${constants.ON_INIT} INR ${initQuotePrice} does not match with /${constants.ON_SELECT} INR ${onSelectPrice}`
+        20006,
+        `Invalid response: Quoted Price in /${constants.ON_INIT} INR ${initQuotePrice} does not match with /${constants.ON_SELECT} INR ${onSelectPrice}`
       );
     }
 
     if (_.some(quote.breakup, (item) => _.has(item, "item.quantity"))) {
       addError(
         result,
-        20045,
-        `Extra attribute Quantity provided in quote object after on_select`
+        20006,
+        `Invalid response: Extra attribute Quantity provided in quote object after on_select`
       );
     }
   } catch (err: any) {
-    addError(result, 20046, `Error validating quote: ${err.message}`);
+    addError(result, 20006, `Invalid response: Error validating quote: ${err.message}`);
   }
 };
 
@@ -500,14 +500,14 @@ const validatePayment = async (
   payment: any,
   context: any,
   flow: string,
-  result: any[]
+  result: ValidationError[]
 ): Promise<void> => {
   try {
     if (!payment) {
       addError(
         result,
-        20047,
-        `Payment Object can't be null in /${constants.ON_INIT}`
+        20006,
+        `Invalid response: Payment Object can't be null in /${constants.ON_INIT}`
       );
       return;
     }
@@ -522,8 +522,8 @@ const validatePayment = async (
     ) {
       addError(
         result,
-        20048,
-        `Buyer app finder fee can't change in /${constants.ON_INIT}`
+        41001,
+        `Finder fee not acceptable: The buyer app finder fee is not acceptable`
       );
     }
 
@@ -532,10 +532,8 @@ const validatePayment = async (
     if (settlementBasis && !validSettlementBasis.includes(settlementBasis)) {
       addError(
         result,
-        20049,
-        `Invalid settlement basis in /${
-          constants.ON_INIT
-        }. Expected: ${validSettlementBasis.join(", ")}`
+        20006,
+        `Invalid response: Invalid settlement basis in /${constants.ON_INIT}. Expected: ${validSettlementBasis.join(", ")}`
       );
     }
 
@@ -548,8 +546,8 @@ const validatePayment = async (
     ) {
       addError(
         result,
-        20050,
-        `Invalid settlement window in /${constants.ON_INIT}. Expected format: PTd+[MH]`
+        20006,
+        `Invalid response: Invalid settlement window in /${constants.ON_INIT}. Expected format: PTd+[MH]`
       );
     }
 
@@ -557,8 +555,8 @@ const validatePayment = async (
     if (!settlementDetails) {
       addError(
         result,
-        20051,
-        `settlement_details missing in /${constants.ON_INIT}`
+        20006,
+        `Invalid response: settlement_details missing in /${constants.ON_INIT}`
       );
     } else {
       await RedisService.setKey(
@@ -568,8 +566,8 @@ const validatePayment = async (
       if (settlementDetails.settlement_counterparty !== "seller-app") {
         addError(
           result,
-          20052,
-          `settlement_counterparty must be 'seller-app' in @ondc/org/settlement_details`
+          20006,
+          `Invalid response: settlement_counterparty must be 'seller-app' in @ondc/org/settlement_details`
         );
       }
 
@@ -577,8 +575,8 @@ const validatePayment = async (
       if (!["neft", "rtgs", "upi"].includes(settlement_type)) {
         addError(
           result,
-          20053,
-          `settlement_type must be 'neft/rtgs/upi' in @ondc/org/settlement_details`
+          20006,
+          `Invalid response: settlement_type must be 'neft/rtgs/upi' in @ondc/org/settlement_details`
         );
       } else if (settlement_type !== "upi") {
         const missingFields = [];
@@ -605,34 +603,34 @@ const validatePayment = async (
         if (missingFields.length > 0) {
           addError(
             result,
-            20054,
-            `Payment details missing: ${missingFields.join(", ")}`
+            20006,
+            `Invalid response: Payment details missing: ${missingFields.join(", ")}`
           );
         }
       } else if (
         !settlementDetails.upi_address ||
         settlementDetails.upi_address.trim() === ""
       ) {
-        addError(result, 20055, `Payment details missing: upi_address`);
+        addError(result, 20006, `Invalid response: Payment details missing: upi_address`);
       }
     }
 
     if (payment.collected_by === "BPP") {
       if (!payment.type || payment.type !== "ON-ORDER") {
-        addError(result, 20056, "Type must be 'ON-ORDER' in payment");
+        addError(result, 20006, `Invalid response: Type must be 'ON-ORDER' in payment`);
       }
       if (!payment.uri || !/^https?:\/\/[^\s/$.?#].[^\s]*$/.test(payment.uri)) {
-        addError(result, 20057, "Uri must be a valid URL in payment");
+        addError(result, 20006, `Invalid response: Uri must be a valid URL in payment`);
       }
       if (!payment.status || payment.status !== "NOT-PAID") {
-        addError(result, 20058, "Status must be 'NOT-PAID' in payment");
+        addError(result, 20006, `Invalid response: Status must be 'NOT-PAID' in payment`);
       }
       if (
         !payment.params ||
         typeof payment.params !== "object" ||
         payment.params === null
       ) {
-        addError(result, 20059, "Params must be a non-null object in payment");
+        addError(result, 20006, `Invalid response: Params must be a non-null object in payment`);
       }
       if (
         !payment["@ondc/org/settlement_basis"] ||
@@ -640,8 +638,8 @@ const validatePayment = async (
       ) {
         addError(
           result,
-          20060,
-          "Settlement_basis must be 'delivery' in payment"
+          20006,
+          `Invalid response: Settlement_basis must be 'delivery' in payment`
         );
       }
       if (
@@ -650,8 +648,8 @@ const validatePayment = async (
       ) {
         addError(
           result,
-          20061,
-          "Settlement_window must be a valid ISO 8601 duration in payment"
+          20006,
+          `Invalid response: Settlement_window must be a valid ISO 8601 duration in payment`
         );
       }
       if (
@@ -659,7 +657,7 @@ const validatePayment = async (
         !Array.isArray(payment.tags) ||
         payment.tags.length === 0
       ) {
-        addError(result, 20062, "Tags must be a non-empty array in payment");
+        addError(result, 20006, `Invalid response: Tags must be a non-empty array in payment`);
       }
 
       if (payment.params) {
@@ -669,8 +667,8 @@ const validatePayment = async (
         ) {
           addError(
             result,
-            20063,
-            "Currency must be a valid ISO 4217 code in params"
+            20006,
+            `Invalid response: Currency must be a valid ISO 4217 code in params`
           );
         }
         if (
@@ -680,8 +678,8 @@ const validatePayment = async (
         ) {
           addError(
             result,
-            20064,
-            "Transaction_id must be a non-empty string in params"
+            20006,
+            `Invalid response: Transaction_id must be a non-empty string in params`
           );
         }
         if (
@@ -690,8 +688,8 @@ const validatePayment = async (
         ) {
           addError(
             result,
-            20065,
-            "Amount must be a valid decimal number in params"
+            20006,
+            `Invalid response: Amount must be a valid decimal number in params`
           );
         }
       }
@@ -700,15 +698,15 @@ const validatePayment = async (
         if (!tag.code || tag.code !== "bpp_collect") {
           addError(
             result,
-            20066,
-            `payment.tag[${index}].code must be 'bpp_collect'`
+            20006,
+            `Invalid response: payment.tag[${index}].code must be 'bpp_collect'`
           );
         }
         if (!tag.list || !Array.isArray(tag.list) || tag.list.length === 0) {
           addError(
             result,
-            20067,
-            `payment.tag[${index}].list must be a non-empty array`
+            20006,
+            `Invalid response: payment.tag[${index}].list must be a non-empty array`
           );
         }
         const codes = new Set();
@@ -716,15 +714,15 @@ const validatePayment = async (
           if (!item.code || !["success", "error"].includes(item.code)) {
             addError(
               result,
-              20068,
-              `payment.tag[${index}].list[${itemIndex}].code must be 'success' or 'error'`
+              20006,
+              `Invalid response: payment.tag[${index}].list[${itemIndex}].code must be 'success' or 'error'`
             );
           }
           if (item.code && codes.has(item.code)) {
             addError(
               result,
-              20069,
-              `payment.tag[${index}].list[${itemIndex}].code is a duplicate`
+              20006,
+              `Invalid response: payment.tag[${index}].list[${itemIndex}].code is a duplicate`
             );
           } else if (item.code) {
             codes.add(item.code);
@@ -732,14 +730,14 @@ const validatePayment = async (
           if (!item.value || typeof item.value !== "string") {
             addError(
               result,
-              20070,
-              `payment.tag[${index}].list[${itemIndex}].value must be a string`
+              20006,
+              `Invalid response: payment.tag[${index}].list[${itemIndex}].value must be a string`
             );
           } else if (item.code === "success" && item.value !== "Y") {
             addError(
               result,
-              20071,
-              `payment.tag[${index}].list[${itemIndex}].value must be 'Y' for code 'success'`
+              20006,
+              `Invalid response: payment.tag[${index}].list[${itemIndex}].value must be 'Y' for code 'success'`
             );
           } else if (
             item.code === "error" &&
@@ -747,8 +745,8 @@ const validatePayment = async (
           ) {
             addError(
               result,
-              20072,
-              `payment.tag[${index}].list[${itemIndex}].value is invalid for code 'error'`
+              20006,
+              `Invalid response: payment.tag[${index}].list[${itemIndex}].value is invalid for code 'error'`
             );
           }
         });
@@ -759,12 +757,12 @@ const validatePayment = async (
     if (!status || status.message) {
       addError(
         result,
-        20073,
-        status.message || `Transaction_id missing in message/order/payment`
+        20006,
+        `Invalid response: ${status.message || `Transaction_id missing in message/order/payment`}`
       );
     }
   } catch (err: any) {
-    addError(result, 20074, `Error validating payment: ${err.message}`);
+    addError(result, 20006, `Invalid response: Error validating payment: ${err.message}`);
   }
 };
 
@@ -772,15 +770,15 @@ const validatePayment = async (
 const validateTags = async (
   txnId: string,
   tags: any[],
-  result: any[]
+  result: ValidationError[]
 ): Promise<void> => {
   try {
     if (tags?.length) {
       if (!isTagsValid(tags, "bpp_terms")) {
         addError(
           result,
-          20075,
-          `Tags should have valid gst number and fields in /${constants.ON_INIT}`
+          20006,
+          `Invalid response: Tags should have valid gst number and fields in /${constants.ON_INIT}`
         );
       }
 
@@ -791,7 +789,7 @@ const validateTags = async (
           (item: any) => item.code === "accept_bap_terms"
         );
         if (acceptBapTerms.length > 0) {
-          addError(result, 20076, `accept_bap_terms is not required`);
+          addError(result, 20006, `Invalid response: accept_bap_terms is not required`);
         }
 
         let tax_number: any = {};
@@ -805,8 +803,8 @@ const validateTags = async (
             if (!e.value) {
               addError(
                 result,
-                20077,
-                `value must be present for tax_number in ${constants.ON_INIT}`
+                20006,
+                `Invalid response: value must be present for tax_number in ${constants.ON_INIT}`
               );
             } else {
               const taxNumberPattern =
@@ -814,8 +812,8 @@ const validateTags = async (
               if (!taxNumberPattern.test(e.value)) {
                 addError(
                   result,
-                  20078,
-                  `Invalid format for tax_number in ${constants.ON_INIT}`
+                  20006,
+                  `Invalid response: Invalid format for tax_number in ${constants.ON_INIT}`
                 );
               }
             }
@@ -825,16 +823,16 @@ const validateTags = async (
             if (!e.value) {
               addError(
                 result,
-                20079,
-                `value must be present for provider_tax_number in ${constants.ON_INIT}`
+                20006,
+                `Invalid response: value must be present for provider_tax_number in ${constants.ON_INIT}`
               );
             } else {
               const taxNumberPattern = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
               if (!taxNumberPattern.test(e.value)) {
                 addError(
                   result,
-                  20080,
-                  `Invalid format for provider_tax_number in ${constants.ON_INIT}`
+                  20006,
+                  `Invalid response: Invalid format for provider_tax_number in ${constants.ON_INIT}`
                 );
               }
             }
@@ -845,15 +843,15 @@ const validateTags = async (
         if (_.isEmpty(tax_number)) {
           addError(
             result,
-            20081,
-            `tax_number must be present in ${constants.ON_INIT}`
+            20006,
+            `Invalid response: tax_number must be present in ${constants.ON_INIT}`
           );
         }
         if (_.isEmpty(provider_tax_number)) {
           addError(
             result,
-            20082,
-            `provider_tax_number must be present in ${constants.ON_INIT}`
+            20006,
+            `Invalid response: provider_tax_number must be present in ${constants.ON_INIT}`
           );
         }
 
@@ -869,8 +867,8 @@ const validateTags = async (
           ) {
             addError(
               result,
-              20083,
-              `Pan_id is different in tax_number and provider_tax_number`
+              20006,
+              `Invalid response: Pan_id is different in tax_number and provider_tax_number`
             );
           } else if (
             pan_id === provider_tax_number.value &&
@@ -878,8 +876,8 @@ const validateTags = async (
           ) {
             addError(
               result,
-              20084,
-              `Pan_id shouldn't be same in tax_number and provider_tax_number`
+              20006,
+              `Invalid response: Pan_id shouldn't be same in tax_number and provider_tax_number`
             );
           }
         }
@@ -892,8 +890,8 @@ const validateTags = async (
             if (hasStaticTerms) {
               addError(
                 result,
-                20085,
-                `static_terms is not required in ${constants.ON_INIT}`
+                20006,
+                `Invalid response: static_terms is not required in ${constants.ON_INIT}`
               );
             }
           }
@@ -905,8 +903,8 @@ const validateTags = async (
             if (!panRegex.test(providerTaxNumber.value)) {
               addError(
                 result,
-                20086,
-                `'provider_tax_number' should have a valid PAN number format`
+                20006,
+                `Invalid response: 'provider_tax_number' should have a valid PAN number format`
               );
             }
           }
@@ -932,24 +930,20 @@ const validateTags = async (
       }
     }
   } catch (err: any) {
-    addError(result, 20087, `Error validating tags: ${err.message}`);
+    addError(result, 20006, `Invalid response: Error validating tags: ${err.message}`);
   }
 };
 
 const onInit = async (data: any) => {
   const { context, message } = data;
-  const result: any[] = [];
+  const result: ValidationError[] = [];
   const txnId = context?.transaction_id;
   const flow = "2";
 
   try {
     await contextChecker(context, result, constants.ON_INIT, constants.INIT);
   } catch (err: any) {
-    result.push({
-      valid: false,
-      code: 20000,
-      description: err.message,
-    });
+    addError(result, 20006, err.message);
     return result;
   }
 
@@ -977,7 +971,7 @@ const onInit = async (data: any) => {
     return result;
   } catch (err: any) {
     console.error(
-      `!!Some error occurred while checking /${constants.ON_INIT} API, ${err.stack}`
+      `Error occurred while checking /${constants.ON_INIT} API, ${err.stack}`
     );
     return result;
   }
