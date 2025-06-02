@@ -81,7 +81,13 @@ export const onUpdateRouter = async (data: any) => {
     return [addError(400, "Fulfillments are missing or empty")];
   }
 
-  const fulfillmentObj = fulfillments[length - 1];
+  let fulfillmentObj = fulfillments[length - 1];
+  const returnRequestObj = fulfillments.find((f: any) => f.type === "Return");
+
+  if (returnRequestObj) {
+    fulfillmentObj = returnRequestObj;
+  }
+
   const fulfillmentType = fulfillmentObj.type;
   if (fulfillmentType === "Cancel") {
     apiSeq = ApiSequence.ON_UPDATE_PART_CANCEL;

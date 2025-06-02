@@ -137,6 +137,7 @@ export const checkUpdate = async (
       try {
         console.info(`Checking for return_request object in /${apiSeq}`);
         let return_request_obj = null;
+        let isReplace = false;
         update.fulfillments.forEach((item: any) => {
           item.tags?.forEach(async (tag: any) => {
             if (tag.code === "return_request") {
@@ -303,6 +304,16 @@ export const checkUpdate = async (
                       `Error parsing ttl_reverseqc duration in ${apiSeq}`,
                       ERROR_CODES.INVALID_RETURN_REQUEST
                     )
+                  );
+                }
+              }
+              if (fields.replace) {
+                if (fields.replace == "yes") {
+                  isReplace = true;
+                  await RedisService.setKey(
+                    `${context.transaction_id}_replaceable`,
+                    "true",
+                    TTL_IN_SECONDS
                   );
                 }
               }
