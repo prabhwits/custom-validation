@@ -9,6 +9,9 @@ import { onSelect } from "./RET12/apiTests/on_select";
 import { onStatus } from "./RET12/apiTests/on_status/on_status";
 import { search } from "./RET12/apiTests/search";
 import { select } from "./RET12/apiTests/select";
+import { checkStatus } from "./RET12/apiTests/status";
+import { track } from "./RET12/apiTests/track";
+import { on_track } from "./RET12/apiTests/on_track";
 import { onUpdateRouter, updateRouter } from "./RET12/apiTests/update";
 import { validationOutput } from "./types";
 
@@ -26,7 +29,6 @@ export async function performL1CustomValidations(
       break;
     case "on_search":
       result = await onSearch(payload);
-      console.log('Result from on_search:', result);
       break;
     case "select":
       result = await select(payload);
@@ -46,8 +48,17 @@ export async function performL1CustomValidations(
     case "on_confirm":
       result = await on_confirm(payload);
       break;
+    case "status":
+      result = await checkStatus(payload);
+      break;
     case "on_status":
       result = await onStatus(payload);
+      break;
+    case "track":
+      result = await track(payload);
+      break;
+    case "on_track":
+      result = await on_track(payload);
       break;
     case "cancel":
       result = await cancel(payload);

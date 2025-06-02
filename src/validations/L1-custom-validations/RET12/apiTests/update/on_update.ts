@@ -7,6 +7,7 @@ import {
   timeDiff,
   isPresentInRedisSet,
   setRedisValue,
+  addActionToRedisSet,
 } from "../../../../../utils/helper";
 import {
   partcancel_return_reasonCodes,
@@ -57,13 +58,25 @@ export const checkOnUpdate = async (
   const { message, context }: any = data;
   try {
     try {
-      await contextChecker(
-        context,
-        result,
-        constants.ON_UPDATE,
-        constants.ON_CONFIRM,
-        true
-      );
+      await contextChecker(context, result, apiSeq, constants.ON_CONFIRM, true);
+      if (
+        apiSeq === ApiSequence.ON_UPDATE_APPROVAL ||
+        apiSeq === ApiSequence.ON_UPDATE_INTERIM
+      ) {
+        try {
+          await RedisService.setKey(
+            `${context.transaction_id}_PreviousUpdatedTimestamp`,
+            JSON.stringify(message.order.updated_at),
+            TTL_IN_SECONDS
+          );
+        } catch (error: any) {
+          result.push({
+            valid: false,
+            code: 20001,
+            description: `Error storing order details: ${error.message}`,
+          });
+        }
+      }
     } catch (err: any) {
       result.push(addError(`Error checking context: ${err.message}`, 20000));
 
@@ -577,7 +590,10 @@ export const checkOnUpdate = async (
         }
       });
 
-      await setRedisValue(`${context.transaction_id}_fulfillmentIdArray`, fulfillmentIdArray);
+      await setRedisValue(
+        `${context.transaction_id}_fulfillmentIdArray`,
+        fulfillmentIdArray
+      );
     } catch (error: any) {
       console.error(
         `Error while checking fulfillments id, type and tracking in /${constants.ON_STATUS}`
@@ -588,7 +604,6 @@ export const checkOnUpdate = async (
         description: `Error checking fulfillments id, type, and tracking in /${apiSeq}: ${error.message}`,
       });
     }
-
 
     // Flow 6-b and 6-c checks
     if (flow === "6-b") {
@@ -950,7 +965,6 @@ export const checkOnUpdate = async (
           description: `Error checking quote trail items in /${apiSeq}: ${error.message}`,
         });
       }
-
       // Reason_id mapping for return_request in 6-b
       try {
         console.info(`Reason_id mapping for return_request`);

@@ -124,8 +124,8 @@ export default async function onSearch(
       );
     }
 
-    validateBapUri(context.bap_uri, context.bap_id, result, addError);
-    validateBppUri(context.bpp_uri, context.bpp_id, result, addError);
+    validateBapUri(context.bap_uri, context.bap_id, result);
+    validateBppUri(context.bpp_uri, context.bpp_id, result);
 
     if (context.transaction_id === context.message_id) {
       addError(

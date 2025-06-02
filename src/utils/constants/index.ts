@@ -79,6 +79,7 @@ export const ApiSequence = {
   CANCEL: 'cancel',
   ON_CANCEL: 'on_cancel',
   ON_CANCEL_RTO: 'on_cancel_rto',
+  ON_CANCEL_RETURN: 'on_cancel_return',
   TRACK: 'track',
   ON_TRACK: 'on_track',
   STATUS: 'status',

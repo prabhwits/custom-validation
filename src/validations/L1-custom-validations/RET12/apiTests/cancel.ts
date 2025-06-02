@@ -3,10 +3,7 @@ import constants, {
   ApiSequence,
   buyerCancellationRid,
 } from "../../../../utils/constants";
-import {
-  
-  isValidISO8601Duration,
-} from "../../../../utils/helper";
+import { isValidISO8601Duration } from "../../../../utils/helper";
 import { RedisService } from "ondc-automation-cache-lib";
 import { contextChecker } from "../../../../utils/contextUtils";
 const addError = (result: any[], code: number, description: string): void => {
@@ -21,13 +18,18 @@ export const cancel = async (data: any) => {
   const result: any[] = [];
   const { message, context }: any = data;
   try {
-  try {
-      await contextChecker(context, result, constants.CANCEL, constants.ON_CONFIRM);
+    try {
+      await contextChecker(
+        context,
+        result,
+        constants.CANCEL,
+        constants.ON_CONFIRM
+      );
     } catch (err: any) {
       addError(result, 20000, `Error checking context: ${err.message}`);
       return result;
     }
-  
+
     const confirmOrderIdKey = `${context.transaction_id}_cnfrmOrdrId`;
     const cancelMsgIdKey = `${context.transaction_id}_${ApiSequence.CANCEL}_msgId`;
     const cancelDataKey = `${context.transaction_id}_${ApiSequence.CANCEL}`;
@@ -87,11 +89,6 @@ export const cancel = async (data: any) => {
 
       // Validate tags array
       if (!tags || !Array.isArray(tags) || tags.length === 0) {
-        result.push({
-          valid: false,
-          code: 40000,
-          description: `message/descriptor/tags is missing or invalid in /${constants.CANCEL}`,
-        });
       } else {
         const paramsTag = tags.find((tag: any) => tag.code === "params");
         if (!paramsTag || !paramsTag.list || !Array.isArray(paramsTag.list)) {
