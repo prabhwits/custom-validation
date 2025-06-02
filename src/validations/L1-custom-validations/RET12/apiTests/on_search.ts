@@ -2,8 +2,8 @@ import constants, { ApiSequence } from "../../../../utils/constants";
 import { contextChecker } from "../../../../utils/contextUtils";
 import { RedisService } from "ondc-automation-cache-lib";
 import _ from "lodash";
-import { areTimestampsLessThanOrEqualTo } from "../../../../utils/helper";
 
+import { areTimestampsLessThanOrEqualTo } from "../../../../utils/helper";
 import { fashion } from "../../../../utils/constants/fashion";
 
 interface ValidationError {
@@ -13,7 +13,6 @@ interface ValidationError {
 }
 
 const TTL_IN_SECONDS = Number(process.env.TTL_IN_SECONDS) || 3600;
-
 // Helper to add validation errors
 const addError = (
   result: ValidationError[],
@@ -23,7 +22,6 @@ const addError = (
   result.push({ valid: false, code, description });
 };
 
-// Validate providers and their components
 async function validateProviders(
   providers: any[],
   context: any,
@@ -63,7 +61,7 @@ async function validateProviders(
       if (isNaN(numericRating) || numericRating < 1 || numericRating > 5) {
         addError(
           result,
-          40000,
+          20006,
           "provider.rating must be a number between 1 and 5"
         );
       }
@@ -192,7 +190,141 @@ async function validateProviders(
           );
         }
       }
+      const quantity = item?.quantity;
+      if (quantity) {
+        const minimum_qty = parseFloat(quantity?.minimum?.count);
+        const maximum_qty = parseFloat(quantity?.maximum?.count);
+        const available_qty = parseFloat(quantity?.available?.count);
+        if (minimum_qty && maximum_qty && minimum_qty > maximum_qty) {
+          addError(
+            result,
+            20006,
+            `minimum quantity: ${minimum_qty} can't be greater than the maximum quantity: ${maximum_qty}`
+          );
+        }
+        if (minimum_qty && available_qty && available_qty < minimum_qty) {
+          addError(
+            result,
+            20006,
+            `available quantity: ${available_qty} can't be less than the minimum quantity: ${minimum_qty}`
+          );
+        }
+        if (maximum_qty && available_qty && available_qty < maximum_qty) {
+          addError(
+            result,
+            20006,
+            `maximum quantity: ${maximum_qty} can't be greater than the available quantity: ${available_qty}`
+          );
+        }
+      }
     });
+    let credsDescriptor: any[] = [];
+
+    const creds = provider.creds;
+    if (creds) {
+      creds?.forEach((cred: any, credIndex: number) => {
+        let isValid = true;
+
+        try {
+          if (cred.url) new URL(cred.url);
+        } catch {
+          addError(
+            result,
+            20005,
+            `Invalid URL format in credential at index ${credIndex} in provider ${index}: ${cred.url} in /ON_SEARCH`
+          );
+          isValid = false;
+        }
+
+        const verificationTag = cred.tags?.find(
+          (tag: any) => tag.code === "verification"
+        );
+
+        if (!verificationTag || !verificationTag.list) {
+          addError(
+            result,
+            20006,
+            `Verification tag missing or invalid in credential at index ${credIndex} in provider ${index} in /ON_SEARCH`
+          );
+          isValid = false;
+        }
+
+        const verifyUrl = verificationTag?.list?.find(
+          (item: any) => item.code === "verify_url"
+        )?.value;
+        const validFrom = verificationTag?.list?.find(
+          (item: any) => item.code === "valid_from"
+        )?.value;
+        const validTo = verificationTag?.list?.find(
+          (item: any) => item.code === "valid_to"
+        )?.value;
+
+        if (!verifyUrl || !validFrom || !validTo) {
+          addError(
+            result,
+            20007,
+            `Verification details missing in credential at index ${credIndex} in provider ${index} in /ON_SEARCH`
+          );
+          isValid = false;
+        }
+
+        try {
+          if (verifyUrl) new URL(verifyUrl);
+        } catch {
+          addError(
+            result,
+            20008,
+            `Invalid verify_url format in credential at index ${credIndex} in provider ${index}: ${verifyUrl} in /ON_SEARCH`
+          );
+          isValid = false;
+        }
+
+        const fromDate = validFrom && new Date(validFrom);
+        const toDate = validTo && new Date(validTo);
+        const currentDate = new Date();
+        if (fromDate && isNaN(fromDate.getTime())) {
+          addError(
+            result,
+            20009,
+            `Invalid valid_from date in credential at index ${credIndex} in provider ${index}: ${validFrom} in /ON_SEARCH`
+          );
+          isValid = false;
+        }
+
+        if (toDate && isNaN(toDate.getTime())) {
+          addError(
+            result,
+            20010,
+            `Invalid valid_to date in credential at index ${credIndex} in provider ${index}: ${validTo} in /ON_SEARCH`
+          );
+          isValid = false;
+        }
+
+        if (fromDate && toDate && toDate <= fromDate) {
+          addError(
+            result,
+            20011,
+            `valid_to must be after valid_from in credential at index ${credIndex} in provider ${index} in /ON_SEARCH`
+          );
+          isValid = false;
+        }
+
+        if (isValid && cred.descriptor && cred.id) {
+          credsDescriptor.push({
+            id: cred.id,
+            descriptor: cred.descriptor,
+          });
+          console.info(
+            `Credential at index ${credIndex} in provider ${index} is valid`
+          );
+        }
+      });
+      await RedisService.setKey(
+        `${context?.transaction_id}_${ApiSequence.ON_SEARCH}_credsDescriptor`,
+        JSON.stringify(credsDescriptor),
+        TTL_IN_SECONDS
+      );
+    }
   }
 
   return {
@@ -363,7 +495,6 @@ async function storeData(
       JSON.stringify([...categoriesId]),
       TTL_IN_SECONDS
     ),
-
     RedisService.setKey(
       `${transactionId}_onSearchItems`,
       JSON.stringify(itemsArray),
@@ -374,7 +505,6 @@ async function storeData(
       JSON.stringify([...prvdrsId]),
       TTL_IN_SECONDS
     ),
-
     RedisService.setKey(
       `${transactionId}_${ApiSequence.ON_SEARCH}itemsId`,
       JSON.stringify([...itemsId]),
@@ -391,7 +521,6 @@ async function storeData(
     ),
   ]);
 }
-
 export async function onSearch(data: any) {
   const { context, message } = data;
   const result: ValidationError[] = [];
@@ -405,7 +534,6 @@ export async function onSearch(data: any) {
       constants.SEARCH
     );
   } catch (err: any) {
-    console.log("Entered the block 2243", err);
     result.push({
       valid: false,
       code: 20000,
@@ -452,7 +580,7 @@ export async function onSearch(data: any) {
     return result;
   } catch (err: any) {
     console.error(`Error in /${constants.ON_SEARCH}: ${err.stack}`);
-    addError(result, 50000, `Internal error: ${err.message}`);
+    addError(result, 20006, `Internal error: ${err.message}`);
     return result;
   }
 }

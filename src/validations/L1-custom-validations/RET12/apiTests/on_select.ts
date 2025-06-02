@@ -1,7 +1,7 @@
 import { RedisService } from "ondc-automation-cache-lib";
 import constants, { ApiSequence, ffCategory } from "../../../../utils/constants";
 import { contextChecker } from "../../../../utils/contextUtils";
-import { setRedisValue,  tagFinder, isoDurToSec, taxNotInlcusive } from "../../../../utils/helper";
+import { setRedisValue, tagFinder, isoDurToSec, taxNotInlcusive } from "../../../../utils/helper";
 import _ from "lodash";
 
 interface ValidationError {
@@ -9,7 +9,6 @@ interface ValidationError {
   code: number;
   description: string;
 }
-
 
 const retailPymntTtl: { [key: string]: string } = {
   "delivery charges": "delivery",
@@ -30,9 +29,7 @@ async function validateProvider(
   onSelect: any,
   transaction_id: string,
   result: ValidationError[]
-  
 ) {
-
   try {
     console.info(`Checking provider in /${constants.ON_SELECT}`);
     const providerIdRaw = await RedisService.getKey(`${transaction_id}_providerId`);
@@ -41,15 +38,15 @@ async function validateProvider(
     const providerLoc = providerLocRaw ? JSON.parse(providerLocRaw) : null;
 
     if (providerId != onSelect.provider.id) {
-      addError(result, 20000, `provider.id mismatches in /${constants.SELECT} and /${constants.ON_SELECT}`);
+      addError(result, 20006, `provider.id mismatches in /${constants.SELECT} and /${constants.ON_SELECT}`);
     }
 
     if (onSelect.provider.locations[0].id !== providerLoc) {
-      addError(result, 20000, `provider.locations[0].id mismatches in /${constants.SELECT} and /${constants.ON_SELECT}`);
+      addError(result, 20006, `provider.locations[0].id mismatches in /${constants.SELECT} and /${constants.ON_SELECT}`);
     }
   } catch (error: any) {
     console.error(`Error while checking provider in /${constants.ON_SELECT}, ${error.stack}`);
-    addError(result, 20000, `Error while checking provider: ${error.message}`);
+    addError(result, 23001, `Internal Error: ${error.message}`);
   }
 }
 
@@ -68,21 +65,17 @@ async function validateItems(
 
     onSelect.items.forEach((item: any, index: number) => {
       if (!itemsOnSelect?.includes(item.id)) {
-        
-        addError(result, 20000, `Invalid Item Id provided in /${constants.ON_SELECT}: ${item.id}`);
+        addError(result, 20006, `Invalid Item Id provided in /${constants.ON_SELECT}: ${item.id}`);
       } else {
         selectItems.push(item.id);
       }
 
-      // Check fulfillment mapping
       const found = onSelect.fulfillments.some((f: any) => f.id === item.fulfillment_id);
       if (!found) {
-        addError(result, 20000, `fulfillment_id for item ${item.id} does not exist in order.fulfillments[]`);
+        addError(result, 20006, `fulfillment_id for item ${item.id} does not exist in order.fulfillments[]`);
       }
 
       itemFlfllmnts[item.id] = item.fulfillment_id;
-
-     
     });
 
     await Promise.all([
@@ -91,7 +84,7 @@ async function validateItems(
     ]);
   } catch (error: any) {
     console.error(`Error while checking items in /${constants.ON_SELECT}, ${error.stack}`);
-    addError(result, 20000, `Error while checking items: ${error.message}`);
+    addError(result, 23001, `Internal Error: ${error.message}`);
   }
 }
 
@@ -112,80 +105,73 @@ async function validateFulfillments(
 
     onSelect.fulfillments.forEach((ff: any, index: number) => {
       if (!ff.id) {
-        addError(result, 20000, `Fulfillment Id must be present in /${constants.ON_SELECT}`);
+        addError(result, 20006, `Fulfillment Id must be present in /${constants.ON_SELECT}`);
         return;
       }
       fulfillmentIdArray.push(ff.id);
 
-      // Check TAT
       if (!ff["@ondc/org/TAT"]) {
-        addError(result, 20000, `Fulfillment TAT must be present for fulfillment ID: ${ff.id}`);
+        addError(result, 20006, `Fulfillment TAT must be present for fulfillment ID: ${ff.id}`);
       } else {
         const tat = isoDurToSec(ff["@ondc/org/TAT"]);
         fulfillment_tat_obj[ff.id] = tat;
         if (tat <= tts) {
-          addError(result, 
-            20000,
+          addError(result,
+            22504,
             `/fulfillments[${index}]/@ondc/org/TAT (O2D) in /${constants.ON_SELECT} can't be less than or equal to @ondc/org/time_to_ship (O2S) in /${constants.ON_SEARCH}`
           );
         }
       }
 
       if (!ff.state || !ff.state.descriptor?.code) {
-        addError(result, 20000, `In Fulfillment${index}, descriptor code is mandatory in /${constants.ON_SELECT}`);
+        addError(result, 20007, `In Fulfillment${index}, descriptor code is mandatory in /${constants.ON_SELECT}`);
       } else {
         const code = ff.state.descriptor.code;
         if (code === "Non-serviceable") {
           nonServiceableFlag = 1;
         }
         if (!["Serviceable", "Non-serviceable"].includes(code)) {
-          addError(result, 
-            20000,
+          addError(result,
+            20007,
             `Pre-order fulfillment state codes should be 'Serviceable' or 'Non-serviceable' in fulfillments[${index}].state.descriptor.code`
           );
         }
       }
 
-      // Check category
       if (ff.state?.descriptor?.code === "Serviceable" && ff.type === "Delivery") {
         if (!ff["@ondc/org/category"] || !ffCategory[0].includes(ff["@ondc/org/category"])) {
-          addError(result, 
-            20000,
+          addError(result,
+            20006,
             `In Fulfillment${index}, @ondc/org/category is not a valid value in /${constants.ON_SELECT} and should have one of these values [${ffCategory[0]}]`
           );
         }
-        
       } else if (ff.type === "Self-Pickup") {
         if (!ff["@ondc/org/category"] || !ffCategory[1].includes(ff["@ondc/org/category"])) {
-          addError(result, 
-            20000,
+          addError(result,
+            20006,
             `In Fulfillment${index}, @ondc/org/category is not a valid value in /${constants.ON_SELECT} and should have one of these values [${ffCategory[1]}]`
           );
         }
       }
 
-      // Check time range for Delivery/Self-Pickup
       if (["Delivery", "Self-Pickup"].includes(ff.type)) {
         const timeRange = ff.type === "Delivery" ? ff.end?.time?.range : ff.start?.time?.range;
         const start = timeRange?.start ? new Date(timeRange.start) : null;
         const end = timeRange?.end ? new Date(timeRange.end) : null;
         const contextTime = new Date(timestamp);
 
-       
-          if (start && end && start >= end) {
-            addError(result, 20001, `Start time must be less than end time in ${ff.type} fulfillment`);
-          }
-          if (start && start <= contextTime) {
-            addError(result, 20001, `Start time must be after context.timestamp in ${ff.type} fulfillment`);
-          }
-        
+        if (start && end && start >= end) {
+          addError(result, 20008, `Start time must be less than end time in ${ff.type} fulfillment`);
+        }
+        if (start && start <= contextTime) {
+          addError(result, 20009, `Start time must be after context.timestamp in ${ff.type} fulfillment`);
+        }
       }
 
-      // Check Buyer-Delivery tags
       if (ff.type === "Buyer-Delivery") {
         const orderDetailsTag = ff.tags?.find((tag: any) => tag.code === "order_details");
         if (!orderDetailsTag) {
-          addError(result, 20007, `Missing 'order_details' tag in fulfillments when fulfillment.type is 'Buyer-Delivery'`);
+          addError(result, 20008, `Missing 'order_details' tag in fulfillments when fulfillment.type is 'Buyer-Delivery'`);
         } else {
           const requiredFields = ["weight_unit", "weight_value", "dim_unit", "length", "breadth", "height"];
           const list = orderDetailsTag.list || [];
@@ -198,22 +184,19 @@ async function validateFulfillments(
         }
       }
 
-      // Check tracking
       if (ff.tracking === undefined || typeof ff.tracking !== "boolean") {
-        addError(result, 20000, `Tracking must be present for fulfillment ID: ${ff.id} in boolean form`);
+        addError(result, 20006, `Tracking must be present for fulfillment ID: ${ff.id} in boolean form`);
       } else {
         setRedisValue(`${transaction_id}_${ff.id}_tracking`, ff.tracking, TTL_IN_SECONDS);
       }
 
-      // Check fulfillment ID vs provider ID
       if (ff.id === onSelect.provider.id) {
-        addError(result, 20000, `Fulfillment ID can't be equal to Provider ID in /${constants.ON_SELECT}`);
+        addError(result, 20006, `Fulfillment ID can't be equal to Provider ID in /${constants.ON_SELECT}`);
       }
     });
 
-    // Check non-serviceable error
     if (nonServiceableFlag && (!onSelect.error || onSelect.error.type !== "DOMAIN-ERROR" || onSelect.error.code !== "30009")) {
-      addError(result, 20000, `Non Serviceable Domain error should be provided when fulfillment is not serviceable`);
+      addError(result, 20007, `Non Serviceable Domain error should be provided when fulfillment is not serviceable`);
     }
 
     await Promise.all([
@@ -222,13 +205,12 @@ async function validateFulfillments(
     ]);
   } catch (error: any) {
     console.error(`Error while checking fulfillments in /${constants.ON_SELECT}, ${error.stack}`);
-    addError(result, 20000, `Error while checking fulfillments: ${error.message}`);
+    addError(result, 23001, `Internal Error: ${error.message}`);
   }
 
   return { nonServiceableFlag };
 }
 
-// Validate quote-related data
 async function validateQuote(
   onSelect: any,
   transaction_id: string,
@@ -237,7 +219,7 @@ async function validateQuote(
 ) {
   try {
     console.info(`Checking quote in /${constants.ON_SELECT}`);
- 
+
     const itemsIdListRaw = await RedisService.getKey(`${transaction_id}_itemsIdList`);
     const itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
     const itemsCtgrsRaw = await RedisService.getKey(`${transaction_id}_itemsCtgrs`);
@@ -250,11 +232,9 @@ async function validateQuote(
     const itemPrices = new Map<string, number>();
     const fulfillmentIdArrayRaw = await RedisService.getKey(`${transaction_id}_fulfillmentIdArray`);
     const fulfillmentIdArray = fulfillmentIdArrayRaw ? JSON.parse(fulfillmentIdArrayRaw) : [];
-    // Parse itemFlfllmntsRaw into an object
     let itemFlfllmntsRaw = await RedisService.getKey(`${transaction_id}_itemFlfllmnts`);
-    let itemFlfllmnts : any = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
+    let itemFlfllmnts: any = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
 
-    // Check quote breakup
     const deliveryItems = onSelect.quote.breakup.filter(
       (item: any) => item["@ondc/org/title_type"] === "delivery"
     );
@@ -263,79 +243,71 @@ async function validateQuote(
     if (noOfDeliveries && nonServiceableFlag) {
       deliveryItems.forEach((e: any) => {
         if (parseFloat(e.price.value) > 0) {
-          addError(result, 20000, `Delivery charges not applicable for non-serviceable locations`);
+          addError(result, 22506, `Delivery charges not applicable for non-serviceable locations`);
         }
       });
     }
 
-    // Validate breakup elements
     onSelect.quote.breakup.forEach((element: any, i: number) => {
       const titleType: any = element["@ondc/org/title_type"];
       const itemId = element["@ondc/org/item_id"];
 
-      // Check title type
       if (titleType !== "item" && titleType !== "offer" && !Object.values(retailPymntTtl).includes(titleType)) {
-        addError(result, 20000, `Quote breakup Payment title type "${titleType}" is not as per the API contract`);
+        addError(result, 22507, `Quote breakup Payment title type "${titleType}" is not as per the API contract`);
       }
 
-      // Check title
       if (titleType !== "item" && titleType !== "offer" && !(element.title.toLowerCase().trim() in retailPymntTtl)) {
-        addError(result, 20000, `Quote breakup Payment title "${element.title}" is not as per the API Contract`);
+        addError(result, 22507, `Quote breakup Payment title "${element.title}" is not as per the API Contract`);
       } else if (
         titleType !== "item" &&
         titleType !== "offer" &&
         retailPymntTtl[element.title.toLowerCase().trim()] !== titleType
       ) {
-        addError(result, 
-          20000,
+        addError(result,
+          22507,
           `Quote breakup Payment title "${element.title}" comes under the title type "${retailPymntTtl[element.title.toLowerCase().trim()]}"`
         );
       }
 
-      // Check item-related validations
       if (titleType === "item") {
-        console.log('ItemID', itemId, 'itemFlfllmnts', itemFlfllmnts, 'type of itemFlfllmnts', typeof itemFlfllmnts);
         if (!(itemId in itemsIdList)) {
-          addError(result, 20000, `item with id: ${itemId} in quote.breakup[${i}] does not exist in items[]`);
+          addError(result, 20006, `item with id: ${itemId} in quote.breakup[${i}] does not exist in items[]`);
         }
         if (!element.item) {
-          addError(result, 20000, `Item's unit price missing in quote.breakup for item id ${itemId}`);
+          addError(result, 20006, `Item's unit price missing in quote.breakup for item id ${itemId}`);
         } else if (
           parseFloat(element.item.price.value) * parseInt(element["@ondc/org/item_quantity"].count) !=
           parseFloat(element.price.value)
         ) {
-          addError(result, 20000, `Item's unit and total price mismatch for id: ${itemId}`);
+          addError(result, 20006, `Item's unit and total price mismatch for id: ${itemId}`);
         }
         if (itemId in itemsIdList && element["@ondc/org/item_quantity"].count != itemsIdList[itemId]) {
-          addError(result, 
-            20000,
+          addError(result,
+            20008,
             `Count of item with id: ${itemId} does not match in /${constants.SELECT} & /${constants.ON_SELECT}`
           );
         }
         itemPrices.set(itemId, Math.abs(parseFloat(element.price.value)));
       }
 
-      // Check tax/discount
       if (["tax", "discount"].includes(titleType)) {
         if (!(itemId in itemsIdList)) {
-          addError(result, 
-            20000,
+          addError(result,
+            20006,
             `item with id: ${itemId} in quote.breakup[${i}] does not exist in items[] (should be a valid item id)`
           );
         }
       }
 
-      // Check packing/delivery/misc
       if (["packing", "delivery", "misc"].includes(titleType)) {
         if (!fulfillmentIdArray.includes(itemId)) {
-          addError(result, 
-            20000,
+          addError(result,
+            20006,
             `invalid id: ${itemId} in ${titleType} line item (should be a valid fulfillment_id)`
           );
         }
       }
 
-      // Calculate prices
       onSelectPrice += parseFloat(element.price.value);
       if (
         titleType === "item" ||
@@ -345,25 +317,22 @@ async function validateQuote(
       }
     });
 
-    // Check total price
     onSelectPrice = parseFloat(onSelectPrice.toFixed(2));
     const quotedPrice = parseFloat(onSelect.quote.price.value);
     if (Math.round(onSelectPrice) !== Math.round(quotedPrice)) {
-      addError(result, 
-        20000,
+      addError(result,
+        20006,
         `quote.price.value ${quotedPrice} does not match with the price breakup ${onSelectPrice}`
       );
     }
 
-    // Compare with SELECT price
     if (typeof selectedPrice === "number" && onSelectItemsPrice !== selectedPrice) {
-      addError(result, 
-        20000,
+      addError(result,
+        20006,
         `Quoted Price in /${constants.ON_SELECT} INR ${onSelectItemsPrice} does not match with the total price of items in /${constants.SELECT} INR ${selectedPrice}`
       );
     }
 
-    // Store quote and prices
     const quoteObj = { ...onSelect.quote };
     quoteObj.breakup.forEach((element: any) => {
       if (element["@ondc/org/title_type"] === "item" && element.item?.quantity) {
@@ -377,7 +346,6 @@ async function validateQuote(
       setRedisValue(`${transaction_id}_selectPriceMap`, Array.from(itemPrices.entries()), TTL_IN_SECONDS),
     ]);
 
-    // Check parent_item_id in quote vs items
     const parentItemIds = onSelect.items
       .map((item: any) => item.parent_item_id)
       .filter((id: any) => id);
@@ -387,18 +355,17 @@ async function validateQuote(
 
     parentItemIdsQuotes.forEach((quoteParentId: string, index: number) => {
       if (!parentItemIds.includes(quoteParentId)) {
-        addError(result, 
-          20000,
+        addError(result,
+          20006,
           `parent_item_id '${quoteParentId}' in quote.breakup[${index}] is not present in items array`
         );
       }
     });
   } catch (error: any) {
     console.error(`Error while checking quote in /${constants.ON_SELECT}, ${error.stack}`);
-    addError(result, 20000, `Error while checking quote: ${error.message}`);
+    addError(result, 23001, `Internal Error: ${error.message}`);
   }
 }
-
 
 async function validateError(
   onSelect: any,
@@ -418,7 +385,7 @@ async function validateError(
       try {
         errorArray = JSON.parse(error.message);
       } catch (err: any) {
-        addError(result, 
+        addError(result,
           20006,
           `The error.message provided in ${ApiSequence.ON_SELECT_OUT_OF_STOCK} should be a valid JSON array`
         );
@@ -426,21 +393,19 @@ async function validateError(
       }
 
       if (!Array.isArray(errorArray)) {
-        addError(result, 
+        addError(result,
           20006,
           `The error.message provided in ${ApiSequence.ON_SELECT_OUT_OF_STOCK} should be an array`
         );
         return;
       }
 
-      
-
       const breakup_msg = onSelect.quote.breakup;
       const parent_item_ids = breakup_msg.map((item: any) => item.item?.parent_item_id).filter((id: any) => id);
       const dynamic_item_ids = errorArray.map((item: any) => item.dynamic_item_id);
 
       _.difference(dynamic_item_ids, parent_item_ids).forEach((diff: string) => {
-        addError(result, 
+        addError(result,
           20006,
           `Dynamic_item_id: ${diff} doesn't exist in any quote.breakup.item.parent_item_ids`
         );
@@ -453,7 +418,7 @@ async function validateError(
       );
 
       _.difference(_.map(itemsReduced, "item.parent_item_id"), dynamic_item_ids).forEach((diff: string) => {
-        addError(result, 
+        addError(result,
           20006,
           `Dynamic_item_id: ${diff} is missing from error payload`
         );
@@ -464,7 +429,7 @@ async function validateError(
           (item: any) => item["@ondc/org/item_id"] === errorItem.item_id
         );
         if (!isPresent && errorItem.item_id) {
-          addError(result, 
+          addError(result,
             20006,
             `Item isn't reduced ${errorItem.item_id} in error message is not present in fulfillments/items`
           );
@@ -476,7 +441,7 @@ async function validateError(
           (errorItem: any) => errorItem.item_id === item["@ondc/org/item_id"]
         );
         if (!isPresent) {
-          addError(result, 
+          addError(result,
             20006,
             `message/order/items for item ${item["@ondc/org/item_id"]} does not match in error message`
           );
@@ -497,13 +462,11 @@ export async function onSelect(data: any) {
   try {
     await contextChecker(context, result, constants.ON_SELECT, constants.SELECT);
   } catch (err: any) {
-    addError(result, 20000, err.message);
+    addError(result, 20006, err.message);
     return result;
   }
 
   try {
- 
-
     const onSelect = message.order;
     await setRedisValue(`${txnId}_${ApiSequence.ON_SELECT}`, data, TTL_IN_SECONDS);
 
@@ -511,13 +474,12 @@ export async function onSelect(data: any) {
     await validateItems(onSelect, txnId, result);
     const { nonServiceableFlag } = await validateFulfillments(onSelect, txnId, result, context.timestamp);
     await validateQuote(onSelect, txnId, result, nonServiceableFlag);
-    // await validateOffers(onSelect, txnId, result, );
-    await validateError(onSelect, txnId, result, );
+    await validateError(onSelect, txnId, result);
 
     return result;
   } catch (error: any) {
     console.error(`Error in /${constants.ON_SELECT}: ${error.stack}`);
-    addError(result, 20000, `Internal error: ${error.message}`);
+    addError(result, 23001, `Internal Error: ${error.message}`);
     return result;
   }
 }

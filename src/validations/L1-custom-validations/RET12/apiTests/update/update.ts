@@ -96,6 +96,7 @@ export const checkUpdate = async (
             ...settlementDetailSet,
           ];
 
+          
           await RedisService.setKey(
             `${context.transaction_id}_prevPayment`,
             JSON.stringify(prevPayment),

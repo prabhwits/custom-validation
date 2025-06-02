@@ -6,7 +6,7 @@ import on_confirm from "./RET12/apiTests/on_confirm";
 import onInit from "./RET12/apiTests/on_init";
 import { onSearch } from "./RET12/apiTests/on_search";
 import { onSelect } from "./RET12/apiTests/on_select";
-import { onStatus } from "./RET12/apiTests/on_status/on_status";
+import { onStatusRouter } from "./RET12/apiTests/on_status";
 import { search } from "./RET12/apiTests/search";
 import { select } from "./RET12/apiTests/select";
 import { checkStatus } from "./RET12/apiTests/status";
@@ -52,7 +52,7 @@ export async function performL1CustomValidations(
       result = await checkStatus(payload);
       break;
     case "on_status":
-      result = await onStatus(payload);
+      result = await onStatusRouter(payload);
       break;
     case "track":
       result = await track(payload);
