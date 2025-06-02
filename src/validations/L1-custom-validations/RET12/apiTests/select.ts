@@ -16,7 +16,6 @@ const addError = (result: ValidationError[], code: number, description: string) 
   result.push({ valid: false, code, description });
 };
 
-// Validate provider-related data
 async function validateProvider(
   select: any,
   transaction_id: string,
@@ -42,21 +41,19 @@ async function validateProvider(
       setRedisValue(`${transaction_id}_providerName`, providerOnSelect?.descriptor?.name, TTL_IN_SECONDS),
     ]);
 
-    // Validate provider location
     if (providerOnSelect?.locations[0]?.id !== select.provider?.locations[0]?.id) {
-      addError(result, 
+      addError(result,
         30002,
         `provider.locations[0].id ${providerOnSelect.locations[0].id}, Provider location not found - The provider location ID provided in the request was not found in /${constants.ON_SEARCH} and /${constants.SELECT}`
       );
     }
 
-    // Check provider time status
     if (providerOnSelect?.time && providerOnSelect?.time?.label === "disable") {
-      addError(result, 20000, `provider with provider.id: ${providerOnSelect.id} was disabled in on_search`);
+      addError(result, 40000, `provider with provider.id: ${providerOnSelect.id} was disabled in on_search`);
     }
   } catch (error: any) {
     console.error(`Error while checking for valid provider in /${constants.ON_SEARCH} and /${constants.SELECT}, ${error.stack}`);
-    addError(result, 20000, `Error while checking provider: ${error.message}`);
+    addError(result, 40000, `Error while checking provider: ${error.message}`);
   }
   return providerOnSelect;
 }
@@ -70,9 +67,6 @@ async function validateFulfillment(
     console.log(`Checking for GPS precision in /${constants.SELECT}`);
     select.fulfillments?.forEach(async (ff: any) => {
       if (ff.hasOwnProperty("end")) {
-       
-
-    
         await Promise.all([
           setRedisValue(`${transaction_id}_buyerGps`, ff.end?.location?.gps, TTL_IN_SECONDS),
           setRedisValue(`${transaction_id}_buyerAddr`, ff.end?.location?.address?.area_code, TTL_IN_SECONDS),
@@ -81,11 +75,10 @@ async function validateFulfillment(
     });
   } catch (error: any) {
     console.error(`!!Error while checking GPS Precision in /${constants.SELECT}, ${error.stack}`);
-    addError(result, 20000, `Error while checking fulfillment: ${error.message}`);
+    addError(result, 40000, `Error while checking fulfillment: ${error.message}`);
   }
 }
 
-// Validate item-related data
 async function validateItem(
   select: any,
   transaction_id: string,
@@ -103,10 +96,9 @@ async function validateItem(
     const itemsOnSearchRaw = await RedisService.getKey(`${transaction_id}_${ApiSequence.ON_SEARCH}itemsId`);
     const itemsOnSearch = itemsOnSearchRaw ? JSON.parse(itemsOnSearchRaw) : [];
 
-
     select.items.forEach((item: { id: string | number; quantity: { count: number } }) => {
       if (!itemsOnSearch?.includes(item.id.toString())) {
-        addError(result, 20000, `Invalid item found in /${constants.SELECT} id: ${item.id}`);
+        addError(result, 30004, `Item not found - The item ID provided in the request was not found: ${item.id}`);
       }
       itemIdArray.push(item.id.toString());
       itemsOnSelect.push(item.id.toString());
@@ -119,20 +111,18 @@ async function validateItem(
     ]);
   } catch (error: any) {
     console.error(`Error while storing item IDs in /${constants.SELECT}, ${error.stack}`);
-    addError(result, 20000, `Error while storing item IDs: ${error.message}`);
+    addError(result, 40000, `Error while storing item IDs: ${error.message}`);
   }
 
   try {
     console.log(`Checking for valid and present location ID inside item list for /${constants.SELECT}`);
-
-   
 
     const itemProviderMapRaw = await RedisService.getKey(`${transaction_id}_itemProviderMap`);
     const itemProviderMap = itemProviderMapRaw ? JSON.parse(itemProviderMapRaw) : {};
     const providerID = select.provider.id;
     select.items.forEach((item: any, index: number) => {
       if (!itemProviderMap[providerID]?.includes(item.id)) {
-        addError(result, 
+        addError(result,
           30004,
           `Item with id ${item.id} not found - The item ID provided in the request was not found with provider_id ${providerID}`
         );
@@ -140,10 +130,8 @@ async function validateItem(
     });
   } catch (error: any) {
     console.error(`Error while checking for valid and present location ID inside item list for /${constants.SELECT}, ${error.stack}`);
-    addError(result, 20000, `Error while checking item location/provider: ${error.message}`);
+    addError(result, 40000, `Error while checking item location/provider: ${error.message}`);
   }
-
-  
 
   try {
     console.log(`Mapping the items with their prices on /${constants.ON_SEARCH} and /${constants.SELECT}`);
@@ -177,13 +165,13 @@ async function validateItem(
                 selectedQuantity <= maximumCount
               )
             ) {
-              addError(result, 
+              addError(result,
                 40009,
                 `Maximum order qty exceeded - The maximum order quantity has been exceeded for the item.id: ${item.id}`
               );
             }
           } else {
-            addError(result, 
+            addError(result,
               40012,
               `Minimum order qty required - The minimum order quantity has not been met for the item.id: ${item.id}`
             );
@@ -202,7 +190,7 @@ async function validateItem(
         parsedData?.find((itm: any) => itm.provider_id === provider_id)?.value || 0;
 
       if (selectedPrice < min_value) {
-        addError(result, 
+        addError(result,
           30023,
           `Minimum order value error - The cart value is less than the minimum order value (${selectedPrice} < ${min_value})`
         );
@@ -214,7 +202,7 @@ async function validateItem(
     ]);
   } catch (error: any) {
     console.error(`Error while mapping the items with their prices on /${constants.ON_SEARCH} and /${constants.SELECT}, ${error.stack}`);
-    addError(result, 20000, `Error while mapping item prices: ${error.message}`);
+    addError(result, 40000, `Error while mapping item prices: ${error.message}`);
   }
 
   try {
@@ -227,13 +215,11 @@ async function validateItem(
     await setRedisValue(`${transaction_id}_timeToShip`, timeToShip, TTL_IN_SECONDS);
   } catch (error: any) {
     console.error(`!!Error while saving time_to_ship in ${constants.SELECT}, ${error.stack}`);
-    addError(result, 20000, `Error while saving time_to_ship: ${error.message}`);
+    addError(result, 40000, `Error while saving time_to_ship: ${error.message}`);
   }
 
   return { itemIdArray, itemsOnSelect, itemsIdList, itemsCtgrs, selectedPrice };
 }
-
-
 
 export async function select(data: any) {
   const { context, message } = data;
@@ -243,17 +229,16 @@ export async function select(data: any) {
   try {
     await contextChecker(context, result, constants.SELECT, constants.ON_SEARCH);
   } catch (err: any) {
-    result.push({
+    console.log('Entered the block 2243', err);
+     result.push({
       valid: false,
-      code: 20000,
+      code: 40000,
       description: err.message,
     });
-    return result;
+    return result
   }
 
   try {
-  
-
     const select = message.order;
 
     await Promise.all([
@@ -263,15 +248,13 @@ export async function select(data: any) {
       setRedisValue(`${txnId}_items`,select.items, TTL_IN_SECONDS),
     ]);
 
-    
-
     await validateFulfillment(select, txnId, result);
     await validateItem(select, txnId, result );
 
     return result;
   } catch (error: any) {
     console.error(`Error in /${constants.SELECT}: ${error.stack}`);
-    addError(result, 20000, `Internal error: ${error.message}`);
+    addError(result, 50000, `Internal error: ${error.message}`);
     return result;
   }
 }

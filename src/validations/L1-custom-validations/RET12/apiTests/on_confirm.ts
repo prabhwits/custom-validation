@@ -173,6 +173,27 @@ const validateOrder = async (
         `cancellation_terms should not be provided in /${constants.ON_CONFIRM}`
       );
     }
+
+     if (order.state === "Accepted") {
+        const fulfillmentsItemsSet = new Set();
+       
+      
+          const deliveryObjArr = order.fulfillments.filter(
+            (f: any) => f.type === "Delivery"
+          );
+         
+            const deliverObj = { ...deliveryObjArr[0] };
+            delete deliverObj?.state;
+            delete deliverObj?.tags;
+            delete deliverObj?.start?.instructions;
+            delete deliverObj?.end?.instructions;
+            fulfillmentsItemsSet.add(deliverObj);
+            await RedisService.setKey(
+              `${txnId}_fulfillmentsItemsSet`,
+              JSON.stringify([...fulfillmentsItemsSet]),
+              TTL_IN_SECONDS
+            );
+      }
   } catch (err: any) {
     addError(result, 20016, `Error validating order: ${err.message}`);
   }
@@ -267,6 +288,7 @@ const validateBilling = async (
         );
       });
     }
+
   } catch (err: any) {
     addError(result, 20024, `Error validating billing: ${err.message}`);
   }
@@ -513,6 +535,8 @@ const validateFulfillments = async (
         }
       }
     });
+
+   
   } catch (err: any) {
     addError(result, 20047, `Error validating fulfillments: ${err.message}`);
   }

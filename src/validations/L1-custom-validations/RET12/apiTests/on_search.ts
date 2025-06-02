@@ -1,15 +1,8 @@
-
-
 import constants, { ApiSequence } from "../../../../utils/constants";
 import { contextChecker } from "../../../../utils/contextUtils";
 import { RedisService } from "ondc-automation-cache-lib";
 import _ from "lodash";
-import {
-  
-  areTimestampsLessThanOrEqualTo,
-  
-} from "../../../../utils/helper";
-
+import { areTimestampsLessThanOrEqualTo } from "../../../../utils/helper";
 import { fashion } from "../../../../utils/constants/fashion";
 
 interface ValidationError {
@@ -20,14 +13,10 @@ interface ValidationError {
 
 const TTL_IN_SECONDS = Number(process.env.TTL_IN_SECONDS) || 3600;
 
-// Helper to add validation errors
 const addError = (result: ValidationError[], code: number, description: string) => {
   result.push({ valid: false, code, description });
 };
 
-
-
-// Validate providers and their components
 async function validateProviders(
   providers: any[],
   context: any,
@@ -61,7 +50,7 @@ async function validateProviders(
     if (provider.rating !== undefined) {
       const numericRating = parseFloat(provider.rating);
       if (isNaN(numericRating) || numericRating < 1 || numericRating > 5) {
-        addError(result, 40000, "provider.rating must be a number between 1 and 5");
+        addError(result, 20006, "provider.rating must be a number between 1 and 5");
       }
     }
 
@@ -71,12 +60,8 @@ async function validateProviders(
       addError(result, 20006, "store enable/disable timestamp should be <= context.timestamp");
     }
 
- 
-  
-
     provider.fulfillments?.forEach((ff: any) => {
       onSearchFFIdsArray.add(ff.id);
-      
     });
 
     provider.locations?.forEach((loc: any, locIndex: number) => {
@@ -86,12 +71,6 @@ async function validateProviders(
         prvdrLocId.add(loc.id);
       }
 
-      
-
-      
-
-  
-     
       if (loc.time?.range) {
         const start = parseInt(loc.time.range.start);
         const end = parseInt(loc.time.range.end);
@@ -107,9 +86,8 @@ async function validateProviders(
       } else {
         categoriesId.add(category.id);
       }
-    
     });
-    
+
     provider.items?.forEach((item: any, itemIndex: number) => {
       if (itemsId.has(item.id)) {
         addError(result, 20005, `Duplicate item id: ${item.id} in bpp/providers[${index}]`);
@@ -119,8 +97,7 @@ async function validateProviders(
       itemIdList.push(item.id);
       itemsArray.push(item);
       const categoryId = item.category_id as keyof typeof fashion;
-      const categoryRules = fashion[categoryId]; 
-      
+      const categoryRules = fashion[categoryId];
 
       const attributesTag = item.tags?.find((tag: any) => tag.code === 'attribute');
       const attributes = attributesTag?.list || [];
@@ -131,20 +108,17 @@ async function validateProviders(
       });
 
       for (const [code, rule] of Object.entries(categoryRules)) {
-  const attrValue = attributeMap.get(code);
+        const attrValue = attributeMap.get(code);
 
-  if (rule.mandatory && (attrValue === undefined || attrValue === null || attrValue === '')) {
-    addError(result, 20007, `Missing mandatory attribute '${code}' in item ${item.id}`);
-    continue;
-  }
-  if('category_id' in item){
-    itemCategoriesId.add(item.category_id);
-  }
+        if (rule.mandatory && (attrValue === undefined || attrValue === null || attrValue === '')) {
+          addError(result, 20007, `Missing mandatory attribute '${code}' in item ${item.id}`);
+          continue;
+        }
+        if ('category_id' in item) {
+          itemCategoriesId.add(item.category_id);
+        }
+      }
 
- 
-}
-
-    
       if (item.fulfillment_id && !onSearchFFIdsArray.has(item.fulfillment_id)) {
         addError(result, 20006, `fulfillment_id in bpp/providers[${index}]/items[${itemIndex}] must map to a valid fulfillment id`);
       }
@@ -157,9 +131,34 @@ async function validateProviders(
           addError(result, 20006, `item[${itemIndex}] timestamp can't be > context.timestamp`);
         }
       }
+      const quantity = item?.quantity;
+      if (quantity) {
+        const minimum_qty = parseFloat(quantity?.minimum?.count);
+        const maximum_qty = parseFloat(quantity?.maximum?.count);
+        const available_qty = parseFloat(quantity?.available?.count);
+        if (minimum_qty && maximum_qty && minimum_qty > maximum_qty) {
+          addError(
+            result,
+            20006,
+            `minimum quantity: ${minimum_qty} can't be greater than the maximum quantity: ${maximum_qty}`
+          );
+        }
+        if (minimum_qty && available_qty && available_qty < minimum_qty) {
+          addError(
+            result,
+            20006,
+            `available quantity: ${available_qty} can't be less than the minimum quantity: ${minimum_qty}`
+          );
+        }
+        if (maximum_qty && available_qty && available_qty < maximum_qty) {
+          addError(
+            result,
+            20006,
+            `maximum quantity: ${maximum_qty} can't be greater than the available quantity: ${available_qty}`
+          );
+        }
+      }
     });
-
-   
   }
 
   return {
@@ -212,65 +211,57 @@ function validateServiceabilityAndTiming(
         const timeFrom = timingFields.find((elem: any) => elem.code === "time_from")?.value;
         const timeTo = timingFields.find((elem: any) => elem.code === "time_to")?.value;
 
-       
-          const dayFromNum = parseInt(dayFrom);
-          const dayToNum = parseInt(dayTo);
-          if (
-            isNaN(dayFromNum) ||
-            isNaN(dayToNum) ||
-            dayFromNum < 1 ||
-            dayFromNum > 7 ||
-            dayToNum < 1 ||
-            dayToNum > 7
-          ) {
-            addError(
-              result,
-              20006,
-              `day_from and day_to must be integers between 1 and 7 in bpp/providers[${index}]/tags[${tagIndex}]`
-            );
-          } else if (dayFromNum > dayToNum) {
-            addError(
-              result,
-              20006,
-              `day_from must be <= day_to in bpp/providers[${index}]/tags[${tagIndex}]`
-            );
-          }
-        
+        const dayFromNum = parseInt(dayFrom);
+        const dayToNum = parseInt(dayTo);
+        if (
+          isNaN(dayFromNum) ||
+          isNaN(dayToNum) ||
+          dayFromNum < 1 ||
+          dayFromNum > 7 ||
+          dayToNum < 1 ||
+          dayToNum > 7
+        ) {
+          addError(
+            result,
+            20006,
+            `day_from and day_to must be integers between 1 and 7 in bpp/providers[${index}]/tags[${tagIndex}]`
+          );
+        } else if (dayFromNum > dayToNum) {
+          addError(
+            result,
+            20006,
+            `day_from must be <= day_to in bpp/providers[${index}]/tags[${tagIndex}]`
+          );
+        }
 
-       
-          const timeFromNum = parseInt(timeFrom);
-          const timeToNum = parseInt(timeTo);
-          if (
-            isNaN(timeFromNum) ||
-            isNaN(timeToNum) ||
-            timeFrom.length !== 4 ||
-            timeTo.length !== 4 ||
-            timeFromNum < 0 ||
-            timeFromNum > 2359 ||
-            timeToNum < 0 ||
-            timeToNum > 2359
-          ) {
-            addError(
-              result,
-              20006,
-              `time_from and time_to must be in HHMM format (0000-2359) in bpp/providers[${index}]/tags[${tagIndex}]`
-            );
-          } else if (dayFrom === dayTo && timeFromNum >= timeToNum) {
-            addError(
-              result,
-              20006,
-              `time_from must be < time_to for same-day timing in bpp/providers[${index}]/tags[${tagIndex}]`
-            );
-          
+        const timeFromNum = parseInt(timeFrom);
+        const timeToNum = parseInt(timeTo);
+        if (
+          isNaN(timeFromNum) ||
+          isNaN(timeToNum) ||
+          timeFrom.length !== 4 ||
+          timeTo.length !== 4 ||
+          timeFromNum < 0 ||
+          timeFromNum > 2359 ||
+          timeToNum < 0 ||
+          timeToNum > 2359
+        ) {
+          addError(
+            result,
+            20006,
+            `time_from and time_to must be in HHMM format (0000-2359) in bpp/providers[${index}]/tags[${tagIndex}]`
+          );
+        } else if (dayFrom === dayTo && timeFromNum >= timeToNum) {
+          addError(
+            result,
+            20006,
+            `time_from must be < time_to for same-day timing in bpp/providers[${index}]/tags[${tagIndex}]`
+          );
         }
       }
-    });   
-
- 
+    });
   });
 }
-
-
 
 async function storeData(
   transactionId: string,
@@ -289,7 +280,6 @@ async function storeData(
   });
 
   await Promise.all([
-   
     RedisService.setKey(
       `${transactionId}_onSearchFFIdsArray`,
       JSON.stringify([...onSearchFFIdsArray]),
@@ -310,7 +300,6 @@ async function storeData(
       JSON.stringify([...categoriesId]),
       TTL_IN_SECONDS
     ),
-  
     RedisService.setKey(
       `${transactionId}_onSearchItems`,
       JSON.stringify(itemsArray),
@@ -321,7 +310,6 @@ async function storeData(
       JSON.stringify([...prvdrsId]),
       TTL_IN_SECONDS
     ),
-   
     RedisService.setKey(
       `${transactionId}_${ApiSequence.ON_SEARCH}itemsId`,
       JSON.stringify([...itemsId]),
@@ -333,8 +321,8 @@ async function storeData(
       TTL_IN_SECONDS
     ),
     RedisService.setKey(
-        `${transactionId}_${ApiSequence.ON_SEARCH}_message`,
-        JSON.stringify(message)
+      `${transactionId}_${ApiSequence.ON_SEARCH}_message`,
+      JSON.stringify(message)
     )
   ]);
 }
@@ -347,18 +335,15 @@ export async function onSearch(data: any) {
   try {
     await contextChecker(context, result, constants.ON_SEARCH, constants.SEARCH);
   } catch (err: any) {
-    console.log('Entered the block 2243', err);
-     result.push({
+    result.push({
       valid: false,
       code: 20000,
       description: err.message,
     });
-    return result
+    return result;
   }
 
   try {
-
- 
     const {
       prvdrsId,
       itemsId,
@@ -371,8 +356,6 @@ export async function onSearch(data: any) {
     } = await validateProviders(message.catalog["bpp/providers"] || [], context, result);
 
     validateServiceabilityAndTiming(message.catalog["bpp/providers"] || [], prvdrLocId, itemCategoriesId, result);
-
-
 
     await storeData(
       txnId,
@@ -389,7 +372,7 @@ export async function onSearch(data: any) {
     return result;
   } catch (err: any) {
     console.error(`Error in /${constants.ON_SEARCH}: ${err.stack}`);
-    addError(result, 50000, `Internal error: ${err.message}`);
+    addError(result, 20006, `Internal error: ${err.message}`);
     return result;
   }
 }
