@@ -27,7 +27,7 @@ export const onStatusRouter = async (data: any) => {
   let fulfillmentsItemsSet = new Set(
     fulfillmentsItemsSetRaw ? JSON.parse(fulfillmentsItemsSetRaw) : []
   );
-  console.log('State: ', state);
+  
   switch (state) {
     case "Pending":
       result = await checkOnStatusPending(data, state, fulfillmentsItemsSet);

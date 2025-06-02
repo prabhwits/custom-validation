@@ -1,8 +1,7 @@
-import _, { isEmpty, update } from "lodash";
+import _ from "lodash";
 import { RedisService } from "ondc-automation-cache-lib";
-import constants, { buyerReturnId } from "../../../../../utils/constants";
+import constants from "../../../../../utils/constants";
 import {
-  isObjectEmpty,
   isPresentInRedisSet,
 } from "../../../../../utils/helper";
 import { return_request_reasonCodes } from "../../../../../utils/constants/reasonCode";

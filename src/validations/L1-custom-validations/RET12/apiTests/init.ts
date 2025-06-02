@@ -1,6 +1,6 @@
 import { RedisService } from "ondc-automation-cache-lib";
 import { contextChecker } from "../../../../utils/contextUtils";
-import { checkItemTag, compareObjects, getRedisValue, tagFinder } from "../../../../utils/helper";
+import { compareObjects, getRedisValue } from "../../../../utils/helper";
 import constants, { ApiSequence } from "../../../../utils/constants";
 import _ from "lodash";
 
