@@ -132,252 +132,35 @@ async function validateFulfillments(
   const buyerGps = buyerGpsRaw ? JSON.parse(buyerGpsRaw) : null;
   const buyerAddr = buyerAddrRaw ? JSON.parse(buyerAddrRaw) : null;
   const providerAddr = providerAddrRaw ? JSON.parse(providerAddrRaw) : null;
+ const deliveryFulfillments: any[] = order.fulfillments?.filter(
+  (ff: any) => ff.type === "Delivery"
+) || [];
 
-  for (const ff of order.fulfillments || []) {
-    if (!ff.id) {
-      result.push(
-        addError(`Fulfillment Id must be present`, ERROR_CODES.INVALID_RESPONSE)
-      );
-    }
+const deliveryObjReplacementRaw = await RedisService.getKey(
+  `${transaction_id}_deliveryObjReplacement`
+);
+const deliveryObjReplacement: any[] = deliveryObjReplacementRaw
+  ? [JSON.parse(deliveryObjReplacementRaw)]
+  : [];
 
-    if (!ff.type) {
-      result.push(
+if (deliveryObjReplacement.length > 0) {
+  deliveryFulfillments.forEach((fulfillment: any) => {
+    const matched = deliveryObjReplacement.find(
+      (replacement: any) => replacement.id === fulfillment.id
+    );
+
+    if (matched) {
+      const fulfillmentErrors = compareObjects(fulfillment, matched);
+      fulfillmentErrors?.forEach((error: string) => {
         addError(
-          `Fulfillment type does not exist in /${constants.ON_STATUS}`,
-          ERROR_CODES.INVALID_RESPONSE
-        )
-      );
-    }
-
-    if (ff.type !== "Cancel") {
-      const ffTrackingRaw = await RedisService.getKey(
-        `${transaction_id}_${ff.id}_tracking`
-      );
-      const ffTracking = ffTrackingRaw ? JSON.parse(ffTrackingRaw) : null;
-      if (ffTracking !== null) {
-        if (typeof ff.tracking !== "boolean") {
-          result.push(
-            addError(
-              `Tracking must be present for fulfillment ID: ${ff.id} in boolean form`,
-              ERROR_CODES.INVALID_RESPONSE
-            )
-          );
-        } else if (ffTracking !== ff.tracking) {
-          result.push(
-            addError(
-              `Fulfillment Tracking mismatch with the ${constants.ON_SELECT} call`,
-              ERROR_CODES.INVALID_RESPONSE
-            )
-          );
-        }
-      }
-    }
-    if (ff.type !== "Cancel") {
-        const ffTrackingRaw = await RedisService.getKey(
-          `${transaction_id}_${ff.id}_tracking`
+          `Business Error: fulfillment: ${error} when compared with /${constants.SELECT} fulfillment object with id '${fulfillment.id}'`,
+          40000,
         );
-        const ffTracking = ffTrackingRaw ? JSON.parse(ffTrackingRaw) : null;
-        if (ffTracking !== null) {
-          if (typeof ff.tracking !== "boolean") {
-            result.push(
-              addError(
-                `Tracking must be present for fulfillment ID: ${ff.id} in boolean form`,
-                ERROR_CODES.INVALID_RESPONSE
-              )
-            );
-          } else if (ffTracking !== ff.tracking) {
-            result.push(
-              addError(
-                `Fulfillment Tracking mismatch with the ${constants.ON_SELECT} call`,
-                ERROR_CODES.INVALID_RESPONSE
-              )
-            );
-          }
-        }
-      }
-  
-    if (ff?.type == "Delivery") {
-      const ffDesc = ff.state?.descriptor;
-      const ffStateCheck =
-        ffDesc?.hasOwnProperty("code") && ffDesc.code === "Packed";
-      if (!ffStateCheck) {
-        result.push(
-          addError(
-            `Fulfillment state should be 'Order-packed' in /${constants.ON_STATUS}`,
-            ERROR_CODES.INVALID_ORDER_STATE
-          )
-        );
-      }
-      if (!ff.start || !ff.end) {
-        result.push(
-          addError(
-            `fulfillments[${ff.id}] start and end locations are mandatory`,
-            ERROR_CODES.INVALID_RESPONSE
-          )
-        );
-      }
-
-      if (
-        ff.start?.location?.gps &&
-        !compareCoordinates(ff.start.location.gps, providerAddr?.location?.gps)
-      ) {
-        result.push(
-          addError(
-            `store gps location /fulfillments[${ff.id}]/start/location/gps can't change`,
-            ERROR_CODES.INVALID_RESPONSE
-          )
-        );
-      }
-
-      if (
-        (!providerAddr ||
-          !_.isEqual(
-            ff?.start?.location?.descriptor?.name,
-            providerAddr?.location?.descriptor?.name
-          )) &&
-        ff?.type == "Delivery"
-      ) {
-        result.push(
-          addError(
-            `store name /fulfillments[${ff.id}]/start/location/descriptor/name can't change`,
-            ERROR_CODES.INVALID_RESPONSE
-          )
-        );
-      }
-
-      if (ff.end?.location?.gps && !_.isEqual(ff.end.location.gps, buyerGps)) {
-        result.push(
-          addError(
-            `fulfillments[${ff.id}].end.location gps is not matching with gps in /${constants.SELECT}`,
-            ERROR_CODES.INVALID_RESPONSE
-          )
-        );
-      }
-
-      if (
-        ff.end?.location?.address?.area_code &&
-        !_.isEqual(ff.end.location.address.area_code, buyerAddr)
-      ) {
-        result.push(
-          addError(
-            `fulfillments[${ff.id}].end.location.address.area_code is not matching with area_code in /${constants.SELECT}`,
-            ERROR_CODES.INVALID_RESPONSE
-          )
-        );
-      }
-    }
-  }
-  const storedFulfillmentRaw = await RedisService.getKey(
-    `${transaction_id}_deliveryFulfillment`
-  );
-  const storedFulfillment = storedFulfillmentRaw
-    ? JSON.parse(storedFulfillmentRaw)
-    : null;
-  const deliveryFulfillment = order.fulfillments.filter(
-    (f: any) => f.type === "Delivery"
-  );
-
-  if (!storedFulfillment) {
-    if (deliveryFulfillment.length > 0) {
-      await Promise.all([
-        RedisService.setKey(
-          `${transaction_id}_deliveryFulfillment`,
-          JSON.stringify(deliveryFulfillment[0]),
-          TTL_IN_SECONDS
-        ),
-        RedisService.setKey(
-          `${transaction_id}_deliveryFulfillmentAction`,
-          JSON.stringify(ApiSequence.ON_STATUS_PACKED),
-          TTL_IN_SECONDS
-        ),
-      ]);
-    }
-  } else {
-    const storedFulfillmentActionRaw = await RedisService.getKey(
-      `${transaction_id}_deliveryFulfillmentAction`
-    );
-    const storedFulfillmentAction = storedFulfillmentActionRaw
-      ? JSON.parse(storedFulfillmentActionRaw)
-      : null;
-    const fulfillmentRangeErrors = compareTimeRanges(
-      storedFulfillment,
-      storedFulfillmentAction,
-      deliveryFulfillment[0],
-      ApiSequence.ON_STATUS_PACKED
-    );
-
-    if (fulfillmentRangeErrors) {
-      fulfillmentRangeErrors.forEach((error: string) => {
-        result.push(addError(`${error}`, ERROR_CODES.INVALID_RESPONSE));
       });
     }
-  }
+  });
+}
 
-  const flow = (await RedisService.getKey("flow")) || "2";
-  if (["6", "2", "3", "5"].includes(flow)) {
-    if (!order.fulfillments?.length) {
-      result.push(
-        addError(
-          `missingFulfillments is mandatory for ${ApiSequence.ON_STATUS_PACKED}`,
-          ERROR_CODES.ORDER_VALIDATION_FAILURE
-        )
-      );
-    } else {
-      let i = 0;
-      for (const obj1 of fulfillmentsItemsSet) {
-        const keys = Object.keys(obj1);
-        let obj2 = order.fulfillments.filter((f: any) => f.type === obj1.type);
-        let apiSeq =
-          obj1.type === "Cancel"
-            ? ApiSequence.ON_UPDATE_PART_CANCEL
-            : (await RedisService.getKey(`${transaction_id}_onCnfrmState`)) ===
-              "Accepted"
-            ? ApiSequence.ON_CONFIRM
-            : ApiSequence.ON_STATUS_PENDING;
-
-        if (obj2.length > 0) {
-          obj2 = obj2[0];
-          if (obj2.type === "Delivery") {
-            delete obj2?.start?.instructions;
-            delete obj2?.end?.instructions;
-            delete obj2?.tags;
-            delete obj2?.state;
-            delete obj1?.state;
-          }
-          const errors = compareFulfillmentObject(obj1, obj2, keys, i, apiSeq);
-          errors.forEach((item: any) => {
-            result.push(addError(item.errMsg, ERROR_CODES.INVALID_RESPONSE));
-          });
-        } else {
-          result.push(
-            addError(
-              `Missing fulfillment type '${obj1.type}' in ${ApiSequence.ON_STATUS_PACKED} as compared to ${apiSeq}`,
-              ERROR_CODES.INVALID_RESPONSE
-            )
-          );
-        }
-        i++;
-      }
-
-      const deliveryObjArr = order.fulfillments.filter(
-        (f: any) => f.type === "Delivery"
-      );
-      if (!deliveryObjArr.length) {
-        result.push(
-          addError(
-            `Delivery fulfillment must be present in ${ApiSequence.ON_STATUS_PACKED}`,
-            ERROR_CODES.ORDER_VALIDATION_FAILURE
-          )
-        );
-      } else {
-        const deliverObj = { ...deliveryObjArr[0] };
-        delete deliverObj?.state;
-        delete deliverObj?.tags;
-        delete deliverObj?.start?.instructions;
-        delete deliverObj?.end?.instructions;
-      }
-    }
-  }
 }
 
 async function validateTimestamps(

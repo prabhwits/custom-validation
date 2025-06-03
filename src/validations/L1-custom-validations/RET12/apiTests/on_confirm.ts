@@ -707,106 +707,98 @@ const validatePayment = async (
         }
       }
     }
+    if(payment.type === "ON-ORDER" ) {
+            if(payment.status !== "PAID") {
+              addError(result, 20006, `Invalid response: payment.status must be 'PAID' when payment.type is 'ON-ORDER' in /${constants.CONFIRM}`);
+            }
+             if (!payment.uri || !/^https?:\/\/[^\s/$.?#].[^\s]*$/.test(payment.uri)) {
+              addError(result, 20006, `Invalid response: payment.uri must be a valid URL in /${constants.CONFIRM}`);
+            }
+            if (!payment.tl_method || payment.tl_method !== "http/get") {
+              addError(result, 20006, `Invalid response: payment.tl_method must be 'http/get' when collected_by is 'BAP' in /${constants.CONFIRM}`);
+            }
+            if (payment.params) {
+              if (!payment.params.currency || !/^[A-Z]{3}$/.test(payment.params.currency)) {
+                addError(result, 20006, `Invalid response: payment.params.currency must be a valid ISO 4217 code in /${constants.CONFIRM}`);
+              }
+              if (!payment.params.transaction_id || typeof payment.params.transaction_id !== "string" || payment.params.transaction_id === "") {
+                addError(result, 20006, `Invalid response: payment.params.transaction_id must be a non-empty string in /${constants.CONFIRM}`);
+              }
+            }
+          }
 
-    if (payment.collected_by === "BAP") {
-      if (!payment.type || payment.type !== "ON-ORDER") {
-        addError(
-          result,
-          20006,
-          `Invalid response: payment.type must be 'ON-ORDER' when collected_by is 'BAP' in /${constants.ON_CONFIRM}`
-        );
-      }
-      if (!payment.status || payment.status !== "PAID") {
-        addError(
-          result,
-          20006,
-          `Invalid response: payment.status must be 'PAID' when collected_by is 'BAP' in /${constants.ON_CONFIRM}`
-        );
-      }
-      if (!payment.uri || !/^https?:\/\/[^\s/$.?#].[^\s]*$/.test(payment.uri)) {
-        addError(
-          result,
-          20006,
-          `Invalid response: payment.uri must be a valid URL in /${constants.ON_CONFIRM}`
-        );
-      }
-      if (!payment.tl_method || payment.tl_method !== "http/get") {
-        addError(
-          result,
-          20006,
-          `Invalid response: payment.tl_method must be 'http/get' when collected_by is 'BAP' in /${constants.ON_CONFIRM}`
-        );
-      }
-      if (payment.params) {
-        if (
-          !payment.params.currency ||
-          !/^[A-Z]{3}$/.test(payment.params.currency)
-        ) {
-          addError(
-            result,
-            20006,
-            `Invalid response: payment.params.currency must be a valid ISO 4217 code in /${constants.ON_CONFIRM}`
-          );
-        }
-        if (
-          !payment.params.transaction_id ||
-          typeof payment.params.transaction_id !== "string" ||
-          payment.params.transaction_id === ""
-        ) {
-          addError(
-            result,
-            20006,
-            `Invalid response: payment.params.transaction_id must be a non-empty string in /${constants.ON_CONFIRM}`
-          );
-        }
-      }
-    }
-    if (payment.type === "ON-FULFILLMENT") {
-      if (!payment.status || payment.status == 'NOT_PAID') {
-        addError(
-          result,
-          20006,
-          `Invalid response: payment.status must be 'NOT_PAID' when payment.type is 'ON-FULFILLMENT' in /${constants.ON_CONFIRM}`
-        );
-      }
-      if (!payment.uri || !/^https?:\/\/[^\s/$.?#].[^\s]*$/.test(payment.uri)) {
-        addError(
-          result,
-          20006,
-          `Invalid response: payment.uri must be a valid URL in /${constants.ON_CONFIRM}`
-        );
-      }
-      if (!payment.tl_method || payment.tl_method !== "http/get") {
-        addError(
-          result,
-          20006,
-          `Invalid response: payment.tl_method must be 'http/get' when collected_by is 'BAP' in /${constants.ON_CONFIRM}`
-        );
-      }
-      if (payment.params) {
-        if (
-          !payment.params.currency ||
-          !/^[A-Z]{3}$/.test(payment.params.currency)
-        ) {
-          addError(
-            result,
-            20006,
-            `Invalid response: payment.params.currency must be a valid ISO 4217 code in /${constants.ON_CONFIRM}`
-          );
-        }
-        if (
-          !payment.params.transaction_id ||
-          typeof payment.params.transaction_id !== "string" ||
-          payment.params.transaction_id === ""
-        ) {
-          addError(
-            result,
-            20006,
-            `Invalid response: payment.params.transaction_id must be a non-empty string in /${constants.ON_CONFIRM}`
-          );
-        }
-      }
-    }
+    // if (payment.collected_by === "BAP") {
+    //   if (!payment.type || payment.type !== "ON-ORDER") {
+    //     addError(
+    //       result,
+    //       20006,
+    //       `Invalid response: payment.type must be 'ON-ORDER' when collected_by is 'BAP' in /${constants.ON_CONFIRM}`
+    //     );
+    //   }
+    //   if (!payment.status || payment.status !== "PAID") {
+    //     addError(
+    //       result,
+    //       20006,
+    //       `Invalid response: payment.status must be 'PAID' when collected_by is 'BAP' in /${constants.ON_CONFIRM}`
+    //     );
+    //   }
+    //   if (!payment.uri || !/^https?:\/\/[^\s/$.?#].[^\s]*$/.test(payment.uri)) {
+    //     addError(
+    //       result,
+    //       20006,
+    //       `Invalid response: payment.uri must be a valid URL in /${constants.ON_CONFIRM}`
+    //     );
+    //   }
+    //   if (!payment.tl_method || payment.tl_method !== "http/get") {
+    //     addError(
+    //       result,
+    //       20006,
+    //       `Invalid response: payment.tl_method must be 'http/get' when collected_by is 'BAP' in /${constants.ON_CONFIRM}`
+    //     );
+    //   }
+    //   if (payment.params) {
+    //     if (
+    //       !payment.params.currency ||
+    //       !/^[A-Z]{3}$/.test(payment.params.currency)
+    //     ) {
+    //       addError(
+    //         result,
+    //         20006,
+    //         `Invalid response: payment.params.currency must be a valid ISO 4217 code in /${constants.ON_CONFIRM}`
+    //       );
+    //     }
+    //     if (
+    //       !payment.params.transaction_id ||
+    //       typeof payment.params.transaction_id !== "string" ||
+    //       payment.params.transaction_id === ""
+    //     ) {
+    //       addError(
+    //         result,
+    //         20006,
+    //         `Invalid response: payment.params.transaction_id must be a non-empty string in /${constants.ON_CONFIRM}`
+    //       );
+    //     }
+    //   }
+    // }
+   else if (payment.type === "ON-FULFILLMENT") {
+           if (payment.collected_by !== "BPP" || payment.status !== 'NOT-PAID') {
+             addError(result, 20006, `Invalid response: payment.collected_by must be "BPP" and payment.status must be "NOT-PAID if payment.status is ON-FULFILLMENT" in /${constants.ON_CONFIRM}`);
+           }
+           if (!payment.uri || !/^https?:\/\/[^\s/$.?#].[^\s]*$/.test(payment.uri)) {
+             addError(result, 20006, `Invalid response: payment.uri must be a valid URL in /${constants.CONFIRM}`);
+           }
+           if (!payment.tl_method || payment.tl_method !== "http/get") {
+             addError(result, 20006, `Invalid response: payment.tl_method must be 'http/get' when collected_by is 'BAP' in /${constants.CONFIRM}`);
+           }
+           if (payment.params) {
+             if (!payment.params.currency || !/^[A-Z]{3}$/.test(payment.params.currency)) {
+               addError(result, 20006, `Invalid response: payment.params.currency must be a valid ISO 4217 code in /${constants.CONFIRM}`);
+             }
+             if (!payment.params.transaction_id || typeof payment.params.transaction_id !== "string" || payment.params.transaction_id === "") {
+               addError(result, 20006, `Invalid response: payment.params.transaction_id must be a non-empty string in /${constants.CONFIRM}`);
+             }
+           }
+         }
   } catch (err: any) {
     addError(result, 23001, `Internal Error: Error validating payment: ${err.message}`);
   }
