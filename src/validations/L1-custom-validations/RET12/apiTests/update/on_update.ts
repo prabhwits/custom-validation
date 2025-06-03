@@ -912,7 +912,12 @@ export const checkOnUpdate = async (
                 const deliveryObj = on_update.fulfillments.find((ff: any) => {
                   return ff.type == "Delivery" && ff.id === replaceId;
                 });
-
+                await RedisService.setKey(
+                  `${transaction_id}_deliveryObjReplacement`,
+                  JSON.stringify(deliveryObj),
+                  TTL_IN_SECONDS
+                );
+                // delivery Obj check
                 if (deliveryObj) {
                   const [buyerGpsRaw, buyerAddrRaw] = await Promise.all([
                     getRedisValue(context.transaction_id, "buyerGps"),

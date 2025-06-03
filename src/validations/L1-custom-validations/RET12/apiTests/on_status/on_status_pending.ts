@@ -12,6 +12,7 @@ import {
   checkItemTag,
   tagFinder,
   isoDurToSec,
+  compareFulfillmentObject,
 } from "../../../../../utils/helper";
 import { FLOW } from "../../../../../utils/enums";
 import constants, {
@@ -143,6 +144,7 @@ async function validateFulfillments(
     ] = await Promise.all([
       RedisService.getKey(`${transaction_id}_buyerGps`),
       RedisService.getKey(`${transaction_id}_buyerAddr`),
+    
       RedisService.getKey(`${transaction_id}_fulfillment_tat_obj`),
       RedisService.getKey(`${transaction_id}_onSelectFulfillments`),
       RedisService.getKey(`${transaction_id}_providerAddr`),
@@ -431,6 +433,7 @@ async function validateFulfillments(
         }
       }
       if (ff.type === "Delivery") {
+
         if (!ff?.start?.contact?.phone) {
           result.push(
             addError(
@@ -733,6 +736,29 @@ async function validateFulfillments(
           });
         }
       }
+
+      const deliveryFulfillmentReplacementRaw = await RedisService.getKey(`${transaction_id}_deliveryObjReplacement`)
+      const deliveryFulfillmentReplacement = deliveryFulfillmentReplacementRaw
+        ? JSON.parse(deliveryFulfillmentReplacementRaw)
+        : null;
+
+      deliveryFulfillment.forEach((ff: any) => {
+        if (deliveryFulfillmentReplacement) {
+          const matchingReplacement = deliveryFulfillmentReplacement.find(
+            (replacement: any) => replacement.id === ff.id
+          );
+          if (matchingReplacement) {
+            // Compare and validate the matching replacement
+            const fulfillmentErrors = compareObjects(ff, matchingReplacement);
+             console.log('fulfillmentErrors', fulfillmentErrors);
+            if (fulfillmentErrors) {
+              fulfillmentErrors.forEach((error: any) => {
+                result.push(addError(`${error}`, ERROR_CODES.INVALID_RESPONSE));
+              });
+            }
+          }
+        }
+      });
     } catch {
       result.push(
         addError(

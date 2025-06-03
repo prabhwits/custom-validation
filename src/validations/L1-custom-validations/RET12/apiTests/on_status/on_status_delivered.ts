@@ -147,23 +147,22 @@ async function validateFulfillments(
 ): Promise<void> {
   const [
     itemFlfllmntsRaw,
-  
+    fulfillmentIdsArrayRaw,
     buyerGpsRaw,
     buyerAddrRaw,
     providerAddrRaw
   ] = await Promise.all([
     RedisService.getKey(`${transaction_id}_itemFlfllmnts`),
-
+    RedisService.getKey(`${transaction_id}_fulfillmentIdArray`),
     RedisService.getKey(`${transaction_id}_buyerGps`),
     RedisService.getKey(`${transaction_id}_buyerAddr`),
     RedisService.getKey(`${transaction_id}_providerAddr`),
   ]);
   const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
- 
+  const fulfillmentIdsArray : any = fulfillmentIdsArrayRaw  ? JSON.parse(fulfillmentIdsArrayRaw) : [];
   const buyerGps = buyerGpsRaw ? JSON.parse(buyerGpsRaw) : null;
   const buyerAddr = buyerAddrRaw ? JSON.parse(buyerAddrRaw) : null;
   const providerAddr = providerAddrRaw ? JSON.parse(providerAddrRaw) : null;
-
   const deliveryObjArr = order.fulfillments.filter(
     (f: any) => f.type === "Delivery"
   );
@@ -271,7 +270,7 @@ async function validateFulfillments(
       }
     }
 
-    if (!itemFlfllmnts || !Object.values(itemFlfllmnts).includes(ff.id)) {
+    if (fulfillmentIdsArray && !fulfillmentIdsArray.includes(ff.id)) {
       result.push(
         addError(
           `Fulfillment id ${ff.id || "missing"} does not exist in /${
@@ -281,6 +280,8 @@ async function validateFulfillments(
         )
       );
     }
+
+    if(ff.type === "Delivery" ) {
 
     const ffDesc = ff.state?.descriptor;
     const ffStateCheck =
@@ -292,7 +293,7 @@ async function validateFulfillments(
           ERROR_CODES.INVALID_ORDER_STATE
         )
       );
-    }
+    }}
 
   
 
@@ -310,8 +311,11 @@ async function validateFulfillments(
 
     if (
       !providerAddr ||
-      !_.isEqual(ff.start?.location?.descriptor?.name, providerAddr?.location?.descriptor?.name)
+      !_.isEqual(ff.start?.location?.descriptor?.name, providerAddr?.location?.descriptor?.name) &&
+        ff?.type == "Delivery"
     ) {
+      console.log('ff.start?.location?.descriptor?.name: ', ff.start?.location?.descriptor?.name);
+      console.log('providerAddr?.location?.descriptor?.name: ', providerAddr?.location?.descriptor?.name);
       result.push(
         addError(
           `store name /fulfillments[${ff.id}]/start/location/descriptor/name can't change`,
@@ -961,9 +965,6 @@ async function validateItems(
         continue;
       }
 
-      
-
-      
     }
 
     return result;
