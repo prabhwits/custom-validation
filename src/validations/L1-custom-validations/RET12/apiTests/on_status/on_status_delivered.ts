@@ -46,8 +46,6 @@ const addError = (description: string, code: number): ValidationError => ({
   description,
 });
 
-
-
 async function validateOrder(
   order: any,
   transaction_id: string,
@@ -101,29 +99,31 @@ async function validateOrder(
     );
   }
   const provider = order?.provider || {};
-    if (Array.isArray(provider.creds) && provider.creds.length > 0) {
-        const currentCred = provider.creds[0];
-        const { id, descriptor } = currentCred;
-  
-        if (id && descriptor?.code && descriptor?.short_desc) {
-          const stored = await RedisService.getKey(`${transaction_id}_${constants.ON_SEARCH}_credsDescriptor`);
-          const storedCreds = stored ? JSON.parse(stored) : [];
-  
-          const isMatchFound = storedCreds.some((storedCred: any) =>
-            storedCred.id === id &&
-            storedCred.descriptor?.code === descriptor.code &&
-            storedCred.descriptor?.short_desc === descriptor.short_desc
-          );
-  
-          if (!isMatchFound) {
-            addError(
-        
-                `Order validation failure: Credential (id + descriptor) in /${constants.ON_CONFIRM} does not match /${constants.ON_SEARCH}`,
-                23003,
-            );
-          }
-        }
+  if (Array.isArray(provider.creds) && provider.creds.length > 0) {
+    const currentCred = provider.creds[0];
+    const { id, descriptor } = currentCred;
+
+    if (id && descriptor?.code && descriptor?.short_desc) {
+      const stored = await RedisService.getKey(
+        `${transaction_id}_${constants.ON_SEARCH}_credsDescriptor`
+      );
+      const storedCreds = stored ? JSON.parse(stored) : [];
+
+      const isMatchFound = storedCreds.some(
+        (storedCred: any) =>
+          storedCred.id === id &&
+          storedCred.descriptor?.code === descriptor.code &&
+          storedCred.descriptor?.short_desc === descriptor.short_desc
+      );
+
+      if (!isMatchFound) {
+        addError(
+          `Order validation failure: Credential (id + descriptor) in /${constants.ON_CONFIRM} does not match /${constants.ON_SEARCH}`,
+          23003
+        );
       }
+    }
+  }
 
   await RedisService.setKey(
     `${transaction_id}_orderState`,
@@ -144,7 +144,7 @@ async function validateFulfillments(
     fulfillmentIdsArrayRaw,
     buyerGpsRaw,
     buyerAddrRaw,
-    providerAddrRaw
+    providerAddrRaw,
   ] = await Promise.all([
     RedisService.getKey(`${transaction_id}_itemFlfllmnts`),
     RedisService.getKey(`${transaction_id}_fulfillmentIdArray`),
@@ -153,7 +153,9 @@ async function validateFulfillments(
     RedisService.getKey(`${transaction_id}_providerAddr`),
   ]);
   const itemFlfllmnts = itemFlfllmntsRaw ? JSON.parse(itemFlfllmntsRaw) : null;
-  const fulfillmentIdsArray : any = fulfillmentIdsArrayRaw  ? JSON.parse(fulfillmentIdsArrayRaw) : [];
+  const fulfillmentIdsArray: any = fulfillmentIdsArrayRaw
+    ? JSON.parse(fulfillmentIdsArrayRaw)
+    : [];
   const buyerGps = buyerGpsRaw ? JSON.parse(buyerGpsRaw) : null;
   const buyerAddr = buyerAddrRaw ? JSON.parse(buyerAddrRaw) : null;
   const providerAddr = providerAddrRaw ? JSON.parse(providerAddrRaw) : null;
@@ -275,26 +277,24 @@ async function validateFulfillments(
       );
     }
 
-    if(ff.type === "Delivery" ) {
-
-    const ffDesc = ff.state?.descriptor;
-    const ffStateCheck =
-      ffDesc?.hasOwnProperty("code") && ffDesc.code === "Order-delivered";
-    if (!ffStateCheck) {
-      result.push(
-        addError(
-          `Fulfillment state should be 'Order-delivered' in /${constants.ON_STATUS}_${state}`,
-          ERROR_CODES.INVALID_ORDER_STATE
-        )
-      );
-    }}
-
-  
+    if (ff.type === "Delivery") {
+      const ffDesc = ff.state?.descriptor;
+      const ffStateCheck =
+        ffDesc?.hasOwnProperty("code") && ffDesc.code === "Order-delivered";
+      if (!ffStateCheck) {
+        result.push(
+          addError(
+            `Fulfillment state should be 'Order-delivered' in /${constants.ON_STATUS}_${state}`,
+            ERROR_CODES.INVALID_ORDER_STATE
+          )
+        );
+      }
+    }
 
     if (
-        ff.start?.location?.gps &&
-        !compareCoordinates(ff.start.location.gps, providerAddr?.location?.gps)
-      ) {
+      ff.start?.location?.gps &&
+      !compareCoordinates(ff.start.location.gps, providerAddr?.location?.gps)
+    ) {
       result.push(
         addError(
           `store gps location /fulfillments[${ff.id}]/start/location/gps can't change`,
@@ -305,11 +305,20 @@ async function validateFulfillments(
 
     if (
       !providerAddr ||
-      !_.isEqual(ff.start?.location?.descriptor?.name, providerAddr?.location?.descriptor?.name) &&
-        ff?.type == "Delivery"
+      (!_.isEqual(
+        ff.start?.location?.descriptor?.name,
+        providerAddr?.location?.descriptor?.name
+      ) &&
+        ff?.type == "Delivery")
     ) {
-      console.log('ff.start?.location?.descriptor?.name: ', ff.start?.location?.descriptor?.name);
-      console.log('providerAddr?.location?.descriptor?.name: ', providerAddr?.location?.descriptor?.name);
+      console.log(
+        "ff.start?.location?.descriptor?.name: ",
+        ff.start?.location?.descriptor?.name
+      );
+      console.log(
+        "providerAddr?.location?.descriptor?.name: ",
+        providerAddr?.location?.descriptor?.name
+      );
       result.push(
         addError(
           `store name /fulfillments[${ff.id}]/start/location/descriptor/name can't change`,
@@ -659,13 +668,16 @@ async function validatePayment(
     `${transaction_id}_prevPayment`
   );
   const prevPayment = prevPaymentRaw ? JSON.parse(prevPaymentRaw) : null;
-  if (prevPayment && !_.isEqual(prevPayment, order.payment)) {
-    result.push(
-      addError(
-        `payment object mismatches with the previous action call and /${constants.ON_STATUS}_${state}`,
-        ERROR_CODES.INVALID_RESPONSE
-      )
-    );
+
+  if (order.payment.type != "ON-FULFILLMENT") {
+    if (prevPayment && !_.isEqual(prevPayment, order.payment)) {
+      result.push(
+        addError(
+          `payment object mismatches with the previous action call and /${constants.ON_STATUS}_${state}`,
+          ERROR_CODES.INVALID_RESPONSE
+        )
+      );
+    }
   }
 
   const status = payment_status(order.payment, flow);
@@ -920,19 +932,13 @@ async function validateItems(
       RedisService.getKey(`${transactionId}_itemFlfllmnts`),
       RedisService.getKey(`${transactionId}_itemsIdList`),
     ];
-   
 
-    const [
-      itemFlfllmntsRaw,
-      itemsIdListRaw,
-    
-    ] = await Promise.all(redisKeys);
+    const [itemFlfllmntsRaw, itemsIdListRaw] = await Promise.all(redisKeys);
 
     const itemFlfllmnts = itemFlfllmntsRaw
       ? JSON.parse(itemFlfllmntsRaw)
       : null;
     const itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
-  
 
     // Validate each item
     for (let i = 0; i < items.length; i++) {
@@ -958,7 +964,6 @@ async function validateItems(
         });
         continue;
       }
-
     }
 
     return result;
@@ -983,28 +988,24 @@ const checkOnStatusDelivered = async (
   const result: ValidationError[] = [];
 
   try {
-   
     const { context, message } = data;
-     try {
-                   await contextChecker(context, result, constants.ON_STATUS_DELIVERED, constants.ON_STATUS_OUT_FOR_DELIVERY, true);
-                 } catch (err: any) {
-                   result.push(
-            addError(
-                           `Error checking context: ${err.message}`,
-                           20000
-                         )
-                   )
-                   
-                   return result;
-                 }
-       
-    
-  
+    try {
+      await contextChecker(
+        context,
+        result,
+        constants.ON_STATUS_DELIVERED,
+        constants.ON_STATUS_OUT_FOR_DELIVERY,
+        true
+      );
+    } catch (err: any) {
+      result.push(addError(`Error checking context: ${err.message}`, 20000));
+
+      return result;
+    }
+
     const flow = (await RedisService.getKey("flow")) || "2";
     const { transaction_id } = context;
     const order = message.order;
-
-    
 
     await Promise.all([
       validateOrder(order, transaction_id, state, result),

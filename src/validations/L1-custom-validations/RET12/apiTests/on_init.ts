@@ -19,7 +19,11 @@ interface ValidationError {
 }
 
 // Helper to add error to result array
-const addError = (result: ValidationError[], code: number, description: string): void => {
+const addError = (
+  result: ValidationError[],
+  code: number,
+  description: string
+): void => {
   result.push({
     valid: false,
     code,
@@ -40,7 +44,11 @@ const storeBilling = async (
       TTL_IN_SECONDS
     );
   } catch (err: any) {
-    addError(result, 20006, `Invalid response: Error storing billing: ${err.message}`);
+    addError(
+      result,
+      20006,
+      `Invalid response: Error storing billing: ${err.message}`
+    );
   }
 };
 
@@ -57,7 +65,11 @@ const storeQuote = async (
       TTL_IN_SECONDS
     );
   } catch (err: any) {
-    addError(result, 20006, `Invalid response: Error storing quote: ${err.message}`);
+    addError(
+      result,
+      20006,
+      `Invalid response: Error storing quote: ${err.message}`
+    );
   }
 };
 
@@ -74,7 +86,11 @@ const storePayment = async (
       TTL_IN_SECONDS
     );
   } catch (err: any) {
-    addError(result, 20006, `Invalid response: Error storing payment: ${err.message}`);
+    addError(
+      result,
+      20006,
+      `Invalid response: Error storing payment: ${err.message}`
+    );
   }
 };
 
@@ -91,7 +107,11 @@ const storeApplicableOffers = async (
       TTL_IN_SECONDS
     );
   } catch (err: any) {
-    addError(result, 20006, `Invalid response: Error storing applicable offers: ${err.message}`);
+    addError(
+      result,
+      20006,
+      `Invalid response: Error storing applicable offers: ${err.message}`
+    );
   }
 };
 
@@ -121,7 +141,11 @@ const validateProvider = async (
       );
     }
   } catch (err: any) {
-    addError(result, 20006, `Invalid response: Error validating provider: ${err.message}`);
+    addError(
+      result,
+      20006,
+      `Invalid response: Error validating provider: ${err.message}`
+    );
   }
 };
 
@@ -181,7 +205,11 @@ const validateBilling = async (
       });
     }
   } catch (err: any) {
-    addError(result, 20006, `Invalid response: Error validating billing: ${err.message}`);
+    addError(
+      result,
+      20006,
+      `Invalid response: Error validating billing: ${err.message}`
+    );
   }
 };
 
@@ -275,7 +303,11 @@ const validateItems = async (
       }
     });
   } catch (err: any) {
-    addError(result, 20006, `Invalid response: Error validating items: ${err.message}`);
+    addError(
+      result,
+      20006,
+      `Invalid response: Error validating items: ${err.message}`
+    );
   }
 };
 
@@ -353,13 +385,25 @@ const validateFulfillments = async (
         }
 
         if (lenBuilding <= 3) {
-          addError(result, 20006, `Invalid response: address.building should be > 3 chars`);
+          addError(
+            result,
+            20006,
+            `Invalid response: address.building should be > 3 chars`
+          );
         }
         if (lenName <= 3) {
-          addError(result, 20006, `Invalid response: address.name should be > 3 chars`);
+          addError(
+            result,
+            20006,
+            `Invalid response: address.name should be > 3 chars`
+          );
         }
         if (lenLocality <= 3) {
-          addError(result, 20006, `Invalid response: address.locality should be > 3 chars`);
+          addError(
+            result,
+            20006,
+            `Invalid response: address.locality should be > 3 chars`
+          );
         }
 
         if (
@@ -429,7 +473,11 @@ const validateFulfillments = async (
       }
     });
   } catch (err: any) {
-    addError(result, 20006, `Invalid response: Error validating fulfillments: ${err.message}`);
+    addError(
+      result,
+      20006,
+      `Invalid response: Error validating fulfillments: ${err.message}`
+    );
   }
 };
 
@@ -488,7 +536,11 @@ const validateQuote = async (
       );
     }
   } catch (err: any) {
-    addError(result, 20006, `Invalid response: Error validating quote: ${err.message}`);
+    addError(
+      result,
+      20006,
+      `Invalid response: Error validating quote: ${err.message}`
+    );
   }
 };
 
@@ -531,7 +583,9 @@ const validatePayment = async (
       addError(
         result,
         20006,
-        `Invalid response: Invalid settlement basis in /${constants.ON_INIT}. Expected: ${validSettlementBasis.join(", ")}`
+        `Invalid response: Invalid settlement basis in /${
+          constants.ON_INIT
+        }. Expected: ${validSettlementBasis.join(", ")}`
       );
     }
 
@@ -602,33 +656,55 @@ const validatePayment = async (
           addError(
             result,
             20006,
-            `Invalid response: Payment details missing: ${missingFields.join(", ")}`
+            `Invalid response: Payment details missing: ${missingFields.join(
+              ", "
+            )}`
           );
         }
       } else if (
         !settlementDetails.upi_address ||
         settlementDetails.upi_address.trim() === ""
       ) {
-        addError(result, 20006, `Invalid response: Payment details missing: upi_address`);
+        addError(
+          result,
+          20006,
+          `Invalid response: Payment details missing: upi_address`
+        );
       }
     }
 
-    if (payment.collected_by === "BPP") {
+    if (payment.collected_by === "BPP" && payment.type !== "ON-FULFILLMENT") {
       if (!payment.type || payment.type !== "ON-ORDER") {
-        addError(result, 20006, `Invalid response: Type must be 'ON-ORDER' in payment`);
+        addError(
+          result,
+          20006,
+          `Invalid response: Type must be 'ON-ORDER' in payment`
+        );
       }
       if (!payment.uri || !/^https?:\/\/[^\s/$.?#].[^\s]*$/.test(payment.uri)) {
-        addError(result, 20006, `Invalid response: Uri must be a valid URL in payment`);
+        addError(
+          result,
+          20006,
+          `Invalid response: Uri must be a valid URL in payment`
+        );
       }
       if (!payment.status || payment.status !== "NOT-PAID") {
-        addError(result, 20006, `Invalid response: Status must be 'NOT-PAID' in payment`);
+        addError(
+          result,
+          20006,
+          `Invalid response: Status must be 'NOT-PAID' in payment`
+        );
       }
       if (
         !payment.params ||
         typeof payment.params !== "object" ||
         payment.params === null
       ) {
-        addError(result, 20006, `Invalid response: Params must be a non-null object in payment`);
+        addError(
+          result,
+          20006,
+          `Invalid response: Params must be a non-null object in payment`
+        );
       }
       if (
         !payment["@ondc/org/settlement_basis"] ||
@@ -655,7 +731,11 @@ const validatePayment = async (
         !Array.isArray(payment.tags) ||
         payment.tags.length === 0
       ) {
-        addError(result, 20006, `Invalid response: Tags must be a non-empty array in payment`);
+        addError(
+          result,
+          20006,
+          `Invalid response: Tags must be a non-empty array in payment`
+        );
       }
 
       if (payment.params) {
@@ -756,11 +836,17 @@ const validatePayment = async (
       addError(
         result,
         20006,
-        `Invalid response: ${status.message || `Transaction_id missing in message/order/payment`}`
+        `Invalid response: ${
+          status.message || `Transaction_id missing in message/order/payment`
+        }`
       );
     }
   } catch (err: any) {
-    addError(result, 20006, `Invalid response: Error validating payment: ${err.message}`);
+    addError(
+      result,
+      20006,
+      `Invalid response: Error validating payment: ${err.message}`
+    );
   }
 };
 
@@ -787,7 +873,11 @@ const validateTags = async (
           (item: any) => item.code === "accept_bap_terms"
         );
         if (acceptBapTerms.length > 0) {
-          addError(result, 20006, `Invalid response: accept_bap_terms is not required`);
+          addError(
+            result,
+            20006,
+            `Invalid response: accept_bap_terms is not required`
+          );
         }
 
         let tax_number: any = {};
@@ -928,7 +1018,11 @@ const validateTags = async (
       }
     }
   } catch (err: any) {
-    addError(result, 20006, `Invalid response: Error validating tags: ${err.message}`);
+    addError(
+      result,
+      20006,
+      `Invalid response: Error validating tags: ${err.message}`
+    );
   }
 };
 
