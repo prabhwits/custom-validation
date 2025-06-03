@@ -313,7 +313,8 @@ async function validateFulfillments(
       }
 
       if (!providerAddr ||
-                !_.isEqual(ff?.start?.location?.descriptor?.name, providerAddr?.location?.descriptor?.name)) {
+                !_.isEqual(ff?.start?.location?.descriptor?.name, providerAddr?.location?.descriptor?.name) &&
+        ff?.type == "Delivery") {
         result.push(
           addError(
             `store name /fulfillments[${ff.id}]/start/location/descriptor/name can't change`,

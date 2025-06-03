@@ -308,7 +308,8 @@ if (
 
       if (
         !providerAddr ||
-        !_.isEqual(ff.start?.location?.descriptor?.name, providerAddr?.location?.descriptor?.name)
+        !_.isEqual(ff.start?.location?.descriptor?.name, providerAddr?.location?.descriptor?.name) &&
+        ff?.type == "Delivery"
       ) {
         result.push(
           addError(
