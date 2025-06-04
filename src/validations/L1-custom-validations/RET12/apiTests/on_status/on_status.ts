@@ -143,6 +143,9 @@ const deliveryObjReplacement: any[] = deliveryObjReplacementRaw
   ? [JSON.parse(deliveryObjReplacementRaw)]
   : [];
 
+  console.log('Delivery Fulfillments21212:', JSON.stringify(deliveryFulfillments));
+  console.log('Delivery Object Replacements212134:', JSON.stringify(deliveryObjReplacement));
+
 if (deliveryObjReplacement.length > 0) {
   deliveryFulfillments.forEach((fulfillment: any) => {
     const matched = deliveryObjReplacement.find(

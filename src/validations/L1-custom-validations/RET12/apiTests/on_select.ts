@@ -401,15 +401,10 @@ async function validateError(
       }
 
       const breakup_msg = onSelect.quote.breakup;
-      const parent_item_ids = breakup_msg.map((item: any) => item.item?.parent_item_id).filter((id: any) => id);
-      const dynamic_item_ids = errorArray.map((item: any) => item.dynamic_item_id);
 
-      _.difference(dynamic_item_ids, parent_item_ids).forEach((diff: string) => {
-        addError(result,
-          20006,
-          `Dynamic_item_id: ${diff} doesn't exist in any quote.breakup.item.parent_item_ids`
-        );
-      });
+
+
+     
 
       const itemsReduced = breakup_msg.filter(
         (item: any) =>
@@ -417,12 +412,7 @@ async function validateError(
           item["@ondc/org/item_quantity"].count < itemsIdList[item["@ondc/org/item_id"]]
       );
 
-      _.difference(_.map(itemsReduced, "item.parent_item_id"), dynamic_item_ids).forEach((diff: string) => {
-        addError(result,
-          20006,
-          `Dynamic_item_id: ${diff} is missing from error payload`
-        );
-      });
+    
 
       errorArray.forEach((errorItem: any) => {
         const isPresent = itemsReduced.some(
@@ -465,6 +455,7 @@ export async function onSelect(data: any) {
     addError(result, 20006, err.message);
     return result;
   }
+  const isErrorObjectFound = data?.error;
 
   try {
     const onSelect = message.order;
@@ -473,7 +464,7 @@ export async function onSelect(data: any) {
     await validateProvider(onSelect, txnId, result);
     await validateItems(onSelect, txnId, result);
     const { nonServiceableFlag } = await validateFulfillments(onSelect, txnId, result, context.timestamp);
-    await validateQuote(onSelect, txnId, result, nonServiceableFlag);
+    !isErrorObjectFound && await validateQuote(onSelect, txnId, result, nonServiceableFlag);
     await validateError(onSelect, txnId, result);
 
     return result;

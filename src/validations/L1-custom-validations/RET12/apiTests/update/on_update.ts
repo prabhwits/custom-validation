@@ -524,6 +524,7 @@ export const checkOnUpdate = async (
         });
       }
       quoteTrailSum = Math.abs(quoteTrailSum);
+      console.log('quoteTrailSum423442', quoteTrailSum);
       if (quoteTrailSum !== 0) {
         await RedisService.setKey(
           `${transaction_id}_quoteTrailSum`,
