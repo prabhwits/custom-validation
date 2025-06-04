@@ -1278,9 +1278,9 @@ export const createAuthorizationHeader = async (payload: any) => {
   try {
     const header = await createAuthHeader({
       body: payload,
-      privateKey: envVariables.SIGN_PRIVATE_KEY,
-      subscriberId: envVariables.SUBSCRIBER_ID,
-      subscriberUniqueKeyId: envVariables.UKID,
+      privateKey: process.env.SIGN_PRIVATE_KEY!,
+      subscriberId: process.env.SUBSCRIBER_ID!,
+      subscriberUniqueKeyId: process.env.UKID!,
     });
     return header;
   } catch (error: any) {

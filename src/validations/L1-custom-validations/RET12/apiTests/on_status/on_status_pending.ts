@@ -10,7 +10,6 @@ import {
   areGSTNumbersMatching,
   compareCoordinates,
   isoDurToSec,
-  compareFulfillmentObject,
 } from "../../../../../utils/helper";
 import { FLOW } from "../../../../../utils/enums";
 import constants, {

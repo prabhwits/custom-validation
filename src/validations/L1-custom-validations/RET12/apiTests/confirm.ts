@@ -917,7 +917,7 @@ const validateTags = async (
 };
 
 // Main confirm function
-const confirm = async (data: any) => {
+export const confirm = async (data: any) => {
   const { context, message } = data;
   const result: ValidationError[] = [];
   const txnId = context?.transaction_id;
@@ -973,5 +973,3 @@ const confirm = async (data: any) => {
     return result;
   }
 };
-
-export default confirm;

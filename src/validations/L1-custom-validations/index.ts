@@ -1,18 +1,22 @@
-import { cancel } from "./RET12/apiTests/cancel";
-import confirm from "./RET12/apiTests/confirm";
-import init from "./RET12/apiTests/init";
-import { onCancelRouter } from "./RET12/apiTests/on_cancel";
-import on_confirm from "./RET12/apiTests/on_confirm";
-import onInit from "./RET12/apiTests/on_init";
-import { onSearch } from "./RET12/apiTests/on_search";
-import { onSelect } from "./RET12/apiTests/on_select";
-import { onStatusRouter } from "./RET12/apiTests/on_status";
-import { search } from "./RET12/apiTests/search";
-import { select } from "./RET12/apiTests/select";
-import { checkStatus } from "./RET12/apiTests/status";
-import { track } from "./RET12/apiTests/track";
-import { on_track } from "./RET12/apiTests/on_track";
-import { onUpdateRouter, updateRouter } from "./RET12/apiTests/update";
+import {
+  cancel,
+  confirm,
+  init,
+  onCancelRouter,
+  on_confirm,
+  onInit,
+  onSearch,
+  onSelect,
+  onStatusRouter,
+  search,
+  select,
+  checkStatus,
+  track,
+  on_track,
+  onUpdateRouter,
+  updateRouter,
+} from "./RET12/apiTests";
+
 import { validationOutput } from "./types";
 
 export async function performL1CustomValidations(
@@ -77,7 +81,7 @@ export async function performL1CustomValidations(
         {
           valid: false,
           code: 403,
-          description: "Not a valid action call", // description is optional
+          description: "Not a valid action call",
         },
       ];
 
