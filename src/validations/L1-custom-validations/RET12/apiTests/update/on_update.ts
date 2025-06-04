@@ -630,7 +630,11 @@ export const checkOnUpdate = async (
       const isReplaceable = await RedisService.getKey(
         `${data.context.transaction_id}_replaceable`
       );
-      if (isReplaceable) {
+      if (
+        isReplaceable &&
+        (apiSeq === ApiSequence.ON_UPDATE_PICKED ||
+          apiSeq === ApiSequence.ON_UPDATE_DELIVERED)
+      ) {
         on_update.fulfillments.forEach(async (ff: any) => {
           if (ff.type === "Return") {
             // Check for replace_request tag
