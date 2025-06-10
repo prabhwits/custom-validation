@@ -290,7 +290,7 @@ export async function select(data: any) {
       context,
       result,
       constants.SELECT,
-      constants.ON_SEARCH
+      constants.SELECT
     );
   } catch (err: any) {
     console.log('Entered the block 2243', err);

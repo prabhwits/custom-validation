@@ -162,7 +162,6 @@ async function validateOrder(
   try {
     let cnfrmOrdrId =
       (await RedisService.getKey(`${transaction_id}_cnfrmOrdrId`)) || "";
-    cnfrmOrdrId = JSON.parse(cnfrmOrdrId);
     if (cnfrmOrdrId && order.id !== cnfrmOrdrId) {
       result.push(
         addError(

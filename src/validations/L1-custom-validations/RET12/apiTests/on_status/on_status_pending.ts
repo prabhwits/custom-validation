@@ -96,28 +96,30 @@ async function validateOrder(
   }
   const provider = order?.provider || {};
   if (Array.isArray(provider.creds) && provider.creds.length > 0) {
-      const currentCred = provider.creds[0];
-      const { id, descriptor } = currentCred;
+    const currentCred = provider.creds[0];
+    const { id, descriptor } = currentCred;
 
-      if (id && descriptor?.code && descriptor?.short_desc) {
-        const stored = await RedisService.getKey(`${transaction_id}_${constants.ON_SEARCH}_credsDescriptor`);
-        const storedCreds = stored ? JSON.parse(stored) : [];
+    if (id && descriptor?.code && descriptor?.short_desc) {
+      const stored = await RedisService.getKey(
+        `${transaction_id}_${constants.ON_SEARCH}_credsDescriptor`
+      );
+      const storedCreds = stored ? JSON.parse(stored) : [];
 
-        const isMatchFound = storedCreds.some((storedCred: any) =>
+      const isMatchFound = storedCreds.some(
+        (storedCred: any) =>
           storedCred.id === id &&
           storedCred.descriptor?.code === descriptor.code &&
           storedCred.descriptor?.short_desc === descriptor.short_desc
-        );
+      );
 
-        if (!isMatchFound) {
-          addError(
-      
-            23003,
-            `Order validation failure: Credential (id + descriptor) in /${constants.ON_CONFIRM} does not match /${constants.ON_SEARCH}`
-          );
-        }
+      if (!isMatchFound) {
+        addError(
+          23003,
+          `Order validation failure: Credential (id + descriptor) in /${constants.ON_CONFIRM} does not match /${constants.ON_SEARCH}`
+        );
       }
     }
+  }
   await RedisService.setKey(
     `${transaction_id}_orderState`,
     JSON.stringify(order.state),
@@ -139,25 +141,31 @@ async function validateFulfillments(
       fulfillmentTatObjRaw,
       onSelectFulfillmentsRaw,
       providerAddrRaw,
-    ] = await Promise.all([
-      RedisService.getKey(`${transaction_id}_buyerGps`),
-      RedisService.getKey(`${transaction_id}_buyerAddr`),
-    
-      RedisService.getKey(`${transaction_id}_fulfillment_tat_obj`),
-      RedisService.getKey(`${transaction_id}_onSelectFulfillments`),
-      RedisService.getKey(`${transaction_id}_providerAddr`),
-    ].map(async (promise) => {
-      try {
-        return await promise;
-      } catch {
-        return null;
-      }
-    }));
+    ] = await Promise.all(
+      [
+        RedisService.getKey(`${transaction_id}_buyerGps`),
+        RedisService.getKey(`${transaction_id}_buyerAddr`),
+
+        RedisService.getKey(`${transaction_id}_fulfillment_tat_obj`),
+        RedisService.getKey(`${transaction_id}_onSelectFulfillments`),
+        RedisService.getKey(`${transaction_id}_providerAddr`),
+      ].map(async (promise) => {
+        try {
+          return await promise;
+        } catch {
+          return null;
+        }
+      })
+    );
 
     const buyerGps = buyerGpsRaw ? JSON.parse(buyerGpsRaw) : null;
     const buyerAddr = buyerAddrRaw ? JSON.parse(buyerAddrRaw) : null;
-    const fulfillmentTatObj = fulfillmentTatObjRaw ? JSON.parse(fulfillmentTatObjRaw) : null;
-    const onSelectFulfillments = onSelectFulfillmentsRaw ? JSON.parse(onSelectFulfillmentsRaw) : null;
+    const fulfillmentTatObj = fulfillmentTatObjRaw
+      ? JSON.parse(fulfillmentTatObjRaw)
+      : null;
+    const onSelectFulfillments = onSelectFulfillmentsRaw
+      ? JSON.parse(onSelectFulfillmentsRaw)
+      : null;
     const providerAddr = providerAddrRaw ? JSON.parse(providerAddrRaw) : null;
     const fulfillmentIds = new Set();
     for (const ff of order?.fulfillments || []) {
@@ -199,7 +207,9 @@ async function validateFulfillments(
         if (!validTypes.includes(ff.type)) {
           result.push(
             addError(
-              `Invalid fulfillment type ${ff.type} for ID ${ffId}; must be one of ${validTypes.join(", ")}`,
+              `Invalid fulfillment type ${
+                ff.type
+              } for ID ${ffId}; must be one of ${validTypes.join(", ")}`,
               ERROR_CODES.INVALID_RESPONSE
             )
           );
@@ -220,7 +230,11 @@ async function validateFulfillments(
       ) {
         result.push(
           addError(
-            `TAT Mismatch between /${constants.ON_STATUS}_${state} i.e ${isoDurToSec(ff["@ondc/org/TAT"])} seconds & /${constants.ON_CONFIRM} i.e ${fulfillmentTatObj[ffId]} seconds for ID ${ffId}`,
+            `TAT Mismatch between /${
+              constants.ON_STATUS
+            }_${state} i.e ${isoDurToSec(ff["@ondc/org/TAT"])} seconds & /${
+              constants.ON_CONFIRM
+            } i.e ${fulfillmentTatObj[ffId]} seconds for ID ${ffId}`,
             ERROR_CODES.INVALID_RESPONSE
           )
         );
@@ -326,7 +340,10 @@ async function validateFulfillments(
             );
           } else if (
             providerAddr &&
-            !compareCoordinates(ff.start.location.gps, providerAddr?.location?.gps)
+            !compareCoordinates(
+              ff.start.location.gps,
+              providerAddr?.location?.gps
+            )
           ) {
             result.push(
               addError(
@@ -378,7 +395,10 @@ async function validateFulfillments(
             }
             if (
               providerAddr &&
-              !_.isEqual(ff.start.location.address, providerAddr.location.address)
+              !_.isEqual(
+                ff.start.location.address,
+                providerAddr.location.address
+              )
             ) {
               result.push(
                 addError(
@@ -431,7 +451,6 @@ async function validateFulfillments(
         }
       }
       if (ff.type === "Delivery") {
-
         if (!ff?.start?.contact?.phone) {
           result.push(
             addError(
@@ -680,7 +699,10 @@ async function validateFulfillments(
       }
       if (
         (!providerAddr ||
-          !_.isEqual(ff?.start?.location?.descriptor?.name, providerAddr?.location?.descriptor?.name)) &&
+          !_.isEqual(
+            ff?.start?.location?.descriptor?.name,
+            providerAddr?.location?.descriptor?.name
+          )) &&
         ff?.type == "Delivery"
       ) {
         result.push(
@@ -735,7 +757,9 @@ async function validateFulfillments(
         }
       }
 
-      const deliveryFulfillmentReplacementRaw = await RedisService.getKey(`${transaction_id}_deliveryObjReplacement`)
+      const deliveryFulfillmentReplacementRaw = await RedisService.getKey(
+        `${transaction_id}_deliveryObjReplacement`
+      );
       const deliveryFulfillmentReplacement = deliveryFulfillmentReplacementRaw
         ? JSON.parse(deliveryFulfillmentReplacementRaw)
         : null;
@@ -748,7 +772,7 @@ async function validateFulfillments(
           if (matchingReplacement) {
             // Compare and validate the matching replacement
             const fulfillmentErrors = compareObjects(ff, matchingReplacement);
-             console.log('fulfillmentErrors', fulfillmentErrors);
+            console.log("fulfillmentErrors", fulfillmentErrors);
             if (fulfillmentErrors) {
               fulfillmentErrors.forEach((error: any) => {
                 result.push(addError(`${error}`, ERROR_CODES.INVALID_RESPONSE));
@@ -892,7 +916,7 @@ async function validatePayment(
     `${transaction_id}_prevPayment`
   );
   const prevPayment = prevPaymentRaw ? JSON.parse(prevPaymentRaw) : null;
-  console.log('order.payment', order.payment);
+  console.log("order.payment", order.payment);
   if (prevPayment && !_.isEqual(prevPayment, order.payment)) {
     result.push(
       addError(
@@ -907,6 +931,7 @@ async function validatePayment(
   );
   const buyerFF = buyerFFRaw ? JSON.parse(buyerFFRaw) : null;
   if (
+    buyerFF &&
     order.payment?.["@ondc/org/buyer_app_finder_fee_amount"] &&
     parseFloat(order.payment["@ondc/org/buyer_app_finder_fee_amount"]) !=
       buyerFF
@@ -943,31 +968,28 @@ async function validatePayment(
     );
   }
   const settlement_details: any =
-  order?.payment["@ondc/org/settlement_details"];
+    order?.payment["@ondc/org/settlement_details"];
 
+  const storedSettlementRaw = await RedisService.getKey(
+    `${transaction_id}_settlementDetailSet`
+  );
 
-  const storedSettlementRaw = await RedisService.getKey(`${transaction_id}_settlementDetailSet`); 
-  
-  const storedSettlementSet = storedSettlementRaw 
+  const storedSettlementSet = storedSettlementRaw
     ? JSON.parse(storedSettlementRaw)
     : null;
-  
 
-    storedSettlementSet?.forEach((obj1: any) => {
-            const exist = settlement_details.some((obj2: any) =>
-              _.isEqual(obj1, obj2)
-            );
-            if (!exist) {
-              result.push({
-                valid: false,
-                code: 20006,
-                description: `Missing payment/@ondc/org/settlement_details as compared to previous calls or not captured correctly: ${JSON.stringify(
-                  obj1
-                )}`,
-              });
-            }
-          });
-
+  storedSettlementSet?.forEach((obj1: any) => {
+    const exist = settlement_details.some((obj2: any) => _.isEqual(obj1, obj2));
+    if (!exist) {
+      result.push({
+        valid: false,
+        code: 20006,
+        description: `Missing payment/@ondc/org/settlement_details as compared to previous calls or not captured correctly: ${JSON.stringify(
+          obj1
+        )}`,
+      });
+    }
+  });
 }
 
 async function validateQuote(
@@ -1202,8 +1224,7 @@ async function validateItems(
       RedisService.getKey(`${transactionId}_itemFlfllmnts`),
       RedisService.getKey(`${transactionId}_itemsIdList`),
     ];
-  
-   
+
     if (checkLocationId) {
       redisKeys.push(RedisService.getKey(`${transactionId}_onSearchItems`));
     }
@@ -1221,17 +1242,12 @@ async function validateItems(
       })
     );
 
-    const [
-      itemFlfllmntsRaw,
-      itemsIdListRaw,
-      onSearchItemsRaw,
-    ] = redisResults;
+    const [itemFlfllmntsRaw, itemsIdListRaw, onSearchItemsRaw] = redisResults;
 
     const itemFlfllmnts = itemFlfllmntsRaw
       ? JSON.parse(itemFlfllmntsRaw)
       : null;
     let itemsIdList = itemsIdListRaw ? JSON.parse(itemsIdListRaw) : null;
-    
 
     const allOnSearchItems = onSearchItemsRaw
       ? JSON.parse(onSearchItemsRaw)
@@ -1289,8 +1305,6 @@ async function validateItems(
         }
       }
 
-    
-
       if (checkLocationId) {
         if (
           !item.location_id ||
@@ -1303,10 +1317,8 @@ async function validateItems(
           //   code: ERROR_CODES.INVALID_RESPONSE,
           //   description: `items[${i}]: location_id is required and must be a non-empty string in /${currentApi}`,
           // });
-        } 
+        }
       }
-
-      
     }
 
     if (checkQuantity && itemsCountChange) {
@@ -1333,23 +1345,23 @@ const checkOnStatusPending = async (
   state: any,
   fulfillmentsItemsSet: any
 ) => {
-  const result : any = [];
+  const result: any = [];
 
   try {
     const { context, message } = data;
-   try {
-           await contextChecker(context, result, constants.ON_STATUS_PENDING, constants.ON_CONFIRM, true);
-         } catch (err: any) {
-           result.push(
-    addError(
-                   `Error checking context: ${err.message}`,
-                   20000
-                 )
-           )
-           
-           return result;
-         }
-   
+    try {
+      await contextChecker(
+        context,
+        result,
+        constants.ON_STATUS_PENDING,
+        constants.ON_CONFIRM,
+        true
+      );
+    } catch (err: any) {
+      result.push(addError(`Error checking context: ${err.message}`, 20000));
+
+      return result;
+    }
 
     const flow = "2";
 
@@ -1368,8 +1380,6 @@ const checkOnStatusPending = async (
 
     const { transaction_id } = context;
     const order = message.order;
-
-   
 
     await Promise.all([
       validateOrder(order, transaction_id, state, result),

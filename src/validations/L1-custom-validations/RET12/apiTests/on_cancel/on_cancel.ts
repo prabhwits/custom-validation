@@ -87,7 +87,6 @@ export const onCancel = async (
 
       let confirmOrderId =
         (await RedisService.getKey(`${transaction_id}_cnfrmOrdrId`)) || "";
-      confirmOrderId = JSON.parse(confirmOrderId);
       if (confirmOrderId != on_cancel.id) {
         results.push({
           valid: false,
@@ -585,7 +584,6 @@ export const onCancel = async (
             const cancelReasonId = await RedisService.getKey(
               `${transaction_id}_cnclRid`
             );
-
             if (reason_id !== cancelReasonId) {
               results.push({
                 valid: false,
@@ -1353,19 +1351,8 @@ export const onCancel = async (
             code: 20006,
             description: `reason_id is mandatory in cancel_request tag for /${constants.ON_CANCEL}`,
           });
-        } else {
-          const cancelReasonId = await RedisService.getKey(
-            `${transaction_id}_cnclRid`
-          );
-          if (reason_id !== cancelReasonId) {
-            results.push({
-              valid: false,
-              code: 22502,
-              description: `Cancellation reason provided in /${constants.ON_CANCEL} is invalid`,
-            });
-          }
         }
-        if (!rto_id_flag) {
+        if (flow != "4" && !rto_id_flag) {
           results.push({
             valid: false,
             code: 20006,

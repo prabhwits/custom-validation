@@ -326,7 +326,7 @@ async function validateQuote(
       );
     }
 
-    if (typeof selectedPrice === "number" && onSelectItemsPrice !== selectedPrice) {
+    if (selectedPrice && typeof selectedPrice === "number" && onSelectItemsPrice !== selectedPrice) {
       addError(result,
         20006,
         `Quoted Price in /${constants.ON_SELECT} INR ${onSelectItemsPrice} does not match with the total price of items in /${constants.SELECT} INR ${selectedPrice}`
