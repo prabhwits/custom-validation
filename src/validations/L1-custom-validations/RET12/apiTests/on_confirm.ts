@@ -254,7 +254,7 @@ const validateProvider = async (
             storedCred.descriptor?.short_desc === descriptor.short_desc
         );
 
-        if (!isMatchFound) {
+        if (storedCreds.length > 0 && !isMatchFound ) {
           addError(
             result,
             23003,
