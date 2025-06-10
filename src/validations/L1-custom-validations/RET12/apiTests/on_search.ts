@@ -13,7 +13,7 @@ interface ValidationError {
 }
 
 const TTL_IN_SECONDS = Number(process.env.TTL_IN_SECONDS) || 3600;
-// Helper to add validation errors
+
 const addError = (
   result: ValidationError[],
   code: number,

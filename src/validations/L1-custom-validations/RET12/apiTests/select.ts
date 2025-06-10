@@ -127,7 +127,7 @@ async function validateItem(
     const itemsOnSearch = itemsOnSearchRaw ? JSON.parse(itemsOnSearchRaw) : [];
 
     select.items.forEach((item: { id: string | number; quantity: { count: number } }) => {
-      if (!itemsOnSearch?.includes(item.id.toString())) {
+      if (itemsOnSearch.length > 0 && !itemsOnSearch?.includes(item.id.toString())) {
         addError(result, 30004, `Item not found - The item ID provided in the request was not found: ${item.id}`);
       }
       itemIdArray.push(item.id.toString());
@@ -163,7 +163,7 @@ async function validateItem(
       : {};
     const providerID = select.provider.id;
     select.items.forEach((item: any, index: number) => {
-      if (!itemProviderMap[providerID]?.includes(item.id)) {
+      if (itemProviderMap.length > 0 && !itemProviderMap[providerID]?.includes(item.id)) {
         addError(result,
           30004,
           `Item with id ${item.id} not found - The item ID provided in the request was not found with provider_id ${providerID}`

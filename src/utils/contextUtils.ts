@@ -7,6 +7,7 @@ import {
   validateBapUri,
   validateBppUri,
 } from "./helper";
+import { ApiSequence } from "./constants";
 
 const TTL_IN_SECONDS = Number(process.env.REDIS_TTL_IN_SECONDS) || 3600;
 
@@ -20,7 +21,7 @@ export const contextChecker = async (
   try {
     const txnId = context?.transaction_id;
 
-    if (!pastCall) {
+    if (!pastCall || currentCall === ApiSequence.SELECT) {
       if (!context.domain) {
         result.push({
           valid: false,
@@ -31,7 +32,9 @@ export const contextChecker = async (
 
       try {
         await setRedisValue(`${txnId}_domain`, context.domain, TTL_IN_SECONDS);
-        await setRedisValue(`${txnId}_city`, context.city, TTL_IN_SECONDS);
+        if(context.city !== "*") {
+          await setRedisValue(`${txnId}_city`, context.city, TTL_IN_SECONDS);
+        }
         await setRedisValue(
           `${txnId}_country`,
           context.country,
@@ -90,7 +93,7 @@ export const contextChecker = async (
         currentCall
       );
 
-      if (!previousCallPresent) {
+      if ( !previousCallPresent) {
         throw new Error(`previous call doesn't exist`);
       }
 
@@ -128,7 +131,7 @@ export const contextChecker = async (
         });
       }
 
-      if (context.city !== prevCity) {
+      if (((currentCall !== ApiSequence.ON_SEARCH ) && context.city !== prevCity) && (context.city !== "*")) {
         result.push({
           valid: false,
           code: 20000,
