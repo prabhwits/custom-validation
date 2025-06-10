@@ -1026,7 +1026,7 @@ const validateTags = async (
   }
 };
 
-const onInit = async (data: any) => {
+export const onInit = async (data: any) => {
   const { context, message } = data;
   const result: ValidationError[] = [];
   const txnId = context?.transaction_id;
@@ -1069,4 +1069,3 @@ const onInit = async (data: any) => {
   }
 };
 
-export default onInit;

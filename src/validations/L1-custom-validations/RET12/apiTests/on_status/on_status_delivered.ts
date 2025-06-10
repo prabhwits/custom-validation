@@ -116,7 +116,7 @@ async function validateOrder(
           storedCred.descriptor?.short_desc === descriptor.short_desc
       );
 
-      if (!isMatchFound) {
+     if (storedCreds.length > 0 && !isMatchFound ) {
         addError(
           `Order validation failure: Credential (id + descriptor) in /${constants.ON_CONFIRM} does not match /${constants.ON_SEARCH}`,
           23003

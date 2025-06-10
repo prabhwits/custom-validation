@@ -187,7 +187,7 @@ const validateFulfillments = async (txnId: string, fulfillments: any[], result: 
   }
 };
 
-const init = async (data: any) => {
+export const init = async (data: any) => {
   const { context, message } = data;
   const result: any = [];
   const txnId = context?.transaction_id;
@@ -219,5 +219,3 @@ const init = async (data: any) => {
     return result;
   }
 };
-
-export default init;
