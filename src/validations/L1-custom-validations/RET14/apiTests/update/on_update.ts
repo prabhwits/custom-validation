@@ -1,22 +1,18 @@
 import _, { isEmpty } from "lodash";
 import { RedisService } from "ondc-automation-cache-lib";
-import constants, { ApiSequence } from "../../../../utils/constants";
+import constants, { ApiSequence } from "../../../../../utils/constants";
 import {
-  isObjectEmpty,
-  checkBppIdOrBapId,
-  checkContext,
   sumQuoteBreakUp,
-  payment_status,
   checkQuoteTrailSum,
   timeDiff,
-  addMsgIdToRedisSet,
   isPresentInRedisSet,
-} from "../../../../utils/helper";
+  setRedisValue,
+} from "../../../../../utils/helper";
 import {
   partcancel_return_reasonCodes,
-  return_rejected_request_reasonCodes,
   return_request_reasonCodes,
-} from "../../../../utils/reasonCode";
+} from "../../../../../utils/reasonCode";
+import { contextChecker } from "../../../../../utils/contextUtils";
 
 const TTL_IN_SECONDS: number = Number(process.env.TTL_IN_SECONDS) || 3600;
 
@@ -25,6 +21,12 @@ interface ValidationError {
   code: number;
   description: string;
 }
+// addError function
+const addError = (description: string, code: number): ValidationError => ({
+  valid: false,
+  code,
+  description,
+});
 
 // Helper function to retrieve and parse Redis value
 async function getRedisValue(
@@ -52,232 +54,35 @@ export const checkOnUpdate = async (
   transaction_id: string
 ): Promise<ValidationError[]> => {
   const result: ValidationError[] = [];
-
+  const { message, context }: any = data;
   try {
-    // Check for empty or invalid JSON
-    if (!data || isObjectEmpty(data)) {
-      result.push({
-        valid: false,
-        code: 20006,
-        description: `${ApiSequence.ON_UPDATE}: JSON cannot be empty`,
-      });
-      return result;
-    }
-
-    const { message, context }: any = data;
-    const on_update = message.order;
-
-    // Retrieve context and select data from Redis
-    const searchContext: any = await getRedisValue(
-      transaction_id,
-      `${ApiSequence.SEARCH}_context`
-    );
-    const select: any = await getRedisValue(
-      transaction_id,
-      `${ApiSequence.SELECT}`
-    );
-
-    // Store on_update data in Redis
     try {
-      await RedisService.setKey(
-        `${transaction_id}_${ApiSequence.ON_UPDATE}`,
-        JSON.stringify(data),
-        TTL_IN_SECONDS
-      );
-    } catch (error: any) {
-      result.push({
-        valid: false,
-        code: 23001,
-        description: `Error storing ${ApiSequence.ON_UPDATE} in Redis: ${error.message}`,
-      });
-    }
-
-    // Check for missing fields
-    if (
-      !message ||
-      !context ||
-      isObjectEmpty(message) ||
-      isObjectEmpty(message.order)
-    ) {
-      result.push({
-        valid: false,
-        code: 20006,
-        description: "/context, /message, /message/order is missing or empty",
-      });
-      return result;
-    }
-
-    // Message ID validation
-    try {
+      await contextChecker(context, result, apiSeq, constants.ON_CONFIRM, true);
       if (
-        (flow === "6-b" &&
-          apiSeq === ApiSequence.ON_UPDATE_INTERIM_REVERSE_QC) ||
-        (flow === "6-c" && apiSeq === ApiSequence.ON_UPDATE_INTERIM_LIQUIDATED)
+        apiSeq === ApiSequence.ON_UPDATE_APPROVAL ||
+        apiSeq === ApiSequence.ON_UPDATE_INTERIM
       ) {
-        if (apiSeq === ApiSequence.ON_UPDATE_INTERIM_REVERSE_QC) {
-          console.info(
-            `Comparing Message Ids of /${ApiSequence.UPDATE_REVERSE_QC} and /${ApiSequence.ON_UPDATE_INTERIM_REVERSE_QC}`
-          );
-          const updateMsgId = RedisService.getKey(
-            `${context.transaction_id}_${ApiSequence.UPDATE_REVERSE_QC}_msgId`
-          );
-
-          if (!_.isEqual(updateMsgId, context.message_id)) {
-            result.push({
-              valid: false,
-              code: 20008,
-              description: `Message Ids for /${ApiSequence.UPDATE_REVERSE_QC} and /${ApiSequence.ON_UPDATE_INTERIM_REVERSE_QC} api should be same`,
-            });
-          }
-        } else if (apiSeq === ApiSequence.ON_UPDATE_INTERIM_LIQUIDATED) {
-          console.info(
-            `Comparing Message Ids of /${ApiSequence.UPDATE_LIQUIDATED} and /${ApiSequence.ON_UPDATE_INTERIM_LIQUIDATED}`
-          );
-          const updateMsgId = await RedisService.getKey(
-            `${context.transaction_id}_${ApiSequence.UPDATE_LIQUIDATED}_msgId`
-          );
-
-          if (!_.isEqual(updateMsgId, context.message_id)) {
-            result.push({
-              valid: false,
-              code: 20008,
-              description: `Message Ids for /${ApiSequence.UPDATE_LIQUIDATED} and /${ApiSequence.ON_UPDATE_INTERIM_LIQUIDATED} api should be same`,
-            });
-          }
-        }
-      } else {
         try {
-          console.info(`Adding Message Id /${constants.ON_UPDATE}`);
-          const msgId = await RedisService.setKey(
-            `${transaction_id}_${apiSeq}_msgId`,
-            data.context.message_id,
+          await RedisService.setKey(
+            `${context.transaction_id}_PreviousUpdatedTimestamp`,
+            JSON.stringify(message.order.updated_at),
             TTL_IN_SECONDS
           );
-
-          const isMsgIdNotPresent = await addMsgIdToRedisSet(
-            context.transaction_id,
-            context.message_id,
-            apiSeq
-          );
-          if (!isMsgIdNotPresent) {
-            result.push({
-              valid: false,
-              code: 20000,
-              description: `Message id should not be same with previous calls`,
-            });
-          }
         } catch (error: any) {
-          console.error(
-            `!!Error while checking message id for /${apiSeq}, ${error.stack}`
-          );
-        }
-      }
-    } catch (error: any) {
-      console.error(
-        `!!Error while checking message id for /${apiSeq}, ${error.stack}`
-      );
-      result.push({
-        valid: false,
-        code: 23001,
-        description: `Error while checking message id for /${apiSeq}: ${error.message}`,
-      });
-    }
-
-    // Check bap_id and bpp_id format
-    const checkBap = checkBppIdOrBapId(context.bap_id);
-    const checkBpp = checkBppIdOrBapId(context.bpp_id);
-    if (checkBap) {
-      result.push({
-        valid: false,
-        code: 20006,
-        description: "context/bap_id should not be a url",
-      });
-    }
-    if (checkBpp) {
-      result.push({
-        valid: false,
-        code: 20006,
-        description: "context/bpp_id should not be a url",
-      });
-    }
-
-    // Domain validation
-    const domain = await RedisService.getKey(`${transaction_id}_domain`);
-    if (!_.isEqual(data.context.domain.split(":")[1], domain)) {
-      result.push({
-        valid: false,
-        code: 20008,
-        description: `Domain should be same in each action`,
-      });
-    }
-
-    // Validate context
-    try {
-      console.info(`Checking context for /${apiSeq} API`);
-      const res: any = checkContext(context, constants.ON_UPDATE);
-      if (!res.valid) {
-        Object.keys(res.ERRORS).forEach((key) => {
           result.push({
             valid: false,
-            code: 20006,
-            description: res.ERRORS[key],
+            code: 20001,
+            description: `Error storing order details: ${error.message}`,
           });
-        });
+        }
       }
-    } catch (error: any) {
-      console.error(
-        `!!Some error occurred while checking /${apiSeq} context, ${error.stack}`
-      );
-      result.push({
-        valid: false,
-        code: 23001,
-        description: `Error checking context for /${apiSeq}: ${error.message}`,
-      });
+    } catch (err: any) {
+      result.push(addError(`Error checking context: ${err.message}`, 20000));
+
+      return result;
     }
 
-    // Compare city
-    try {
-      console.info(`Comparing city of /${constants.SEARCH} and /${apiSeq}`);
-      if (!_.isEqual(searchContext?.city, context.city)) {
-        result.push({
-          valid: false,
-          code: 20008,
-          description: `City code mismatch in /${constants.SEARCH} and /${apiSeq}`,
-        });
-      }
-    } catch (error: any) {
-      console.error(
-        `!!Error while comparing city in /${constants.SEARCH} and /${apiSeq}, ${error.stack}`
-      );
-      result.push({
-        valid: false,
-        code: 23001,
-        description: `Error comparing city in /${constants.SEARCH} and /${apiSeq}: ${error.message}`,
-      });
-    }
-
-    // Compare transaction ID
-    try {
-      console.info(
-        `Comparing transaction Ids of /${constants.SELECT} and /${apiSeq}`
-      );
-      if (!_.isEqual(select?.context?.transaction_id, context.transaction_id)) {
-        result.push({
-          valid: false,
-          code: 20008,
-          description: `Transaction Id should be same from /${constants.SELECT} onwards`,
-        });
-      }
-    } catch (error: any) {
-      console.error(
-        `!!Error while comparing transaction ids for /${constants.SELECT} and /${apiSeq}, ${error.stack}`
-      );
-      result.push({
-        valid: false,
-        code: 23001,
-        description: `Error comparing transaction ids for /${constants.SELECT} and /${apiSeq}: ${error.message}`,
-      });
-    }
+    const on_update = message.order;
 
     // Validate quote breakup
     try {
@@ -291,7 +96,7 @@ export const checkOnUpdate = async (
       }
 
       if (
-        apiSeq == ApiSequence.ON_UPDATE_LIQUIDATED ||
+        apiSeq == ApiSequence.ON_UPDATE_PICKED ||
         apiSeq == ApiSequence.ON_UPDATE_PART_CANCEL
       ) {
         await RedisService.setKey(
@@ -331,35 +136,6 @@ export const checkOnUpdate = async (
         valid: false,
         code: 23001,
         description: `Error checking settlementWindow in /${apiSeq}: ${error.message}`,
-      });
-    }
-
-    // Check payment status, transaction_id and setting the payment obj
-    try {
-      console.info(
-        `Checking if payment status is Paid or Unpaid and availability of transaction_id`
-      );
-      const payment = on_update.payment;
-
-      await RedisService.setKey(
-        `${transaction_id}_prevPayment`,
-        JSON.stringify(payment),
-        TTL_IN_SECONDS
-      );
-      const status = payment_status(payment, flow);
-      if (!status) {
-        result.push({
-          valid: false,
-          code: 20006,
-          description: `Transaction_id missing in message/order/payment`,
-        });
-      }
-    } catch (error: any) {
-      console.error(`Error while checking the payment status`);
-      result.push({
-        valid: false,
-        code: 23001,
-        description: `Error checking payment status in /${apiSeq}: ${error.message}`,
       });
     }
 
@@ -500,6 +276,7 @@ export const checkOnUpdate = async (
 
     // Check settlement details
     try {
+      context.timestamp, on_update.updated_at;
       console.info(`Checking for settlement_details in /message/order/payment`);
       const settlement_details: any =
         on_update.payment["@ondc/org/settlement_details"];
@@ -543,21 +320,28 @@ export const checkOnUpdate = async (
       );
       const settlement_details: any =
         on_update.payment["@ondc/org/settlement_details"];
-        if (flow === "6-a") {
-          // Get the object to add
-          const newSettlementDetail = settlement_details[0];
-          if(newSettlementDetail && !isPresentInRedisSet(settlementDetailSet, newSettlementDetail)){
-            settlementDetailSet.add(newSettlementDetail);
-            await RedisService.setKey(
-              `${transaction_id}_settlementDetailSet`,
-              JSON.stringify([...settlementDetailSet]),
-              TTL_IN_SECONDS
-            );
-          }
-        }else {
+      if (flow === "6-a") {
+        // Get the object to add
+        const newSettlementDetail = settlement_details[0];
+        if (
+          newSettlementDetail &&
+          !isPresentInRedisSet(settlementDetailSet, newSettlementDetail)
+        ) {
+          settlementDetailSet.add(newSettlementDetail);
+          await RedisService.setKey(
+            `${transaction_id}_settlementDetailSet`,
+            JSON.stringify([...settlementDetailSet]),
+            TTL_IN_SECONDS
+          );
+        }
+      } else {
         let i = 0;
-        const storedSettlementRaw = await RedisService.getKey(`${transaction_id}_settlementDetailSet`);
-        const storedSettlementSet = storedSettlementRaw ? new Set(JSON.parse(storedSettlementRaw)) : new Set();
+        const storedSettlementRaw = await RedisService.getKey(
+          `${transaction_id}_settlementDetailSet`
+        );
+        const storedSettlementSet = storedSettlementRaw
+          ? new Set(JSON.parse(storedSettlementRaw))
+          : new Set();
 
         storedSettlementSet.forEach((obj1: any) => {
           const exist = settlement_details.some((obj2: any) =>
@@ -695,7 +479,9 @@ export const checkOnUpdate = async (
         `Checking for the availability of initiated_by code in ${apiSeq}`
       );
       const fulfillments = on_update.fulfillments;
+      const fulfillmentIdArray: any[] = [];
       fulfillments.forEach((fulfillment: any, iF: number) => {
+        fulfillmentIdArray.push(fulfillment.id);
         if (fulfillment.tags) {
           const tags = fulfillment.tags;
           tags.forEach((tag: any, iT: number) => {
@@ -719,6 +505,11 @@ export const checkOnUpdate = async (
         }
       });
 
+      await RedisService.setKey(
+        `${transaction_id}_fulfillmentIdArray`,
+        JSON.stringify(fulfillmentIdArray)
+      );
+
       let quoteTrailSum = 0;
       const lastFulfillment = fulfillments[fulfillments.length - 1].tags;
       if (lastFulfillment) {
@@ -733,10 +524,11 @@ export const checkOnUpdate = async (
         });
       }
       quoteTrailSum = Math.abs(quoteTrailSum);
+      console.log('quoteTrailSum423442', quoteTrailSum);
       if (quoteTrailSum !== 0) {
         await RedisService.setKey(
           `${transaction_id}_quoteTrailSum`,
-          String(quoteTrailSum),
+          quoteTrailSum.toFixed(2),
           TTL_IN_SECONDS
         );
       }
@@ -749,6 +541,692 @@ export const checkOnUpdate = async (
         code: 23001,
         description: `Error checking initiated_by in /${apiSeq}: ${error.message}`,
       });
+    }
+
+    // Check fulfillment id, type, and tracking
+    const fulfillmentIdArray: string[] = [];
+    try {
+      console.info("Checking fulfillment.id, fulfillment.type and tracking");
+      on_update.fulfillments.forEach(async (ff: any) => {
+        if (!ff.id) {
+          result.push({
+            valid: false,
+            code: 20006,
+            description: `Fulfillment Id must be present`,
+          });
+        }
+        fulfillmentIdArray.push(ff.id);
+        if (!ff.type) {
+          result.push({
+            valid: false,
+            code: 20006,
+            description: `Fulfillment Type must be present`,
+          });
+        }
+        const ffType = ff.type;
+        const ffId = ff.id;
+        if (ffType !== "Return" && ffType !== "Cancel") {
+          const tracking = await getRedisValue(
+            transaction_id,
+            `${ffId}_tracking`
+          );
+          if (tracking !== null) {
+            if (ff.tracking === false || ff.tracking === true) {
+              if (tracking !== ff.tracking) {
+                result.push({
+                  valid: false,
+                  code: 20008,
+                  description: `Fulfillment Tracking mismatch with the ${constants.ON_SELECT} call`,
+                });
+              }
+            } else {
+              result.push({
+                valid: false,
+                code: 20006,
+                description: `Tracking must be present for fulfillment ID: ${ff.id} in boolean form`,
+              });
+            }
+          }
+        }
+      });
+
+      await setRedisValue(
+        `${context.transaction_id}_fulfillmentIdArray`,
+        fulfillmentIdArray
+      );
+    } catch (error: any) {
+      console.error(
+        `Error while checking fulfillments id, type and tracking in /${constants.ON_STATUS}`
+      );
+      result.push({
+        valid: false,
+        code: 23001,
+        description: `Error checking fulfillments id, type, and tracking in /${apiSeq}: ${error.message}`,
+      });
+    }
+
+    // Flow 6-b and 6-c checks
+    if (flow === "6-b") {
+      // Check order state for 6-b and 6-c
+      try {
+        if (on_update.state !== "Completed") {
+          result.push({
+            valid: false,
+            code: 20007,
+            description: `Order state should be 'Completed' in ${apiSeq}`,
+          });
+        }
+      } catch (error: any) {
+        console.error(`Error while checking order.state for the /${apiSeq}`);
+        result.push({
+          valid: false,
+          code: 23001,
+          description: `Error checking order.state in /${apiSeq}: ${error.message}`,
+        });
+      }
+    }
+
+    // Flow 6-b checks
+    if (flow === "6-b") {
+      const isReplaceable = await RedisService.getKey(
+        `${data.context.transaction_id}_replaceable`
+      );
+      if (
+        isReplaceable &&
+        (apiSeq === ApiSequence.ON_UPDATE_PICKED ||
+          apiSeq === ApiSequence.ON_UPDATE_DELIVERED)
+      ) {
+        on_update.fulfillments.forEach(async (ff: any) => {
+          if (ff.type === "Return") {
+            // Check for replace_request tag
+            const replaceRequestTag = ff.tags?.find(
+              (tag: any) => tag.code === "replace_request"
+            );
+            if (!replaceRequestTag) {
+              result.push({
+                valid: false,
+                code: 20006,
+                description: `Missing 'replace_request' tag in Return fulfillment for ${apiSeq}`,
+              });
+            } else {
+              // Check if the replace_request tag has the correct structure
+              const replaceIdItem = replaceRequestTag.list?.find(
+                (item: any) => item.code === "id"
+              );
+              if (!replaceIdItem || !replaceIdItem.value) {
+                result.push({
+                  valid: false,
+                  code: 20006,
+                  description: `Invalid 'replace_request' tag structure in Return fulfillment for ${apiSeq}. Missing 'id' with a value.`,
+                });
+              } else {
+                await RedisService.setKey(
+                  `${data.context.transaction_id}_replaceId`,
+                  replaceIdItem.value,
+                  TTL_IN_SECONDS
+                );
+              }
+            }
+          }
+        });
+      }
+
+      if (
+        apiSeq === ApiSequence.ON_UPDATE_APPROVAL ||
+        apiSeq === ApiSequence.ON_UPDATE_PICKED ||
+        apiSeq === ApiSequence.ON_UPDATE_DELIVERED
+      ) {
+        try {
+          const RETobj = _.filter(on_update.fulfillments, { type: "Return" });
+          if (!RETobj.length) {
+            result.push({
+              valid: false,
+              code: 20006,
+              description: `Return object is mandatory for ${apiSeq}`,
+            });
+          } else {
+            // Check end object
+            if (!_.isEmpty(RETobj[0]?.end)) {
+              const ret_obj_end = RETobj[0]?.end;
+              if (_.isEmpty(ret_obj_end?.location)) {
+                result.push({
+                  valid: false,
+                  code: 20006,
+                  description: `Return fulfillment end location object is missing in ${apiSeq}`,
+                });
+              }
+              if (apiSeq === ApiSequence.ON_UPDATE_DELIVERED) {
+                if (!_.isEmpty(ret_obj_end?.time)) {
+                  const ret_obj_end_time = ret_obj_end.time;
+                  if (!_.isEmpty(ret_obj_end_time?.timestamp)) {
+                    const ret_obj_end_time_timestamp = new Date(
+                      ret_obj_end_time.timestamp
+                    );
+                    if (
+                      !(ret_obj_end_time_timestamp instanceof Date) ||
+                      ret_obj_end_time_timestamp > new Date(context.timestamp)
+                    ) {
+                      result.push({
+                        valid: false,
+                        code: 20009,
+                        description: `end/time/timestamp of return fulfillment should be less than or equal to context/timestamp of ${apiSeq}`,
+                      });
+                    }
+                  } else {
+                    result.push({
+                      valid: false,
+                      code: 20006,
+                      description: `end/time/timestamp of return fulfillment is missing in ${apiSeq}`,
+                    });
+                  }
+                } else {
+                  result.push({
+                    valid: false,
+                    code: 20006,
+                    description: `end/time/timestamp of return fulfillment is missing in ${apiSeq}`,
+                  });
+                }
+              }
+            } else {
+              result.push({
+                valid: false,
+                code: 20006,
+                description: `Return fulfillment end object is missing in ${apiSeq}`,
+              });
+            }
+
+            // Check start object
+            if (!_.isEmpty(RETobj[0]?.start)) {
+              const ret_obj_start = RETobj[0]?.start;
+              if (!_.isEmpty(ret_obj_start?.location)) {
+                const ret_start_location = ret_obj_start.location;
+                if (ret_start_location.id) {
+                  result.push({
+                    valid: false,
+                    code: 20006,
+                    description: `Return fulfillment start location id is not required in ${apiSeq}`,
+                  });
+                }
+              } else {
+                result.push({
+                  valid: false,
+                  code: 20006,
+                  description: `Return fulfillment start location object is missing in ${apiSeq}`,
+                });
+              }
+              if (!_.isEmpty(ret_obj_start?.time)) {
+                const ret_obj_start_time = ret_obj_start.time;
+                if (apiSeq === ApiSequence.ON_UPDATE_APPROVAL) {
+                  if (!_.isEmpty(ret_obj_start_time?.range)) {
+                    const ret_obj_start_time_range = ret_obj_start_time?.range;
+                    const startTime: any = new Date(
+                      ret_obj_start_time_range?.start
+                    );
+                    const endTime: any = new Date(
+                      ret_obj_start_time_range?.end
+                    );
+                    if (
+                      !(startTime instanceof Date) ||
+                      !(endTime instanceof Date)
+                    ) {
+                      if (!(startTime instanceof Date)) {
+                        result.push({
+                          valid: false,
+                          code: 20006,
+                          description: `start/time/range/start of /${apiSeq} should have valid time format for return fulfillment`,
+                        });
+                      }
+                      if (!(endTime instanceof Date)) {
+                        result.push({
+                          valid: false,
+                          code: 20006,
+                          description: `end/time/range/end of /${apiSeq} should have valid time format for return fulfillment`,
+                        });
+                      }
+                    } else {
+                      const timeDifStart = timeDiff(
+                        ret_obj_start_time_range?.start,
+                        context.timestamp
+                      );
+                      if (timeDifStart < 0) {
+                        result.push({
+                          valid: false,
+                          code: 20009,
+                          description: `start/time/range/start time of return fulfillment should be greater than context/timestamp of ${apiSeq}`,
+                        });
+                      }
+                      const timeDifEnd = timeDiff(
+                        ret_obj_start_time_range?.end,
+                        context.timestamp
+                      );
+                      if (timeDifEnd <= 0) {
+                        result.push({
+                          valid: false,
+                          code: 20009,
+                          description: `start/time/range/end time of return fulfillment should be greater than context/timestamp of ${apiSeq}`,
+                        });
+                      }
+                      await RedisService.setKey(
+                        `${transaction_id}_${ApiSequence.ON_UPDATE_APPROVAL}`,
+                        JSON.stringify({ start: startTime, end: endTime }),
+                        TTL_IN_SECONDS
+                      );
+                      if (startTime >= endTime) {
+                        result.push({
+                          valid: false,
+                          code: 20006,
+                          description: `start/time/range/start should not be greater than or equal to start/time/range/end in return fulfillment`,
+                        });
+                      }
+                    }
+                  } else {
+                    result.push({
+                      valid: false,
+                      code: 20006,
+                      description: `Return fulfillment start time range object is missing in ${apiSeq}`,
+                    });
+                  }
+                } else {
+                  if (!_.isEmpty(ret_obj_start_time?.timestamp)) {
+                    const ret_obj_start_time_timestamp: any = new Date(
+                      ret_obj_start_time.timestamp
+                    );
+                    const onUpdateApprovalTimeRanges = await getRedisValue(
+                      transaction_id,
+                      `${ApiSequence.ON_UPDATE_APPROVAL}`
+                    );
+                    let startTime: any = "";
+                    let endTime: any = "";
+                    if (!isEmpty(onUpdateApprovalTimeRanges)) {
+                      const { start, end }: any = onUpdateApprovalTimeRanges;
+                      startTime = start;
+                      endTime = end;
+                    }
+                    if (!(ret_obj_start_time_timestamp instanceof Date)) {
+                      result.push({
+                        valid: false,
+                        code: 20006,
+                        description: `start/time/timestamp of return fulfillment should have valid time format`,
+                      });
+                    } else {
+                      if (
+                        startTime instanceof Date &&
+                        endTime instanceof Date &&
+                        (ret_obj_start_time_timestamp < startTime ||
+                          ret_obj_start_time_timestamp > endTime)
+                      ) {
+                        result.push({
+                          valid: false,
+                          code: 20009,
+                          description: `start/time/timestamp of return fulfillment should be in the valid time/range as in ${ApiSequence.ON_UPDATE_APPROVAL}`,
+                        });
+                      }
+                      if (ret_obj_start_time_timestamp > context.timestamp) {
+                        result.push({
+                          valid: false,
+                          code: 20009,
+                          description: `start/time/timestamp of return fulfillment should be less than context/timestamp of ${apiSeq}`,
+                        });
+                      }
+                    }
+                  } else {
+                    result.push({
+                      valid: false,
+                      code: 20006,
+                      description: `start/time/timestamp of return fulfillment is missing`,
+                    });
+                  }
+                }
+              } else {
+                result.push({
+                  valid: false,
+                  code: 20006,
+                  description: `Return fulfillment start time object is missing in ${apiSeq}`,
+                });
+              }
+            } else {
+              result.push({
+                valid: false,
+                code: 20006,
+                description: `Return fulfillment start object is missing in ${apiSeq}`,
+              });
+            }
+          }
+        } catch (error: any) {
+          console.error(
+            `Error while checking Fulfillments Return Obj in /${apiSeq}, ${error.stack}`
+          );
+          result.push({
+            valid: false,
+            code: 23001,
+            description: `Error checking Return object in /${apiSeq}: ${error.message}`,
+          });
+        }
+        if (apiSeq !== ApiSequence.ON_UPDATE_APPROVAL) {
+          try {
+            const isReplaceable = await RedisService.getKey(
+              `${data.context.transaction_id}_replaceable`
+            );
+            if (isReplaceable) {
+              const replaceId = await RedisService.getKey(
+                `${data.context.transaction_id}_replaceId`
+              );
+              if (replaceId) {
+                fulfillmentsItemsSet.has;
+                const deliveryObj = on_update.fulfillments.find((ff: any) => {
+                  return ff.type == "Delivery" && ff.id === replaceId;
+                });
+                await RedisService.setKey(
+                  `${transaction_id}_deliveryObjReplacement`,
+                  JSON.stringify(deliveryObj),
+                  TTL_IN_SECONDS
+                );
+                // delivery Obj check
+                if (deliveryObj) {
+                  const [buyerGpsRaw, buyerAddrRaw] = await Promise.all([
+                    getRedisValue(context.transaction_id, "buyerGps"),
+                    getRedisValue(context.transaction_id, "buyerAddr"),
+                  ]);
+
+                  const buyerGps = buyerGpsRaw;
+                  const buyerAddr = buyerAddrRaw;
+
+                  const gpsRegex = /^-?\d{1,3}\.\d+,-?\d{1,3}\.\d+$/;
+
+                  for (const [
+                    i,
+                    fulfillment,
+                  ] of on_update.fulfillments.entries()) {
+                    if (fulfillment.type !== "Delivery") continue;
+
+                    try {
+                      const id = fulfillment.id;
+                      if (!fulfillment["@ondc/org/TAT"]) {
+                        result.push({
+                          valid: false,
+                          code: 20006,
+                          description: `'TAT' must be provided in message/order/fulfillments[${id}]`,
+                        });
+                      }
+
+                      const gps = fulfillment.end?.location?.gps;
+                      if (!gpsRegex.test(gps)) {
+                        result.push({
+                          valid: false,
+                          code: 20006,
+                          description: `fulfillments[${i}].end.location.gps has invalid format in /${constants.ON_CONFIRM}`,
+                        });
+                      } else if (buyerGps && !_.isEqual(gps, buyerGps)) {
+                        result.push({
+                          valid: false,
+                          code: 20007,
+                          description: `gps coordinates in fulfillments[${i}].end.location mismatch in /${constants.SELECT} & /${constants.ON_CONFIRM}`,
+                        });
+                      }
+
+                      const areaCode =
+                        fulfillment.end?.location?.address?.area_code;
+                      if (buyerAddr && !_.isEqual(areaCode, buyerAddr)) {
+                        result.push({
+                          valid: false,
+                          code: 20006,
+                          description: `address.area_code in fulfillments[${i}].end.location mismatch in /${constants.SELECT} & /${constants.ON_CONFIRM}`,
+                        });
+                      }
+
+                      const address = fulfillment.end?.location?.address;
+                      const providerAddress = fulfillment.start;
+                      if (
+                        providerAddress &&
+                        !_.isEqual(providerAddress, address)
+                      ) {
+                        try {
+                          await setRedisValue(
+                            `${context.transaction_id}_providerAddr`,
+                            providerAddress,
+                            TTL_IN_SECONDS
+                          );
+                        } catch (error: any) {
+                          result.push({
+                            valid: false,
+                            code: 23001,
+                            description: `Error setting provider address in Redis for /${constants.ON_CONFIRM}: ${error.message}`,
+                          });
+                        }
+                      }
+
+                      if (address) {
+                        const lenName = address.name?.length || 0;
+                        const lenBuilding = address.building?.length || 0;
+                        const lenLocality = address.locality?.length || 0;
+
+                        if (lenName + lenBuilding + lenLocality >= 190) {
+                          result.push({
+                            valid: false,
+                            code: 20006,
+                            description: `address.name + address.building + address.locality should be < 190 chars in fulfillments[${i}]`,
+                          });
+                        }
+
+                        if (lenBuilding <= 3) {
+                          result.push({
+                            valid: false,
+                            code: 20006,
+                            description: `address.building should be > 3 chars in fulfillments[${i}]`,
+                          });
+                        }
+                        if (lenName <= 3) {
+                          result.push({
+                            valid: false,
+                            code: 20006,
+                            description: `address.name should be > 3 chars in fulfillments[${i}]`,
+                          });
+                        }
+                        if (lenLocality <= 3) {
+                          result.push({
+                            valid: false,
+                            code: 20006,
+                            description: `address.locality should be > 3 chars in fulfillments[${i}]`,
+                          });
+                        }
+
+                        if (
+                          address.building === address.locality ||
+                          address.name === address.building ||
+                          address.name === address.locality
+                        ) {
+                          result.push({
+                            valid: false,
+                            code: 20006,
+                            description: `address.name, address.building, and address.locality should be unique in fulfillments[${i}]`,
+                          });
+                        }
+                      }
+                    } catch (error: any) {
+                      result.push({
+                        valid: false,
+                        code: 23001,
+                        description: `Error checking fulfillment in /${constants.ON_CONFIRM}: ${error.message}`,
+                      });
+                    }
+                  }
+                }
+              }
+            }
+          } catch (error: any) {
+            console.error(
+              `Error while checking replaceable status in /${apiSeq}, ${error.stack}`
+            );
+            result.push({
+              valid: false,
+              code: 23001,
+              description: `Error checking replaceable status in /${apiSeq}: ${error.message}`,
+            });
+          }
+        }
+      }
+
+      // Check quote trail sum for 6-b
+      try {
+        if (sumQuoteBreakUp(on_update.quote)) {
+          const price = Number(on_update.quote.price.value);
+          const priceAtConfirm = Number(
+            await getRedisValue(transaction_id, "quotePrice")
+          );
+          const returnCancelFulfillments = _.filter(
+            on_update.fulfillments,
+            (item) => item.type === "Return" || item.type === "Cancel"
+          );
+          if (
+            apiSeq === ApiSequence.ON_UPDATE_PICKED ||
+            apiSeq === ApiSequence.ON_UPDATE_DELIVERED
+          ) {
+            console.info(
+              `Checking for quote_trail price and item quote price sum for ${apiSeq}`
+            );
+            checkQuoteTrailSum(
+              returnCancelFulfillments,
+              price,
+              priceAtConfirm,
+              result,
+              ApiSequence.ON_UPDATE
+            );
+          }
+        } else {
+          result.push({
+            valid: false,
+            code: 41002,
+            description: `The price breakdown in breakup does not match with the total_price for ${apiSeq}`,
+          });
+        }
+      } catch (error: any) {
+        console.error(
+          `Error occurred while checking for quote_trail price and quote breakup price on /${apiSeq}`
+        );
+        result.push({
+          valid: false,
+          code: 23001,
+          description: `Error checking quote trail sum in /${apiSeq}: ${error.message}`,
+        });
+      }
+
+      // Check quote trail items for 6-b
+      try {
+        let cancelFulfillmentsArray = _.filter(on_update.fulfillments, {
+          type: "Cancel",
+        });
+        if (cancelFulfillmentsArray.length !== 0) {
+          const cancelFulfillments = cancelFulfillmentsArray[0];
+          const quoteTrailItems = cancelFulfillments.tags.filter(
+            (tag: any) => tag.code === "quote_trail"
+          );
+          if (quoteTrailItems.length !== 0) {
+            if (apiSeq === ApiSequence.ON_UPDATE_INTERIM_REVERSE_QC) {
+              quoteTrailItems.forEach((item: any) => {
+                quoteTrailItemsSet.add(item);
+              });
+              await RedisService.setKey(
+                `${transaction_id}_quoteTrailItemsSet`,
+                JSON.stringify([...quoteTrailItemsSet]),
+                TTL_IN_SECONDS
+              );
+            }
+            const storedQuoteTrailItemsSet = new Set(
+              (await getRedisValue(transaction_id, "quoteTrailItemsSet")) || []
+            );
+            storedQuoteTrailItemsSet.forEach((obj1: any) => {
+              const exist = quoteTrailItems.some((obj2: any) =>
+                _.isEqual(obj1, obj2)
+              );
+              if (!exist) {
+                result.push({
+                  valid: false,
+                  code: 20006,
+                  description: `Missing fulfillments/Cancel/tags/quote_trail as compared to previous calls`,
+                });
+              }
+            });
+          } else {
+            result.push({
+              valid: false,
+              code: 20006,
+              description: `Fulfillments/Cancel/tags/quote_trail is missing in ${apiSeq}`,
+            });
+          }
+        } else {
+          result.push({
+            valid: false,
+            code: 20006,
+            description: `Fulfillments/Cancel is missing in ${apiSeq}`,
+          });
+        }
+      } catch (error: any) {
+        console.error(
+          `Error occurred while checking for quote_trail in /${apiSeq}`
+        );
+        result.push({
+          valid: false,
+          code: 23001,
+          description: `Error checking quote trail items in /${apiSeq}: ${error.message}`,
+        });
+      }
+      // Reason_id mapping for return_request in 6-b
+      try {
+        console.info(`Reason_id mapping for return_request`);
+        const fulfillments = on_update.fulfillments;
+        fulfillments.forEach((fulfillment: any) => {
+          if (fulfillment.type !== "Return") return;
+          const tags = fulfillment.tags;
+          let returnRequestPresent = false;
+          tags.forEach((tag: any) => {
+            if (tag.code !== "return_request") return;
+            returnRequestPresent = true;
+            const lists = tag.list;
+            let reason_id = "not_found";
+            lists.forEach((list: any) => {
+              if (list.code === "reason_id") {
+                reason_id = list.value;
+              }
+              if (list.code === "initiated_by") {
+                if (list.value !== context.bap_id) {
+                  result.push({
+                    valid: false,
+                    code: 20007,
+                    description: `initiated_by should be ${context.bap_id}`,
+                  });
+                }
+                if (
+                  reason_id !== "not_found" &&
+                  list.value === context.bap_id &&
+                  !return_request_reasonCodes.includes(reason_id)
+                ) {
+                  result.push({
+                    valid: false,
+                    code: 20007,
+                    description: `reason code allowed are ${return_request_reasonCodes}`,
+                  });
+                }
+              }
+            });
+          });
+          if (!returnRequestPresent) {
+            result.push({
+              valid: false,
+              code: 20007,
+              description: `return request is not present in the 'Return' fulfillment`,
+            });
+          }
+        });
+      } catch (error: any) {
+        console.error(
+          `!!Error while mapping return_request reason_id in ${apiSeq}`
+        );
+        result.push({
+          valid: false,
+          code: 23001,
+          description: `Error mapping return_request reason_id in /${apiSeq}: ${error.message}`,
+        });
+      }
     }
 
     const flowSixAChecks = async (data: any) => {
@@ -996,695 +1474,6 @@ export const checkOnUpdate = async (
         });
       }
     };
-
-    // Check fulfillment id, type, and tracking
-    try {
-      console.info("Checking fulfillment.id, fulfillment.type and tracking");
-      on_update.fulfillments.forEach(async (ff: any) => {
-        if (!ff.id) {
-          result.push({
-            valid: false,
-            code: 20006,
-            description: `Fulfillment Id must be present`,
-          });
-        }
-        if (!ff.type) {
-          result.push({
-            valid: false,
-            code: 20006,
-            description: `Fulfillment Type must be present`,
-          });
-        }
-        const ffType = ff.type;
-        const ffId = ff.id;
-        if (ffType !== "Return" && ffType !== "Cancel") {
-          const tracking = await getRedisValue(
-            transaction_id,
-            `${ffId}_tracking`
-          );
-          if (tracking !== null) {
-            if (ff.tracking === false || ff.tracking === true) {
-              if (tracking !== ff.tracking) {
-                result.push({
-                  valid: false,
-                  code: 20008,
-                  description: `Fulfillment Tracking mismatch with the ${constants.ON_SELECT} call`,
-                });
-              }
-            } else {
-              result.push({
-                valid: false,
-                code: 20006,
-                description: `Tracking must be present for fulfillment ID: ${ff.id} in boolean form`,
-              });
-            }
-          }
-        }
-      });
-    } catch (error: any) {
-      console.error(
-        `Error while checking fulfillments id, type and tracking in /${constants.ON_STATUS}`
-      );
-      result.push({
-        valid: false,
-        code: 23001,
-        description: `Error checking fulfillments id, type, and tracking in /${apiSeq}: ${error.message}`,
-      });
-    }
-
-    // Flow 6-b and 6-c checks
-    if (flow === "6-b" || flow === "6-c") {
-      try {
-        const timestampOnUpdatePartCancel = await getRedisValue(
-          transaction_id,
-          `${ApiSequence.ON_UPDATE_PART_CANCEL}_tmpstmp`
-        );
-
-        const timeDif = timeDiff(
-          context.timestamp,
-          timestampOnUpdatePartCancel
-        );
-        if (timeDif <= 0) {
-          result.push({
-            valid: false,
-            code: 20009,
-            description: `context/timestamp of /${apiSeq} should be greater than /${ApiSequence.ON_UPDATE_PART_CANCEL} context/timestamp`,
-          });
-        }
-
-        const timestamp = await getRedisValue(transaction_id, "timestamp_");
-
-        if (timestamp && timestamp.length !== 0) {
-          const timeDif2 = timeDiff(context.timestamp, timestamp[0]);
-          if (timeDif2 <= 0) {
-            result.push({
-              valid: false,
-              code: 20009,
-              description: `context/timestamp of /${apiSeq} should be greater than context/timestamp of /${timestamp[1]}`,
-            });
-          }
-        } else {
-          result.push({
-            valid: false,
-            code: 20009,
-            description: `context/timestamp of the previous call is missing or the previous action call itself is missing`,
-          });
-        }
-        await RedisService.setKey(
-          `${transaction_id}_timestamp_`,
-          JSON.stringify([context.timestamp, apiSeq]),
-          TTL_IN_SECONDS
-        );
-      } catch (e: any) {
-        console.error(
-          `Error while checking context/timestamp for the /${apiSeq} ${e.stack}`
-        );
-        result.push({
-          valid: false,
-          code: 23001,
-          description: `Error checking timestamp for /${apiSeq}: ${e}`,
-        });
-      }
-
-      // Check order state for 6-b and 6-c
-      try {
-        if (on_update.state !== "Completed") {
-          result.push({
-            valid: false,
-            code: 20007,
-            description: `Order state should be 'Completed' in ${apiSeq}`,
-          });
-        }
-      } catch (error: any) {
-        console.error(`Error while checking order.state for the /${apiSeq}`);
-        result.push({
-          valid: false,
-          code: 23001,
-          description: `Error checking order.state in /${apiSeq}: ${error.message}`,
-        });
-      }
-    }
-
-    // Flow 6-b checks
-    if (flow === "6-b") {
-      if (
-        apiSeq === ApiSequence.ON_UPDATE_APPROVAL ||
-        apiSeq === ApiSequence.ON_UPDATE_PICKED ||
-        apiSeq === ApiSequence.ON_UPDATE_DELIVERED
-      ) {
-        try {
-          const RETobj = _.filter(on_update.fulfillments, { type: "Return" });
-          if (!RETobj.length) {
-            result.push({
-              valid: false,
-              code: 20006,
-              description: `Return object is mandatory for ${apiSeq}`,
-            });
-          } else {
-            // Check end object
-            if (!_.isEmpty(RETobj[0]?.end)) {
-              const ret_obj_end = RETobj[0]?.end;
-              if (_.isEmpty(ret_obj_end?.location)) {
-                result.push({
-                  valid: false,
-                  code: 20006,
-                  description: `Return fulfillment end location object is missing in ${apiSeq}`,
-                });
-              }
-              if (apiSeq === ApiSequence.ON_UPDATE_DELIVERED) {
-                if (!_.isEmpty(ret_obj_end?.time)) {
-                  const ret_obj_end_time = ret_obj_end.time;
-                  if (!_.isEmpty(ret_obj_end_time?.timestamp)) {
-                    const ret_obj_end_time_timestamp = new Date(
-                      ret_obj_end_time.timestamp
-                    );
-                    if (
-                      !(ret_obj_end_time_timestamp instanceof Date) ||
-                      ret_obj_end_time_timestamp > new Date(context.timestamp)
-                    ) {
-                      result.push({
-                        valid: false,
-                        code: 20009,
-                        description: `end/time/timestamp of return fulfillment should be less than or equal to context/timestamp of ${apiSeq}`,
-                      });
-                    }
-                  } else {
-                    result.push({
-                      valid: false,
-                      code: 20006,
-                      description: `end/time/timestamp of return fulfillment is missing in ${apiSeq}`,
-                    });
-                  }
-                } else {
-                  result.push({
-                    valid: false,
-                    code: 20006,
-                    description: `end/time/timestamp of return fulfillment is missing in ${apiSeq}`,
-                  });
-                }
-              }
-            } else {
-              result.push({
-                valid: false,
-                code: 20006,
-                description: `Return fulfillment end object is missing in ${apiSeq}`,
-              });
-            }
-
-            // Check start object
-            if (!_.isEmpty(RETobj[0]?.start)) {
-              const ret_obj_start = RETobj[0]?.start;
-              if (!_.isEmpty(ret_obj_start?.location)) {
-                const ret_start_location = ret_obj_start.location;
-                if (ret_start_location.id) {
-                  result.push({
-                    valid: false,
-                    code: 20006,
-                    description: `Return fulfillment start location id is not required in ${apiSeq}`,
-                  });
-                }
-              } else {
-                result.push({
-                  valid: false,
-                  code: 20006,
-                  description: `Return fulfillment start location object is missing in ${apiSeq}`,
-                });
-              }
-              if (!_.isEmpty(ret_obj_start?.time)) {
-                const ret_obj_start_time = ret_obj_start.time;
-                if (apiSeq === ApiSequence.ON_UPDATE_APPROVAL) {
-                  if (!_.isEmpty(ret_obj_start_time?.range)) {
-                    const ret_obj_start_time_range = ret_obj_start_time?.range;
-                    const startTime: any = new Date(
-                      ret_obj_start_time_range?.start
-                    );
-                    const endTime: any = new Date(
-                      ret_obj_start_time_range?.end
-                    );
-                    if (
-                      !(startTime instanceof Date) ||
-                      !(endTime instanceof Date)
-                    ) {
-                      if (!(startTime instanceof Date)) {
-                        result.push({
-                          valid: false,
-                          code: 20006,
-                          description: `start/time/range/start of /${apiSeq} should have valid time format for return fulfillment`,
-                        });
-                      }
-                      if (!(endTime instanceof Date)) {
-                        result.push({
-                          valid: false,
-                          code: 20006,
-                          description: `end/time/range/end of /${apiSeq} should have valid time format for return fulfillment`,
-                        });
-                      }
-                    } else {
-                      const timeDifStart = timeDiff(
-                        ret_obj_start_time_range?.start,
-                        context.timestamp
-                      );
-                      if (timeDifStart < 0) {
-                        result.push({
-                          valid: false,
-                          code: 20009,
-                          description: `start/time/range/start time of return fulfillment should be greater than context/timestamp of ${apiSeq}`,
-                        });
-                      }
-                      const timeDifEnd = timeDiff(
-                        ret_obj_start_time_range?.end,
-                        context.timestamp
-                      );
-                      if (timeDifEnd <= 0) {
-                        result.push({
-                          valid: false,
-                          code: 20009,
-                          description: `start/time/range/end time of return fulfillment should be greater than context/timestamp of ${apiSeq}`,
-                        });
-                      }
-                      await RedisService.setKey(
-                        `${transaction_id}_${ApiSequence.ON_UPDATE_APPROVAL}`,
-                        JSON.stringify({ start: startTime, end: endTime }),
-                        TTL_IN_SECONDS
-                      );
-                      if (startTime >= endTime) {
-                        result.push({
-                          valid: false,
-                          code: 20006,
-                          description: `start/time/range/start should not be greater than or equal to start/time/range/end in return fulfillment`,
-                        });
-                      }
-                    }
-                  } else {
-                    result.push({
-                      valid: false,
-                      code: 20006,
-                      description: `Return fulfillment start time range object is missing in ${apiSeq}`,
-                    });
-                  }
-                } else {
-                  if (!_.isEmpty(ret_obj_start_time?.timestamp)) {
-                    const ret_obj_start_time_timestamp: any = new Date(
-                      ret_obj_start_time.timestamp
-                    );
-                    const onUpdateApprovalTimeRanges = await getRedisValue(
-                      transaction_id,
-                      `${ApiSequence.ON_UPDATE_APPROVAL}`
-                    );
-                    let startTime: any = "";
-                    let endTime: any = "";
-                    if (!isEmpty(onUpdateApprovalTimeRanges)) {
-                      const { start, end }: any = onUpdateApprovalTimeRanges;
-                      startTime = start;
-                      endTime = end;
-                    }
-                    if (!(ret_obj_start_time_timestamp instanceof Date)) {
-                      result.push({
-                        valid: false,
-                        code: 20006,
-                        description: `start/time/timestamp of return fulfillment should have valid time format`,
-                      });
-                    } else {
-                      if (
-                        startTime instanceof Date &&
-                        endTime instanceof Date &&
-                        (ret_obj_start_time_timestamp < startTime ||
-                          ret_obj_start_time_timestamp > endTime)
-                      ) {
-                        result.push({
-                          valid: false,
-                          code: 20009,
-                          description: `start/time/timestamp of return fulfillment should be in the valid time/range as in ${ApiSequence.ON_UPDATE_APPROVAL}`,
-                        });
-                      }
-                      if (ret_obj_start_time_timestamp > context.timestamp) {
-                        result.push({
-                          valid: false,
-                          code: 20009,
-                          description: `start/time/timestamp of return fulfillment should be less than context/timestamp of ${apiSeq}`,
-                        });
-                      }
-                    }
-                  } else {
-                    result.push({
-                      valid: false,
-                      code: 20006,
-                      description: `start/time/timestamp of return fulfillment is missing`,
-                    });
-                  }
-                }
-              } else {
-                result.push({
-                  valid: false,
-                  code: 20006,
-                  description: `Return fulfillment start time object is missing in ${apiSeq}`,
-                });
-              }
-            } else {
-              result.push({
-                valid: false,
-                code: 20006,
-                description: `Return fulfillment start object is missing in ${apiSeq}`,
-              });
-            }
-          }
-        } catch (error: any) {
-          console.error(
-            `Error while checking Fulfillments Return Obj in /${apiSeq}, ${error.stack}`
-          );
-          result.push({
-            valid: false,
-            code: 23001,
-            description: `Error checking Return object in /${apiSeq}: ${error.message}`,
-          });
-        }
-      }
-
-      // Check quote trail sum for 6-b
-      try {
-        if (sumQuoteBreakUp(on_update.quote)) {
-          const price = Number(on_update.quote.price.value);
-          const priceAtConfirm = Number(
-            await getRedisValue(transaction_id, "quotePrice")
-          );
-          const returnCancelFulfillments = _.filter(
-            on_update.fulfillments,
-            (item) => item.type === "Return" || item.type === "Cancel"
-          );
-          if (
-            apiSeq === ApiSequence.ON_UPDATE_PICKED ||
-            apiSeq === ApiSequence.ON_UPDATE_DELIVERED
-          ) {
-            console.info(
-              `Checking for quote_trail price and item quote price sum for ${apiSeq}`
-            );
-            checkQuoteTrailSum(
-              returnCancelFulfillments,
-              price,
-              priceAtConfirm,
-              result,
-              ApiSequence.ON_UPDATE
-            );
-          }
-        } else {
-          result.push({
-            valid: false,
-            code: 41002,
-            description: `The price breakdown in breakup does not match with the total_price for ${apiSeq}`,
-          });
-        }
-      } catch (error: any) {
-        console.error(
-          `Error occurred while checking for quote_trail price and quote breakup price on /${apiSeq}`
-        );
-        result.push({
-          valid: false,
-          code: 23001,
-          description: `Error checking quote trail sum in /${apiSeq}: ${error.message}`,
-        });
-      }
-
-      // Check quote trail items for 6-b
-      try {
-        let cancelFulfillmentsArray = _.filter(on_update.fulfillments, {
-          type: "Cancel",
-        });
-        if (cancelFulfillmentsArray.length !== 0) {
-          const cancelFulfillments = cancelFulfillmentsArray[0];
-          const quoteTrailItems = cancelFulfillments.tags.filter(
-            (tag: any) => tag.code === "quote_trail"
-          );
-          if (quoteTrailItems.length !== 0) {
-            if (apiSeq === ApiSequence.ON_UPDATE_INTERIM_REVERSE_QC) {
-              quoteTrailItems.forEach((item: any) => {
-                quoteTrailItemsSet.add(item);
-              });
-              await RedisService.setKey(
-                `${transaction_id}_quoteTrailItemsSet`,
-                JSON.stringify([...quoteTrailItemsSet]),
-                TTL_IN_SECONDS
-              );
-            }
-            const storedQuoteTrailItemsSet = new Set(
-              (await getRedisValue(transaction_id, "quoteTrailItemsSet")) || []
-            );
-            storedQuoteTrailItemsSet.forEach((obj1: any) => {
-              const exist = quoteTrailItems.some((obj2: any) =>
-                _.isEqual(obj1, obj2)
-              );
-              if (!exist) {
-                result.push({
-                  valid: false,
-                  code: 20006,
-                  description: `Missing fulfillments/Cancel/tags/quote_trail as compared to previous calls`,
-                });
-              }
-            });
-          } else {
-            result.push({
-              valid: false,
-              code: 20006,
-              description: `Fulfillments/Cancel/tags/quote_trail is missing in ${apiSeq}`,
-            });
-          }
-        } else {
-          result.push({
-            valid: false,
-            code: 20006,
-            description: `Fulfillments/Cancel is missing in ${apiSeq}`,
-          });
-        }
-      } catch (error: any) {
-        console.error(
-          `Error occurred while checking for quote_trail in /${apiSeq}`
-        );
-        result.push({
-          valid: false,
-          code: 23001,
-          description: `Error checking quote trail items in /${apiSeq}: ${error.message}`,
-        });
-      }
-
-      // Reason_id mapping for return_request in 6-b
-      try {
-        console.info(`Reason_id mapping for return_request`);
-        const fulfillments = on_update.fulfillments;
-        fulfillments.forEach((fulfillment: any) => {
-          if (fulfillment.type !== "Return") return;
-          const tags = fulfillment.tags;
-          let returnRequestPresent = false;
-          tags.forEach((tag: any) => {
-            if (tag.code !== "return_request") return;
-            returnRequestPresent = true;
-            const lists = tag.list;
-            let reason_id = "not_found";
-            lists.forEach((list: any) => {
-              if (list.code === "reason_id") {
-                reason_id = list.value;
-              }
-              if (list.code === "initiated_by") {
-                if (list.value !== context.bap_id) {
-                  result.push({
-                    valid: false,
-                    code: 20007,
-                    description: `initiated_by should be ${context.bap_id}`,
-                  });
-                }
-                if (
-                  reason_id !== "not_found" &&
-                  list.value === context.bap_id &&
-                  !return_request_reasonCodes.includes(reason_id)
-                ) {
-                  result.push({
-                    valid: false,
-                    code: 20007,
-                    description: `reason code allowed are ${return_request_reasonCodes}`,
-                  });
-                }
-              }
-            });
-          });
-          if (!returnRequestPresent) {
-            result.push({
-              valid: false,
-              code: 20007,
-              description: `return request is not present in the 'Return' fulfillment`,
-            });
-          }
-        });
-      } catch (error: any) {
-        console.error(
-          `!!Error while mapping return_request reason_id in ${apiSeq}`
-        );
-        result.push({
-          valid: false,
-          code: 23001,
-          description: `Error mapping return_request reason_id in /${apiSeq}: ${error.message}`,
-        });
-      }
-    }
-
-    // Flow 6-c checks
-    if (flow === "6-c") {
-      try {
-        console.info(`Reason_id mapping for return_rejected_request`);
-        const fulfillments = on_update.fulfillments;
-        fulfillments.forEach((fulfillment: any) => {
-          if (fulfillment.type !== "Return") return;
-          const tags = fulfillment.tags;
-          let returnRejectedRequestPresent = false;
-          tags.forEach((tag: any) => {
-            if (tag.code !== "return_request") return;
-            returnRejectedRequestPresent = true;
-            const lists = tag.list;
-            let reason_id = "";
-            lists.forEach((list: any) => {
-              if (list.code === "reason_id") {
-                reason_id = list.value;
-              }
-              if (list.code === "initiated_by") {
-                if (list.value !== context.bap_id) {
-                  result.push({
-                    valid: false,
-                    code: 20007,
-                    description: `initiated_by should be ${context.bap_id}`,
-                  });
-                }
-                if (
-                  reason_id &&
-                  list.value === context.bap_id &&
-                  !return_rejected_request_reasonCodes.includes(reason_id)
-                ) {
-                  result.push({
-                    valid: false,
-                    code: 20007,
-                    description: `reason code allowed are ${return_rejected_request_reasonCodes}`,
-                  });
-                }
-              }
-            });
-          });
-          if (!returnRejectedRequestPresent) {
-            result.push({
-              valid: false,
-              code: 20007,
-              description: `return rejected request is not present in the 'Return' fulfillment`,
-            });
-          }
-        });
-      } catch (error: any) {
-        console.error(
-          `!!Error while mapping return_rejected_request reason_id in ${apiSeq}`
-        );
-        result.push({
-          valid: false,
-          code: 23001,
-          description: `Error mapping return_rejected_request reason_id in /${apiSeq}: ${error.message}`,
-        });
-      }
-
-      // Check quote trail sum for 6-c
-      try {
-        if (sumQuoteBreakUp(on_update.quote)) {
-          const price = Number(on_update.quote.price.value);
-          const priceAtConfirm = Number(
-            await getRedisValue(transaction_id, "quotePrice")
-          );
-          const returnCancelFulfillments = _.filter(
-            on_update.fulfillments,
-            (item) => item.type === "Return" || item.type === "Cancel"
-          );
-          if (apiSeq === ApiSequence.ON_UPDATE_LIQUIDATED) {
-            console.info(
-              `Checking for quote_trail price and item quote price sum for ${apiSeq}`
-            );
-            checkQuoteTrailSum(
-              returnCancelFulfillments,
-              price,
-              priceAtConfirm,
-              result,
-              ApiSequence.ON_UPDATE
-            );
-          }
-        } else {
-          result.push({
-            valid: false,
-            code: 41002,
-            description: `The price breakdown in breakup does not match with the total_price for ${apiSeq}`,
-          });
-        }
-      } catch (error: any) {
-        console.error(
-          `Error occurred while checking for quote_trail price and quote breakup price on /${apiSeq}`
-        );
-        result.push({
-          valid: false,
-          code: 23001,
-          description: `Error checking quote trail sum in /${apiSeq}: ${error.message}`,
-        });
-      }
-
-      // Check quote trail items for 6-c
-      try {
-        let cancelFulfillmentsArray = _.filter(on_update.fulfillments, {
-          type: "Cancel",
-        });
-        if (cancelFulfillmentsArray.length !== 0) {
-          const cancelFulfillments = cancelFulfillmentsArray[0];
-          const quoteTrailItems = cancelFulfillments.tags.filter(
-            (tag: any) => tag.code === "quote_trail"
-          );
-          if (quoteTrailItems.length !== 0) {
-            if (apiSeq === ApiSequence.ON_UPDATE_LIQUIDATED) {
-              quoteTrailItems.forEach((item: any) => {
-                quoteTrailItemsSet.add(item);
-              });
-              await RedisService.setKey(
-                `${transaction_id}_quoteTrailItemsSet`,
-                JSON.stringify([...quoteTrailItemsSet]),
-                TTL_IN_SECONDS
-              );
-            }
-            const storedQuoteTrailItemsSet = new Set(
-              (await getRedisValue(transaction_id, "quoteTrailItemsSet")) || []
-            );
-            storedQuoteTrailItemsSet.forEach((obj1: any) => {
-              const exist = quoteTrailItems.some((obj2: any) =>
-                _.isEqual(obj1, obj2)
-              );
-              if (!exist) {
-                result.push({
-                  valid: false,
-                  code: 20006,
-                  description: `Missing fulfillments/Cancel/tags/quote_trail as compared to previous calls`,
-                });
-              }
-            });
-          } else {
-            result.push({
-              valid: false,
-              code: 20006,
-              description: `Fulfillments/Cancel/tags/quote_trail is missing in ${apiSeq}`,
-            });
-          }
-        } else {
-          result.push({
-            valid: false,
-            code: 20006,
-            description: `Fulfillments/Cancel is missing in ${apiSeq}`,
-          });
-        }
-      } catch (error: any) {
-        console.error(
-          `Error occurred while checking for quote_trail in /${apiSeq}`
-        );
-        result.push({
-          valid: false,
-          code: 23001,
-          description: `Error checking quote trail items in /${apiSeq}: ${error.message}`,
-        });
-      }
-    }
 
     // Execute flow 6-a checks
     if (flow === "6-a") {

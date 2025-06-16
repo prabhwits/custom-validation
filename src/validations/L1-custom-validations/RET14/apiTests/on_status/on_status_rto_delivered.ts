@@ -1,7 +1,7 @@
 /* eslint-disable no-prototype-builtins */
 import _ from "lodash";
 import { RedisService } from "ondc-automation-cache-lib";
-import constants, { ApiSequence } from "../../../../utils/constants";
+import constants, { ApiSequence } from "../../../../../utils/constants";
 import {
   isObjectEmpty,
   checkContext,
@@ -13,7 +13,7 @@ import {
   checkQuoteTrail,
   checkQuoteTrailSum,
   compareFulfillmentObject,
-} from "../../../../utils/helper";
+} from "../../../../../utils/helper";
 
 // Minimal interface for validation error
 interface ValidationError {
@@ -73,16 +73,6 @@ async function validateContext(
       result.push(
         addError(
           "context/bpp_id should not be a url",
-          ERROR_CODES.INVALID_RESPONSE
-        )
-      );
-    }
-
-    const domain = await RedisService.getKey(`${transaction_id}_domain`);
-    if (!_.isEqual(context.domain?.split(":")[1], domain)) {
-      result.push(
-        addError(
-          "Domain should be same in each action",
           ERROR_CODES.INVALID_RESPONSE
         )
       );
@@ -170,9 +160,8 @@ async function validateOrder(
   result: ValidationError[]
 ): Promise<void> {
   try {
-    const cnfrmOrdrId = await RedisService.getKey(
-      `${transaction_id}_cnfrmOrdrId`
-    );
+    let cnfrmOrdrId =
+      (await RedisService.getKey(`${transaction_id}_cnfrmOrdrId`)) || "";
     if (cnfrmOrdrId && order.id !== cnfrmOrdrId) {
       result.push(
         addError(
@@ -226,6 +215,31 @@ async function validateOrder(
         )
       );
     }
+     const provider = order?.provider || {};
+        if (Array.isArray(provider.creds) && provider.creds.length > 0) {
+            const currentCred = provider.creds[0];
+            const { id, descriptor } = currentCred;
+      
+            if (id && descriptor?.code && descriptor?.short_desc) {
+              const stored = await RedisService.getKey(`${transaction_id}_${constants.ON_SEARCH}_credsDescriptor`);
+              const storedCreds = stored ? JSON.parse(stored) : [];
+      
+              const isMatchFound = storedCreds.some((storedCred: any) =>
+                storedCred.id === id &&
+                storedCred.descriptor?.code === descriptor.code &&
+                storedCred.descriptor?.short_desc === descriptor.short_desc
+              );
+      
+              if (storedCreds.length > 0 && !isMatchFound ) {
+                addError(
+            
+                    `Order validation failure: Credential (id + descriptor) in /${constants.ON_CONFIRM} does not match /${constants.ON_SEARCH}`,
+                    23003,
+                );
+              }
+            }
+          }
+    
   } catch (error: any) {
     console.error(
       `!!Error while validating order for /${constants.ON_STATUS_RTO_DELIVERED}, ${error.stack}`
