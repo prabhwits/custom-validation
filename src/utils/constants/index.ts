@@ -89,6 +89,7 @@ export const ApiSequence = {
   ON_STATUS_OUT_FOR_DELIVERY: 'on_status_out_for_delivery',
   ON_STATUS_DELIVERED: 'on_status_delivered',
   ON_STATUS_RTO_DELIVERED: 'on_status_rto_delivered/disposed',
+  ON_STATUS_AGENT_ASSIGNED: 'on_status_agent_assigned',
   ON_UPDATE_PART_CANCEL: 'on_update_part_cancel',
   UPDATE: 'update',
   UPDATE_REVERSE_QC: 'update_reverse_qc',
