@@ -12,7 +12,6 @@ import { select } from "./RET14/apiTests/select";
 import { checkStatus } from "./RET14/apiTests/status";
 import { track } from "./RET14/apiTests/track";
 import { on_track } from "./RET14/apiTests/on_track";
-import { onUpdateRouter, updateRouter } from "./RET14/apiTests/update";
 import { validationOutput } from "./types";
 
 export async function performL1CustomValidations(
@@ -66,18 +65,12 @@ export async function performL1CustomValidations(
     case "on_cancel":
       result = await onCancelRouter(payload);
       break;
-    case "update":
-      result = await updateRouter(payload);
-      break;
-    case "on_update":
-      result = await onUpdateRouter(payload);
-      break;
     default:
       result = [
         {
           valid: false,
           code: 403,
-          description: "Not a valid action call", // description is optional
+          description: "Not a valid action call",
         },
       ];
 

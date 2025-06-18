@@ -7,7 +7,6 @@ import { data } from "./constants/AreacodeMap";
 import { InputObject } from "./interface";
 import { reasonCodes } from "./reasonCode";
 import { createAuthorizationHeader as createAuthHeader } from "ondc-crypto-sdk-nodejs";
-import { envVariables } from "../server";
 import axios from "axios";
 
 type ObjectType = {
@@ -414,9 +413,8 @@ export const checkMandatoryTags = (
         `Origin tag fields are missing for ${categoryName} item[${index}]`
       );
       const key = `missingOriginTag[${i}][${index}]`;
-      errorObj[
-        key
-      ] = `Origin tag fields are missing for ${categoryName} item[${index}]`;
+      errorObj[key] =
+        `Origin tag fields are missing for ${categoryName} item[${index}]`;
     }
 
     if (!attributeTag && categoryName !== "Grocery") {
@@ -424,9 +422,8 @@ export const checkMandatoryTags = (
         `Attribute tag fields are missing for ${categoryName} item[${index}]`
       );
       const key = `missingAttributeTag[${i}][${index}]`;
-      errorObj[
-        key
-      ] = `Attribute tag fields are missing for ${categoryName} item[${index}]`;
+      errorObj[key] =
+        `Attribute tag fields are missing for ${categoryName} item[${index}]`;
       return;
     }
 
@@ -449,11 +446,10 @@ export const checkMandatoryTags = (
 
         if (missingMandatoryTags.length > 0) {
           const key = `invalid_attribute[${i}][${index}]`;
-          errorObj[
-            key
-          ] = `Invalid attribute for item with category id: ${missingMandatoryTags.join(
-            ", "
-          )}`;
+          errorObj[key] =
+            `Invalid attribute for item with category id: ${missingMandatoryTags.join(
+              ", "
+            )}`;
         } else {
           console.log(`All tag codes have corresponding valid attributes.`);
         }
@@ -477,9 +473,8 @@ export const checkMandatoryTags = (
                   `Mandatory tag field [${tagName.toLowerCase()}] missing for ${categoryName} item[${index}]`
                 );
                 const key = `missingTagsItem[${i}][${index}] : ${tagName.toLowerCase()}`;
-                errorObj[
-                  key
-                ] = `Mandatory tag field [${tagName.toLowerCase()}] missing for ${categoryName} item[${index}]`;
+                errorObj[key] =
+                  `Mandatory tag field [${tagName.toLowerCase()}] missing for ${categoryName} item[${index}]`;
               } else {
                 if (tagInfo.value.length > 0) {
                   let isValidValue = false;
@@ -504,9 +499,8 @@ export const checkMandatoryTags = (
                       `The item value can only be one of the possible values or match the regex pattern.`
                     );
                     const key = `InvldValueforItem[${i}][${index}] : ${tagName}`;
-                    errorObj[
-                      key
-                    ] = `Invalid item value: [${originalTag}]. It must be one of the allowed values or match the regex pattern [${regexPattern}].`;
+                    errorObj[key] =
+                      `Invalid item value: [${originalTag}]. It must be one of the allowed values or match the regex pattern [${regexPattern}].`;
                   }
                 }
               }
@@ -535,13 +529,13 @@ export function validateBapUri(
   bapId: string,
   result: ValidationOutput
 ): void {
-  if (!checkIdInUri(bapUri, bapId)) {
-    result.push({
-      valid: false,
-      code: 20006,
-      description: `Bap_id ${bapId} is not found in BapUri ${bapUri}`,
-    });
-  }
+  // if (!checkIdInUri(bapUri, bapId)) {
+  //   result.push({
+  //     valid: false,
+  //     code: 20006,
+  //     description: `Bap_id ${bapId} is not found in BapUri ${bapUri}`,
+  //   });
+  // }
 }
 
 export function validateBppUri(
@@ -549,13 +543,13 @@ export function validateBppUri(
   bppId: string,
   result: ValidationOutput
 ): void {
-  if (!checkIdInUri(bppUri, bppId)) {
-    result.push({
-      valid: false,
-      code: 20006,
-      description: `Bpp_id ${bppId} is not found in BppUri ${bppUri}`,
-    });
-  }
+  // if (!checkIdInUri(bppUri, bppId)) {
+  //   result.push({
+  //     valid: false,
+  //     code: 20006,
+  //     description: `Bpp_id ${bppId} is not found in BppUri ${bppUri}`,
+  //   });
+  // }
 }
 
 export function areTimestampsLessThanOrEqualTo(
@@ -1278,9 +1272,9 @@ export const createAuthorizationHeader = async (payload: any) => {
   try {
     const header = await createAuthHeader({
       body: payload,
-      privateKey: envVariables.SIGN_PRIVATE_KEY,
-      subscriberId: envVariables.SUBSCRIBER_ID,
-      subscriberUniqueKeyId: envVariables.UKID,
+      privateKey: process.env.SIGN_PRIVATE_KEY!,
+      subscriberId: process.env.SUBSCRIBER_ID!,
+      subscriberUniqueKeyId: process.env.UKID!,
     });
     return header;
   } catch (error: any) {

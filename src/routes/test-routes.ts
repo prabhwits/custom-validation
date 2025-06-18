@@ -15,7 +15,7 @@ router.use(
 );
 router.post(
   "/:action",
-  // validationController.validateRequestBodyNp,
+  validationController.validateRequestBodyNp,
   // validationController.validateL0,
   // validationController.validateL1,
   validationController.validateL1Custom,

@@ -4,7 +4,7 @@ import { RedisService } from "ondc-automation-cache-lib";
 import _ from "lodash";
 
 import { areTimestampsLessThanOrEqualTo } from "../../../../utils/helper";
-import { fashion } from "../../../../utils/constants/fashion";
+import { electronicsData } from "../../../../utils/constants/electronics";
 
 interface ValidationError {
   valid: boolean;
@@ -25,8 +25,8 @@ const addError = (
 async function validateProviders(
   providers: any[],
   context: any,
-  result: ValidationError[], 
-  isSearchIncr : any
+  result: ValidationError[],
+  isSearchIncr: any
 ): Promise<{
   prvdrsId: Set<string>;
   itemsId: Set<string>;
@@ -130,8 +130,8 @@ async function validateProviders(
       }
       itemIdList.push(item.id);
       itemsArray.push(item);
-      const categoryId = item.category_id as keyof typeof fashion;
-      const categoryRules = fashion[categoryId];
+      const categoryId = item.category_id as keyof typeof electronicsData;
+      const categoryRules = electronicsData[categoryId];
 
       const attributesTag = item.tags?.find(
         (tag: any) => tag.code === "attribute"
@@ -162,11 +162,27 @@ async function validateProviders(
         }
       }
 
-      if (!isSearchIncr && item.fulfillment_id && !onSearchFFIdsArray.has(item.fulfillment_id)) {
-        addError(result, 20006, `fulfillment_id in bpp/providers[${index}]/items[${itemIndex}] must map to a valid fulfillment id`);
+      if (
+        !isSearchIncr &&
+        item.fulfillment_id &&
+        !onSearchFFIdsArray.has(item.fulfillment_id)
+      ) {
+        addError(
+          result,
+          20006,
+          `fulfillment_id in bpp/providers[${index}]/items[${itemIndex}] must map to a valid fulfillment id`
+        );
       }
-      if (!isSearchIncr && item.location_id && !prvdrLocId.has(item.location_id)) {
-        addError(result, 20006, `location_id in bpp/providers[${index}]/items[${itemIndex}] must map to a valid location id`);
+      if (
+        !isSearchIncr &&
+        item.location_id &&
+        !prvdrLocId.has(item.location_id)
+      ) {
+        addError(
+          result,
+          20006,
+          `location_id in bpp/providers[${index}]/items[${itemIndex}] must map to a valid location id`
+        );
       }
 
       if (item.time?.timestamp) {
@@ -211,113 +227,6 @@ async function validateProviders(
         }
       }
     });
-    let credsDescriptor: any[] = [];
-
-    const creds = provider.creds;
-    if (creds) {
-      creds?.forEach((cred: any, credIndex: number) => {
-        let isValid = true;
-
-        try {
-          if (cred.url) new URL(cred.url);
-        } catch {
-          addError(
-            result,
-            20005,
-            `Invalid URL format in credential at index ${credIndex} in provider ${index}: ${cred.url} in /ON_SEARCH`
-          );
-          isValid = false;
-        }
-
-        const verificationTag = cred.tags?.find(
-          (tag: any) => tag.code === "verification"
-        );
-
-        if (!verificationTag || !verificationTag.list) {
-          addError(
-            result,
-            20006,
-            `Verification tag missing or invalid in credential at index ${credIndex} in provider ${index} in /ON_SEARCH`
-          );
-          isValid = false;
-        }
-
-        const verifyUrl = verificationTag?.list?.find(
-          (item: any) => item.code === "verify_url"
-        )?.value;
-        const validFrom = verificationTag?.list?.find(
-          (item: any) => item.code === "valid_from"
-        )?.value;
-        const validTo = verificationTag?.list?.find(
-          (item: any) => item.code === "valid_to"
-        )?.value;
-
-        if (!verifyUrl || !validFrom || !validTo) {
-          addError(
-            result,
-            20007,
-            `Verification details missing in credential at index ${credIndex} in provider ${index} in /ON_SEARCH`
-          );
-          isValid = false;
-        }
-
-        try {
-          if (verifyUrl) new URL(verifyUrl);
-        } catch {
-          addError(
-            result,
-            20008,
-            `Invalid verify_url format in credential at index ${credIndex} in provider ${index}: ${verifyUrl} in /ON_SEARCH`
-          );
-          isValid = false;
-        }
-
-        const fromDate = validFrom && new Date(validFrom);
-        const toDate = validTo && new Date(validTo);
-        const currentDate = new Date();
-        if (fromDate && isNaN(fromDate.getTime())) {
-          addError(
-            result,
-            20009,
-            `Invalid valid_from date in credential at index ${credIndex} in provider ${index}: ${validFrom} in /ON_SEARCH`
-          );
-          isValid = false;
-        }
-
-        if (toDate && isNaN(toDate.getTime())) {
-          addError(
-            result,
-            20010,
-            `Invalid valid_to date in credential at index ${credIndex} in provider ${index}: ${validTo} in /ON_SEARCH`
-          );
-          isValid = false;
-        }
-
-        if (fromDate && toDate && toDate <= fromDate) {
-          addError(
-            result,
-            20011,
-            `valid_to must be after valid_from in credential at index ${credIndex} in provider ${index} in /ON_SEARCH`
-          );
-          isValid = false;
-        }
-
-        if (isValid && cred.descriptor && cred.id) {
-          credsDescriptor.push({
-            id: cred.id,
-            descriptor: cred.descriptor,
-          });
-          console.info(
-            `Credential at index ${credIndex} in provider ${index} is valid`
-          );
-        }
-      });
-      await RedisService.setKey(
-        `${context?.transaction_id}_${ApiSequence.ON_SEARCH}_credsDescriptor`,
-        JSON.stringify(credsDescriptor),
-        TTL_IN_SECONDS
-      );
-    }
   }
 
   return {
@@ -536,9 +445,9 @@ export async function onSearch(data: any) {
   }
 
   try {
-    let isSearchIncr = false
-    if(context.city === "*") isSearchIncr = true
-     
+    let isSearchIncr = false;
+    if (context.city === "*") isSearchIncr = true;
+
     const {
       prvdrsId,
       itemsId,
@@ -547,8 +456,13 @@ export async function onSearch(data: any) {
       categoriesId,
       itemIdList,
       itemsArray,
-      itemCategoriesId
-    } = await validateProviders(message.catalog["bpp/providers"] || [], context, result, isSearchIncr);
+      itemCategoriesId,
+    } = await validateProviders(
+      message.catalog["bpp/providers"] || [],
+      context,
+      result,
+      isSearchIncr
+    );
 
     validateServiceabilityAndTiming(
       message.catalog["bpp/providers"] || [],

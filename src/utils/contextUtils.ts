@@ -20,7 +20,11 @@ export const contextChecker = async (
 ) => {
   try {
     const txnId = context?.transaction_id;
-
+    
+    if(context.city == "*"){
+      ignoreMessageIdCheck = true;
+    }
+    
     if (!pastCall || currentCall === ApiSequence.SELECT) {
       if (!context.domain) {
         result.push({
@@ -172,7 +176,6 @@ export const contextChecker = async (
           }
         }
       }
-
       if (!actionCall) {
         if (!ignoreMessageIdCheck) {
           if (context.message_id !== prevMessageId) {

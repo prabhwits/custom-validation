@@ -116,7 +116,7 @@ async function validateOrder(
           storedCred.descriptor?.short_desc === descriptor.short_desc
       );
 
-     if (storedCreds.length > 0 && !isMatchFound ) {
+      if (storedCreds.length > 0 && !isMatchFound) {
         addError(
           `Order validation failure: Credential (id + descriptor) in /${constants.ON_CONFIRM} does not match /${constants.ON_SEARCH}`,
           23003
@@ -790,25 +790,6 @@ async function validateTags(
     `${transaction_id}_${ApiSequence.ON_SEARCH}np_type`
   );
 
-  // if (np_type_arr.length === 0) {
-  //   result.push(
-  //     addError(
-  //       `np_type not found in ${constants.ON_STATUS}_${state}`,
-  //       ERROR_CODES.INVALID_RESPONSE
-  //     )
-  //   );
-  // } else {
-  //   const np_type = np_type_arr[0].value;
-  //   if (np_type !== np_type_on_search) {
-  //     result.push(
-  //       addError(
-  //         `np_type of ${constants.ON_SEARCH} is not same to np_type of ${constants.ON_STATUS}_${state}`,
-  //         ERROR_CODES.INVALID_RESPONSE
-  //       )
-  //     );
-  //   }
-  // }
-
   let tax_number = "";
   let provider_tax_number = "";
   list.forEach((item: any) => {
@@ -856,23 +837,6 @@ async function validateTags(
       }
     }
   });
-
-  // if (!tax_number) {
-  //   result.push(
-  //     addError(
-  //       `tax_number must be present for ${constants.ON_STATUS}_${state}`,
-  //       ERROR_CODES.INVALID_RESPONSE
-  //     )
-  //   );
-  // }
-  // if (!provider_tax_number) {
-  //   result.push(
-  //     addError(
-  //       `provider_tax_number must be present for ${constants.ON_STATUS}_${state}`,
-  //       ERROR_CODES.INVALID_RESPONSE
-  //     )
-  //   );
-  // }
 
   if (tax_number.length === 15 && provider_tax_number.length === 10) {
     const pan_id = tax_number.slice(2, 12);
