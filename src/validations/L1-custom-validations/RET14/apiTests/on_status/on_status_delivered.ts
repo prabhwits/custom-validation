@@ -19,6 +19,7 @@ import {
 } from "../../../../../utils/helper";
 import { FLOW } from "../../../../../utils/enums";
 import { contextChecker } from "../../../../../utils/contextUtils";
+import { validateOfferQuoteBreakup } from "./on_status_pending";
 
 // Minimal interface for validation error
 interface ValidationError {
@@ -739,6 +740,8 @@ async function validateQuote(
     );
   }
 
+  validateOfferQuoteBreakup(order, result);
+
   const quoteObjRaw = await RedisService.getKey(`${transaction_id}_quoteObj`);
   const previousQuote = quoteObjRaw ? JSON.parse(quoteObjRaw) : null;
   const quoteErrors = compareQuoteObjects(
@@ -862,14 +865,14 @@ async function validateTags(
   );
   const confirm_tags = confirm_tagsRaw ? JSON.parse(confirm_tagsRaw) : null;
   if (order.tags && confirm_tags) {
-    if (!areGSTNumbersMatching(confirm_tags, order.tags, "bpp_terms")) {
-      result.push(
-        addError(
-          `Tags should have same and valid gst_number as passed in /${constants.CONFIRM}`,
-          ERROR_CODES.INVALID_RESPONSE
-        )
-      );
-    }
+    // if (!areGSTNumbersMatching(confirm_tags, order.tags, "bpp_terms")) {
+    //   result.push(
+    //     addError(
+    //       `Tags should have same and valid gst_number as passed in /${constants.CONFIRM}`,
+    //       ERROR_CODES.INVALID_RESPONSE
+    //     )
+    //   );
+    // }
   }
 }
 async function validateItems(

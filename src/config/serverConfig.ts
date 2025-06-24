@@ -16,7 +16,7 @@ function loadEnv() {
     "REDIS_HOST",
     "REDIS_PORT",
     "REDIS_PASSWORD",
-    "REDIS_USERNAME",
+    // "REDIS_USERNAME",
     "MOCK_SERVER_URL",
     "DATA_BASE_URL",
     "CONFIG_SERVICE_URL",

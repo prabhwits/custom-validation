@@ -19,6 +19,7 @@ import {
 } from "../../../../../utils/helper";
 import { FLOW } from "../../../../../utils/enums";
 import { contextChecker } from "../../../../../utils/contextUtils";
+import { validateOfferQuoteBreakup } from "./on_status_pending";
 
 // Minimal interface for validation error
 interface ValidationError {
@@ -702,6 +703,8 @@ async function validateQuote(
     );
   }
 
+  validateOfferQuoteBreakup(order, result);
+
   const quoteObjRaw = await RedisService.getKey(`${transaction_id}_quoteObj`);
   const previousQuote = quoteObjRaw ? JSON.parse(quoteObjRaw) : null;
   const quoteErrors = compareQuoteObjects(
@@ -825,14 +828,14 @@ async function validateTags(
   );
   const confirm_tags = confirm_tagsRaw ? JSON.parse(confirm_tagsRaw) : null;
   if (order.tags && confirm_tags) {
-    if (!areGSTNumbersMatching(confirm_tags, order.tags, "bpp_terms")) {
-      result.push(
-        addError(
-          `Tags should have same and valid gst_number as passed in /${constants.CONFIRM}`,
-          ERROR_CODES.INVALID_RESPONSE
-        )
-      );
-    }
+    // if (!areGSTNumbersMatching(confirm_tags, order.tags, "bpp_terms")) {
+    //   result.push(
+    //     addError(
+    //       `Tags should have same and valid gst_number as passed in /${constants.CONFIRM}`,
+    //       ERROR_CODES.INVALID_RESPONSE
+    //     )
+    //   );
+    // }
   }
 }
 async function validateItems(
@@ -872,11 +875,73 @@ async function validateItems(
       const item = items[i];
       const itemId = item.id;
 
+      if (items[i].tags) {
+        items[i].tags.forEach((tag: any, idx: number) => {
+          const itemId = items[i].id;
+
+          if (!tag.code || typeof tag.code !== "string") {
+            result.push({
+              valid: false,
+              code: 20006,
+              description: `Item ID ${itemId} — Tag[${idx}] missing or invalid 'code'.`,
+            });
+            return;
+          }
+
+          if (!Array.isArray(tag.list)) {
+            result.push({
+              valid: false,
+              code: 20006,
+              description: `Item ID ${itemId} — Tag[${idx}] missing or invalid 'list'.`,
+            });
+            return;
+          }
+
+          const typeEntry = tag.list.find(
+            (entry: any) => entry.code === "type"
+          );
+          const valueEntry = tag.list.find(
+            (entry: any) => entry.code === "value"
+          );
+
+          if (!typeEntry || !typeEntry.value) {
+            result.push({
+              valid: false,
+              code: 20006,
+              description: `Item ID ${itemId} — Tag[${idx}] missing or invalid 'type' entry.`,
+            });
+          }
+
+          if (!valueEntry || !valueEntry.value) {
+            result.push({
+              valid: false,
+              code: 20006,
+              description: `Item ID ${itemId} — Tag[${idx}] missing or invalid 'value' entry.`,
+            });
+          }
+
+          if (
+            tag.code === "verify" &&
+            typeEntry?.value === "IMEI" &&
+            valueEntry?.value
+          ) {
+            const imei = valueEntry.value;
+            if (!/^\d{15}$/.test(imei)) {
+              result.push({
+                valid: false,
+                code: 20006,
+                description: `Item ID ${itemId} — Tag[${idx}] has invalid IMEI '${imei}'. Must be a 15-digit number.`,
+              });
+            }
+          }
+        });
+      }
+
       // Check if item ID exists
       if (!itemId) {
         result.push({
           valid: false,
-          code: 20000,
+          code: 20006,
           description: `items[${i}].id is missing in /${currentApi}`,
         });
         continue;
@@ -886,7 +951,7 @@ async function validateItems(
       if (!itemFlfllmnts || !(itemId in itemFlfllmnts)) {
         result.push({
           valid: false,
-          code: 20000,
+          code: 20006,
           description: `Item Id ${itemId} does not exist in /${previousApi}`,
         });
         continue;
@@ -900,7 +965,7 @@ async function validateItems(
     );
     result.push({
       valid: false,
-      code: 20000,
+      code: 20006,
       description: `Error occurred while validating items in /${currentApi}`,
     });
     return result;
@@ -925,7 +990,7 @@ const checkOnStatusPicked = async (
         true
       );
     } catch (err: any) {
-      result.push(addError(`Error checking context: ${err.message}`, 20000));
+      result.push(addError(`Error checking context: ${err.message}`, 20006));
 
       return result;
     }
