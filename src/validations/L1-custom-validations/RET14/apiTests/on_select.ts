@@ -86,6 +86,112 @@ async function validateItems(
     console.error(`Error while checking items in /${constants.ON_SELECT}, ${error.stack}`);
     addError(result, 23001, `Internal Error: ${error.message}`);
   }
+
+   try {
+      console.log(`Validating tags for items in /${constants.SELECT}`);
+      const allowedTagCodes = ["type", "customization", "parent"];
+      const allowedTypeValues = ["item", "customization"];
+  
+      onSelect.items.forEach((item: any, index: number) => {
+        if (item.tags && Array.isArray(item.tags)) {
+          item.tags.forEach((tag: any) => {
+            if (!tag.code || !tag.list || !Array.isArray(tag.list)) {
+              addError(
+                result,
+                30004,
+                `Invalid tag structure for item ${item.id}: Missing or invalid code/list`
+              );
+              return;
+            }
+  
+            if (!allowedTagCodes.includes(tag.code)) {
+              addError(
+                result,
+                30004,
+                `Invalid tag code for item ${item.id}: ${tag.code} is not allowed`
+              );
+              return;
+            }
+  
+            tag.list.forEach((listItem: any) => {
+              if (!listItem.code || !listItem.value) {
+                addError(
+                  result,
+                  30004,
+                  `Invalid tag list item for item ${item.id}: Missing or invalid code/value in tag ${tag.code}`
+                );
+                return;
+              }
+  
+              if (tag.code === "type" && listItem.code === "type") {
+                if (!allowedTypeValues.includes(listItem.value)) {
+                  addError(
+                    result,
+                    30004,
+                    `Invalid type value for item ${item.id}: ${listItem.value} is not allowed`
+                  );
+                }
+              }
+            });
+          });
+        }
+  
+        if (item.descriptor?.tags && Array.isArray(item.descriptor.tags)) {
+          item.descriptor.tags.forEach((tag: any) => {
+            if (!tag.code || !tag.list || !Array.isArray(tag.list)) {
+              addError(
+                result,
+                30004,
+                `Invalid descriptor tag structure for item ${item.id}: Missing or invalid code/list`
+              );
+              return;
+            }
+  
+            if (!allowedTagCodes.includes(tag.code)) {
+              addError(
+                result,
+                30004,
+                `Invalid descriptor tag code for item ${item.id}: ${tag.code} is not allowed`
+              );
+              return;
+            }
+  
+            tag.list.forEach((listItem: any) => {
+              if (!listItem.code || !listItem.value) {
+                addError(
+                  result,
+                  30004,
+                  `Invalid descriptor tag list item for item ${item.id}: Missing or invalid code/value in tag ${tag.code}`
+                );
+                return;
+              }
+  
+              if (
+                tag.code === "customization" &&
+                listItem.code === "input_text"
+              ) {
+                if (
+                  typeof listItem.value !== "string" ||
+                  listItem.value.trim() === ""
+                ) {
+                  addError(
+                    result,
+                    30004,
+                    `Invalid customization input_text for item ${item.id}: Value must be a non-empty string`
+                  );
+                }
+              }
+            });
+          });
+        }
+      });
+    } catch (error: any) {
+      console.error(
+        `Error while validating tags in /${constants.SELECT}, ${error.stack}`
+      );
+      addError(result, 40000, `Error while validating tags: ${error.message}`);
+    }
+
 }
 
 async function validateFulfillments(
@@ -164,7 +270,7 @@ async function validateFulfillments(
           addError(result, 20008, `Start time must be less than end time in ${ff.type} fulfillment`);
         }
         if (start && start <= contextTime) {
-          addError(result, 20009, `Start time must be after context.timestamp in ${ff.type} fulfillment`);
+          addError(result, 20006, `Start time must be after context.timestamp in ${ff.type} fulfillment`);
         }
       }
 
@@ -289,7 +395,41 @@ async function validateQuote(
         }
         itemPrices.set(itemId, Math.abs(parseFloat(element.price.value)));
       }
+      if (!element.item?.tags || !Array.isArray(element.item.tags)) {
+        // addError(result, 20006, `Tags missing or invalid for item id ${itemId} in quote.breakup[${i}]`);
+      } else {
+        let hasTypeTag = false;
+        element.item.tags.forEach((tag: any, tagIndex: number) => {
+          if (!tag.code || !tag.list || !Array.isArray(tag.list)) {
+            addError(result, 20006, `Invalid tag structure for item id ${itemId} at tags[${tagIndex}]`);
+            return;
+          }
 
+          tag.list.forEach((listItem: any, listIndex: number) => {
+            if (!listItem.code || !listItem.value) {
+              addError(result, 20006, `Invalid tag.list entry for item id ${itemId} at tags[${tagIndex}].list[${listIndex}]`);
+            }
+          });
+
+          if (tag.code === "type") {
+            hasTypeTag = true;
+            const typeValue = tag.list.find((listItem: any) => listItem.code === "type")?.value;
+            if (!typeValue || !["item", "customization"].includes(typeValue)) {
+              addError(result, 20006, `Invalid or missing type value for item id ${itemId} at tags[${tagIndex}]`);
+            }
+          }
+          else if (tag.code === "parent") {
+            const parentId = tag.list.find((listItem: any) => listItem.code === "id")?.value;
+            if (!parentId) {
+              addError(result, 20006, `Missing parent id for item id ${itemId} at tags[${tagIndex}]`);
+            } 
+          }
+        });
+
+        if (!hasTypeTag) {
+          addError(result, 20006, `Type tag missing for item id ${itemId} in quote.breakup[${i}]`);
+        }
+      }
       if (["tax", "discount"].includes(titleType)) {
         if (!(itemId in itemsIdList)) {
           addError(result,

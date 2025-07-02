@@ -61,18 +61,27 @@ async function validateProvider(
       ),
     ]);
 
-    if (providerOnSelect?.locations[0]?.id !== select.provider?.locations[0]?.id) {
-      addError(result,
+    if (
+      providerOnSelect?.locations[0]?.id !== select.provider?.locations[0]?.id
+    ) {
+      addError(
+        result,
         30002,
         `provider.locations[0].id ${providerOnSelect.locations[0].id}, Provider location not found - The provider location ID provided in the request was not found in /${constants.ON_SEARCH} and /${constants.SELECT}`
       );
     }
 
     if (providerOnSelect?.time && providerOnSelect?.time?.label === "disable") {
-      addError(result, 40000, `provider with provider.id: ${providerOnSelect.id} was disabled in on_search`);
+      addError(
+        result,
+        40000,
+        `provider with provider.id: ${providerOnSelect.id} was disabled in on_search`
+      );
     }
   } catch (error: any) {
-    console.error(`Error while checking for valid provider in /${constants.ON_SEARCH} and /${constants.SELECT}, ${error.stack}`);
+    console.error(
+      `Error while checking for valid provider in /${constants.ON_SEARCH} and /${constants.SELECT}, ${error.stack}`
+    );
     addError(result, 40000, `Error while checking provider: ${error.message}`);
   }
   return providerOnSelect;
@@ -102,8 +111,14 @@ async function validateFulfillment(
       }
     });
   } catch (error: any) {
-    console.error(`!!Error while checking GPS Precision in /${constants.SELECT}, ${error.stack}`);
-    addError(result, 40000, `Error while checking fulfillment: ${error.message}`);
+    console.error(
+      `!!Error while checking GPS Precision in /${constants.SELECT}, ${error.stack}`
+    );
+    addError(
+      result,
+      40000,
+      `Error while checking fulfillment: ${error.message}`
+    );
   }
 }
 
@@ -126,14 +141,23 @@ async function validateItem(
     );
     const itemsOnSearch = itemsOnSearchRaw ? JSON.parse(itemsOnSearchRaw) : [];
 
-    select.items.forEach((item: { id: string | number; quantity: { count: number } }) => {
-      if (itemsOnSearch.length > 0 && !itemsOnSearch?.includes(item.id.toString())) {
-        addError(result, 30004, `Item not found - The item ID provided in the request was not found: ${item.id}`);
+    select.items.forEach(
+      (item: { id: string | number; quantity: { count: number } }) => {
+        if (
+          itemsOnSearch.length > 0 &&
+          !itemsOnSearch?.includes(item.id.toString())
+        ) {
+          addError(
+            result,
+            30004,
+            `Item not found - The item ID provided in the request was not found: ${item.id}`
+          );
+        }
+        itemIdArray.push(item.id.toString());
+        itemsOnSelect.push(item.id.toString());
+        itemsIdList[item.id] = item.quantity.count;
       }
-      itemIdArray.push(item.id.toString());
-      itemsOnSelect.push(item.id.toString());
-      itemsIdList[item.id] = item.quantity.count;
-    });
+    );
 
     await Promise.all([
       setRedisValue(
@@ -148,12 +172,121 @@ async function validateItem(
       ),
     ]);
   } catch (error: any) {
-    console.error(`Error while storing item IDs in /${constants.SELECT}, ${error.stack}`);
+    console.error(
+      `Error while storing item IDs in /${constants.SELECT}, ${error.stack}`
+    );
     addError(result, 40000, `Error while storing item IDs: ${error.message}`);
   }
 
   try {
-    console.log(`Checking for valid and present location ID inside item list for /${constants.SELECT}`);
+    console.log(`Validating tags for items in /${constants.SELECT}`);
+    const allowedTagCodes = ["type", "customization", "parent"];
+    const allowedTypeValues = ["item", "customization"];
+
+    select.items.forEach((item: any, index: number) => {
+      if (item.tags && Array.isArray(item.tags)) {
+        item.tags.forEach((tag: any) => {
+          if (!tag.code || !tag.list || !Array.isArray(tag.list)) {
+            addError(
+              result,
+              30004,
+              `Invalid tag structure for item ${item.id}: Missing or invalid code/list`
+            );
+            return;
+          }
+
+          if (!allowedTagCodes.includes(tag.code)) {
+            addError(
+              result,
+              30004,
+              `Invalid tag code for item ${item.id}: ${tag.code} is not allowed`
+            );
+            return;
+          }
+
+          tag.list.forEach((listItem: any) => {
+            if (!listItem.code || !listItem.value) {
+              addError(
+                result,
+                30004,
+                `Invalid tag list item for item ${item.id}: Missing or invalid code/value in tag ${tag.code}`
+              );
+              return;
+            }
+
+            if (tag.code === "type" && listItem.code === "type") {
+              if (!allowedTypeValues.includes(listItem.value)) {
+                addError(
+                  result,
+                  30004,
+                  `Invalid type value for item ${item.id}: ${listItem.value} is not allowed`
+                );
+              }
+            }
+          });
+        });
+      }
+
+      if (item.descriptor?.tags && Array.isArray(item.descriptor.tags)) {
+        item.descriptor.tags.forEach((tag: any) => {
+          if (!tag.code || !tag.list || !Array.isArray(tag.list)) {
+            addError(
+              result,
+              30004,
+              `Invalid descriptor tag structure for item ${item.id}: Missing or invalid code/list`
+            );
+            return;
+          }
+
+          if (!allowedTagCodes.includes(tag.code)) {
+            addError(
+              result,
+              30004,
+              `Invalid descriptor tag code for item ${item.id}: ${tag.code} is not allowed`
+            );
+            return;
+          }
+
+          tag.list.forEach((listItem: any) => {
+            if (!listItem.code || !listItem.value) {
+              addError(
+                result,
+                30004,
+                `Invalid descriptor tag list item for item ${item.id}: Missing or invalid code/value in tag ${tag.code}`
+              );
+              return;
+            }
+
+            if (
+              tag.code === "customization" &&
+              listItem.code === "input_text"
+            ) {
+              if (
+                typeof listItem.value !== "string" ||
+                listItem.value.trim() === ""
+              ) {
+                addError(
+                  result,
+                  30004,
+                  `Invalid customization input_text for item ${item.id}: Value must be a non-empty string`
+                );
+              }
+            }
+          });
+        });
+      }
+    });
+  } catch (error: any) {
+    console.error(
+      `Error while validating tags in /${constants.SELECT}, ${error.stack}`
+    );
+    addError(result, 40000, `Error while validating tags: ${error.message}`);
+  }
+
+  try {
+    console.log(
+      `Checking for valid and present location ID inside item list for /${constants.SELECT}`
+    );
 
     const itemProviderMapRaw = await RedisService.getKey(
       `${transaction_id}_itemProviderMap`
@@ -163,16 +296,26 @@ async function validateItem(
       : {};
     const providerID = select.provider.id;
     select.items.forEach((item: any, index: number) => {
-      if (itemProviderMap.length > 0 && !itemProviderMap[providerID]?.includes(item.id)) {
-        addError(result,
+      if (
+        itemProviderMap.length > 0 &&
+        !itemProviderMap[providerID]?.includes(item.id)
+      ) {
+        addError(
+          result,
           30004,
           `Item with id ${item.id} not found - The item ID provided in the request was not found with provider_id ${providerID}`
         );
       }
     });
   } catch (error: any) {
-    console.error(`Error while checking for valid and present location ID inside item list for /${constants.SELECT}, ${error.stack}`);
-    addError(result, 40000, `Error while checking item location/provider: ${error.message}`);
+    console.error(
+      `Error while checking for valid and present location ID inside item list for /${constants.SELECT}, ${error.stack}`
+    );
+    addError(
+      result,
+      40000,
+      `Error while checking item location/provider: ${error.message}`
+    );
   }
 
   try {
@@ -213,13 +356,15 @@ async function validateItem(
                 selectedQuantity <= maximumCount
               )
             ) {
-              addError(result,
+              addError(
+                result,
                 40009,
                 `Maximum order qty exceeded - The maximum order quantity has been exceeded for the item.id: ${item.id}`
               );
             }
           } else {
-            addError(result,
+            addError(
+              result,
               40012,
               `Minimum order qty required - The minimum order quantity has not been met for the item.id: ${item.id}`
             );
@@ -241,7 +386,8 @@ async function validateItem(
           ?.value || 0;
 
       if (selectedPrice < min_value) {
-        addError(result,
+        addError(
+          result,
           30023,
           `Minimum order value error - The cart value is less than the minimum order value (${selectedPrice} < ${min_value})`
         );
@@ -256,8 +402,14 @@ async function validateItem(
       setRedisValue(`${transaction_id}_itemsCtgrs`, itemsCtgrs, TTL_IN_SECONDS),
     ]);
   } catch (error: any) {
-    console.error(`Error while mapping the items with their prices on /${constants.ON_SEARCH} and /${constants.SELECT}, ${error.stack}`);
-    addError(result, 40000, `Error while mapping item prices: ${error.message}`);
+    console.error(
+      `Error while mapping the items with their prices on /${constants.ON_SEARCH} and /${constants.SELECT}, ${error.stack}`
+    );
+    addError(
+      result,
+      40000,
+      `Error while mapping item prices: ${error.message}`
+    );
   }
 
   try {
@@ -273,8 +425,14 @@ async function validateItem(
       TTL_IN_SECONDS
     );
   } catch (error: any) {
-    console.error(`!!Error while saving time_to_ship in ${constants.SELECT}, ${error.stack}`);
-    addError(result, 40000, `Error while saving time_to_ship: ${error.message}`);
+    console.error(
+      `!!Error while saving time_to_ship in ${constants.SELECT}, ${error.stack}`
+    );
+    addError(
+      result,
+      40000,
+      `Error while saving time_to_ship: ${error.message}`
+    );
   }
 
   return { itemIdArray, itemsOnSelect, itemsIdList, itemsCtgrs, selectedPrice };
@@ -286,20 +444,15 @@ export async function select(data: any) {
   const txnId = context?.transaction_id;
 
   try {
-    await contextChecker(
-      context,
-      result,
-      constants.SELECT,
-      constants.SELECT
-    );
+    await contextChecker(context, result, constants.SELECT, constants.SELECT);
   } catch (err: any) {
-    console.log('Entered the block 2243', err);
-     result.push({
+    console.log("Entered the block 2243", err);
+    result.push({
       valid: false,
       code: 40000,
       description: err.message,
     });
-    return result
+    return result;
   }
 
   try {
